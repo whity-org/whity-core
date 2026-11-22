@@ -62,7 +62,7 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
     {
         $byRoute = [];
         foreach (AccountingApiSchemas::routes() as $route) {
-            if (self::isInvoiceRoute($route['path'])) {
+            if (self::isInvoiceRoute($route['path']) || self::isPaymentRoute($route['path'])) {
                 continue;
             }
             $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
@@ -123,6 +123,35 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
         }
     }
 
+    public function testEveryPaymentRouteDeclaresTheDesignsPermission(): void
+    {
+        $byRoute = [];
+        foreach (AccountingApiSchemas::routes() as $route) {
+            if (self::isPaymentRoute($route['path'])) {
+                $byRoute[$route['method'] . ' ' . $route['path']] = $route['requiredPermission'];
+            }
+        }
+        self::assertCount(9, $byRoute);
+        $constants = ['payments:read' => 'PAYMENTS_READ', 'payments:write' => 'PAYMENTS_WRITE', 'invoices:read' => 'INVOICES_READ'];
+        $index = (string) file_get_contents(dirname(__DIR__, 2) . '/public/index.php');
+        foreach ($byRoute as $route => $permission) {
+            // Design 32 §9.1: payments are payments:read and :write; what
+            // customers owe reads like their invoices.
+            $expected = match (true) {
+                str_contains($route, '/aged-receivables'), str_contains($route, '/customers/') => 'invoices:read',
+                str_starts_with($route, 'GET ') => 'payments:read',
+                default => 'payments:write',
+            };
+            self::assertSame($expected, $permission, $route);
+            [$method, $path] = explode(' ', $route, 2);
+            self::assertMatchesRegularExpression(
+                '#\$router->register\(\'' . $method . '\',\s+\'' . preg_quote($path, '#') . '\',\s+\[\$accountingPaymentsHandler, \'\w+\'\],\s+null, null, CorePermissions::' . $constants[$expected] . '\);#',
+                $index,
+                $route . ' is registered with its permission'
+            );
+        }
+    }
+
     public function testAManualEntryFromDraftToTheTrialBalance(): void
     {
         TenantContext::setTenantId(1);
@@ -171,6 +200,11 @@ final class AccountingApiHandlerRealEngineTest extends TestCase
     private static function isInvoiceRoute(string $path): bool
     {
         return str_contains($path, '/invoices') || str_contains($path, '/tax-codes') || str_contains($path, '/invoice-settings');
+    }
+
+    private static function isPaymentRoute(string $path): bool
+    {
+        return str_contains($path, '/payments') || str_contains($path, '/transfers') || str_contains($path, '/aged-receivables') || str_contains($path, '/customers/');
     }
 
     /**

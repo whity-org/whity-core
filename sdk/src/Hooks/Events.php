@@ -654,6 +654,29 @@ final class Events
     /** A credit note settled an invoice. Also carries `credit_note_id` and `amount_minor`. */
     public const ACCOUNTING_INVOICE_CREDITED = 'accounting.invoice.credited';
     public const ACCOUNTING_INVOICE_CREDITED_ASYNC = 'accounting.invoice.credited.async';
+    /** Payments settled all of an invoice. Payload as `accounting.invoice.issued`. (SDK 1.156) */
+    public const ACCOUNTING_INVOICE_PAID = 'accounting.invoice.paid';
+    public const ACCOUNTING_INVOICE_PAID_ASYNC = 'accounting.invoice.paid.async';
+    /** A payment settled part of an invoice. Payload as `accounting.invoice.issued`. (SDK 1.156) */
+    public const ACCOUNTING_INVOICE_PARTLY_PAID = 'accounting.invoice.partly_paid';
+    public const ACCOUNTING_INVOICE_PARTLY_PAID_ASYNC = 'accounting.invoice.partly_paid.async';
+
+    // ---- accounting: payments and cheques (SDK 1.156, WHIT-1318, design section 32 §5.4) ----
+    /**
+     * A payment was recorded and posted: money received or a transfer between
+     * the workspace's own accounts. This and the payment events below carry
+     * `tenant_id`, `payment_id`, `direction` (`in`, `transfer`), `number`,
+     * `contact_id`, `paid_on`, `amount_minor`, `currency`, `method`, `status`,
+     * `cheque_status`, `unallocated_minor` and `acting_profile_id`.
+     */
+    public const ACCOUNTING_PAYMENT_RECORDED = 'accounting.payment.recorded';
+    public const ACCOUNTING_PAYMENT_RECORDED_ASYNC = 'accounting.payment.recorded.async';
+    /** A payment settled an invoice. Also carries `invoice_id` and `amount_minor` (the share). */
+    public const ACCOUNTING_PAYMENT_ALLOCATED = 'accounting.payment.allocated';
+    public const ACCOUNTING_PAYMENT_ALLOCATED_ASYNC = 'accounting.payment.allocated.async';
+    /** A cheque bounced: its entries were reversed and the invoices it paid reopened. Also carries `fee_minor` and `reopened_invoice_ids`. */
+    public const ACCOUNTING_CHEQUE_BOUNCED = 'accounting.cheque.bounced';
+    public const ACCOUNTING_CHEQUE_BOUNCED_ASYNC = 'accounting.cheque.bounced.async';
 
     /**
      * The event name to dispatch for one of THIS plugin's own events (SDK 1.29).

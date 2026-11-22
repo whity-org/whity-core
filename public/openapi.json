@@ -2295,6 +2295,119 @@
                 ]
             }
         },
+        "/api/v1/accounting/customers/{id}/statement": {
+            "get": {
+                "operationId": "get_api_v1_accounting_customers_id_statement",
+                "summary": "A customer's statement",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "From the books: what they owed before `from`, every invoice, credit note, payment and bounced cheque on their account, a running balance and what they owe at `to`.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "YYYY-MM-DD. Default: the first of January.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "YYYY-MM-DD. Default: today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The statement",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingCustomerStatement"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/accounting/entries": {
             "get": {
                 "operationId": "get_api_v1_accounting_entries",
@@ -4591,6 +4704,818 @@
                 ]
             }
         },
+        "/api/v1/accounting/payments": {
+            "get": {
+                "operationId": "get_api_v1_accounting_payments",
+                "summary": "List payments",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Money received and transfers, newest first. `unallocated_minor` is what a payment has not settled yet, the customer's credit.",
+                "parameters": [
+                    {
+                        "name": "direction",
+                        "in": "query",
+                        "required": false,
+                        "description": "`in` (received) or `transfer`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "One customer's payments.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "method",
+                        "in": "query",
+                        "required": false,
+                        "description": "`cash`, `bank_transfer`, `cliq`, `card`, `cheque`, `whity_pay` or `other`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "cheque_status",
+                        "in": "query",
+                        "required": false,
+                        "description": "`waiting`, `cleared` or `bounced`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Paid on or after, YYYY-MM-DD.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "Paid on or before, YYYY-MM-DD.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "required": false,
+                        "description": "Part of the number, the reference or the customer's name.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "limit",
+                        "in": "query",
+                        "required": false,
+                        "description": "At most 200. Default 50.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "offset",
+                        "in": "query",
+                        "required": false,
+                        "description": "Skip this many.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Payments",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/AccountingPayment"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_accounting_payments",
+                "summary": "Record money a customer paid",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Posts it at once: the bank, cash, cheques to collect or the payment provider is debited and the customer owes less. It settles the invoices given; anything left stays as the customer's credit. A cheque dated later waits on Cheques to collect until it is deposited. `idempotency_key` records it once.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingPaymentRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same payment, already recorded with this key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/payments/{id}": {
+            "get": {
+                "operationId": "get_api_v1_accounting_payments_id",
+                "summary": "Show a payment",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "With what it settled.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/payments/{id}/allocations": {
+            "post": {
+                "operationId": "post_api_v1_accounting_payments_id_allocations",
+                "summary": "Settle an invoice with a payment",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Uses what the payment has left, up to what the invoice still owes, or `amount_minor`. Posts nothing: the customer's balance already moved.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingAllocationRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/payments/{id}/bounce": {
+            "post": {
+                "operationId": "post_api_v1_accounting_payments_id_bounce",
+                "summary": "Record a bounced cheque",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Reverses its entries, reopens the invoices it paid and posts the bank's fee when there is one.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingChequeBounceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/payments/{id}/deposit": {
+            "post": {
+                "operationId": "post_api_v1_accounting_payments_id_deposit",
+                "summary": "Deposit a waiting cheque",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Moves it from Cheques to collect to the bank.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingChequeDepositRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The payment",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/accounting/periods": {
             "get": {
                 "operationId": "get_api_v1_accounting_periods",
@@ -4913,6 +5838,111 @@
                     },
                     "422": {
                         "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/reports/aged-receivables": {
+            "get": {
+                "operationId": "get_api_v1_accounting_reports_aged_receivables",
+                "summary": "Aged receivables",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "What each customer owes on a date, by days past due (not yet due, 1-30, 31-60, 61-90, over 90), with their credit beside it. Minor units.",
+                "parameters": [
+                    {
+                        "name": "as_of",
+                        "in": "query",
+                        "required": false,
+                        "description": "YYYY-MM-DD. Default: today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "One customer only.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Aged receivables",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingAgedReceivables"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -5582,6 +6612,149 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/transfers": {
+            "post": {
+                "operationId": "post_api_v1_accounting_transfers",
+                "summary": "Move money between the workspace's own accounts",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Cash to the bank, or a payment provider's payout from Money at payment providers to the bank.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingTransferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The same transfer, already recorded with this key",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "201": {
+                        "description": "The transfer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingPayment"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -98272,6 +99445,115 @@
                     "name"
                 ]
             },
+            "AccountingAgedReceivables": {
+                "type": "object",
+                "properties": {
+                    "as_of": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "rows": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "contact_id": {
+                                    "type": "integer"
+                                },
+                                "contact_name": {
+                                    "type": "string"
+                                },
+                                "not_due": {
+                                    "type": "integer",
+                                    "description": "Not yet due."
+                                },
+                                "days_1_30": {
+                                    "type": "integer"
+                                },
+                                "days_31_60": {
+                                    "type": "integer"
+                                },
+                                "days_61_90": {
+                                    "type": "integer"
+                                },
+                                "days_over_90": {
+                                    "type": "integer"
+                                },
+                                "credit_minor": {
+                                    "type": "integer",
+                                    "description": "Money received or credited that settles nothing yet."
+                                },
+                                "balance_minor": {
+                                    "type": "integer",
+                                    "description": "What is owed, less the credit."
+                                }
+                            },
+                            "required": [
+                                "contact_id",
+                                "contact_name",
+                                "not_due",
+                                "balance_minor"
+                            ]
+                        }
+                    },
+                    "totals": {
+                        "type": "object",
+                        "properties": {
+                            "not_due": {
+                                "type": "integer",
+                                "description": "Not yet due."
+                            },
+                            "days_1_30": {
+                                "type": "integer"
+                            },
+                            "days_31_60": {
+                                "type": "integer"
+                            },
+                            "days_61_90": {
+                                "type": "integer"
+                            },
+                            "days_over_90": {
+                                "type": "integer"
+                            },
+                            "credit_minor": {
+                                "type": "integer",
+                                "description": "Money received or credited that settles nothing yet."
+                            },
+                            "balance_minor": {
+                                "type": "integer",
+                                "description": "What is owed, less the credit."
+                            }
+                        },
+                        "required": [
+                            "balance_minor"
+                        ]
+                    }
+                },
+                "required": [
+                    "as_of",
+                    "currency",
+                    "rows",
+                    "totals"
+                ]
+            },
+            "AccountingAllocationRequest": {
+                "type": "object",
+                "properties": {
+                    "invoice_id": {
+                        "type": "integer",
+                        "description": "The invoice to settle."
+                    },
+                    "amount_minor": {
+                        "type": "integer",
+                        "description": "Default: all that fits."
+                    }
+                },
+                "required": [
+                    "invoice_id"
+                ]
+            },
             "AccountingBooks": {
                 "type": "object",
                 "properties": {
@@ -98299,6 +99581,36 @@
                     "year_start_month",
                     "lock_date"
                 ]
+            },
+            "AccountingChequeBounceRequest": {
+                "type": "object",
+                "properties": {
+                    "bounced_on": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. Default: today."
+                    },
+                    "fee_minor": {
+                        "type": "integer",
+                        "description": "The bank's fee, in minor units."
+                    },
+                    "note": {
+                        "type": "string",
+                        "description": "Why, kept on the reversing entry."
+                    }
+                }
+            },
+            "AccountingChequeDepositRequest": {
+                "type": "object",
+                "properties": {
+                    "deposited_on": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. Default: today."
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "description": "The bank account it went into. Default: Bank."
+                    }
+                }
             },
             "AccountingCreditNoteRequest": {
                 "type": "object",
@@ -98335,6 +99647,98 @@
                         "description": "Retrying with the same key returns the same credit note."
                     }
                 }
+            },
+            "AccountingCustomerStatement": {
+                "type": "object",
+                "properties": {
+                    "contact": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "name"
+                        ]
+                    },
+                    "from": {
+                        "type": "string"
+                    },
+                    "to": {
+                        "type": "string"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "opening_minor": {
+                        "type": "integer"
+                    },
+                    "closing_minor": {
+                        "type": "integer"
+                    },
+                    "lines": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "line_id": {
+                                    "type": "integer"
+                                },
+                                "entry_id": {
+                                    "type": "integer"
+                                },
+                                "number": {
+                                    "type": "string"
+                                },
+                                "date": {
+                                    "type": "string"
+                                },
+                                "memo": {
+                                    "type": "string"
+                                },
+                                "source_type": {
+                                    "type": "string"
+                                },
+                                "source_id": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "debit_minor": {
+                                    "type": "integer"
+                                },
+                                "credit_minor": {
+                                    "type": "integer"
+                                },
+                                "balance_minor": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "line_id",
+                                "entry_id",
+                                "number",
+                                "date",
+                                "debit_minor",
+                                "credit_minor",
+                                "balance_minor"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "contact",
+                    "from",
+                    "to",
+                    "currency",
+                    "opening_minor",
+                    "closing_minor",
+                    "lines"
+                ]
             },
             "AccountingEntry": {
                 "type": "object",
@@ -99240,6 +100644,279 @@
                     "lines"
                 ]
             },
+            "AccountingPayment": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "direction": {
+                        "type": "string",
+                        "enum": [
+                            "in",
+                            "out",
+                            "transfer"
+                        ]
+                    },
+                    "number": {
+                        "type": "string"
+                    },
+                    "contact_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "contact_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "paid_on": {
+                        "type": "string"
+                    },
+                    "amount_minor": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "method": {
+                        "type": "string",
+                        "enum": [
+                            "cash",
+                            "bank_transfer",
+                            "cliq",
+                            "card",
+                            "cheque",
+                            "whity_pay",
+                            "other"
+                        ]
+                    },
+                    "account_id": {
+                        "type": "integer"
+                    },
+                    "from_account_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "reference": {
+                        "type": "string"
+                    },
+                    "cheque_number": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "cheque_bank": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "cheque_due_on": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "cheque_status": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "waiting",
+                            "cleared",
+                            "bounced",
+                            null
+                        ]
+                    },
+                    "fee_minor": {
+                        "type": "integer"
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "posted",
+                            "bounced"
+                        ]
+                    },
+                    "allocated_minor": {
+                        "type": "integer"
+                    },
+                    "unallocated_minor": {
+                        "type": "integer",
+                        "description": "What it has not settled yet: the customer's credit."
+                    },
+                    "notes": {
+                        "type": "string"
+                    },
+                    "entry_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "deposit_entry_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "bounce_entry_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "external_ref": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "agent_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "on_behalf_of_profile_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "owner_plugin": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string"
+                    },
+                    "allocations": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "invoice_id": {
+                                    "type": "integer"
+                                },
+                                "invoice_number": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "amount_minor": {
+                                    "type": "integer"
+                                },
+                                "allocated_on": {
+                                    "type": "string"
+                                },
+                                "released": {
+                                    "type": "boolean",
+                                    "description": "True when a bounced cheque released it."
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "invoice_id",
+                                "amount_minor",
+                                "allocated_on",
+                                "released"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "direction",
+                    "number",
+                    "paid_on",
+                    "amount_minor",
+                    "currency",
+                    "method",
+                    "status",
+                    "unallocated_minor"
+                ]
+            },
+            "AccountingPaymentRequest": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The customer who paid."
+                    },
+                    "paid_on": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. Default: today."
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "In normal units, such as \"125.500\"."
+                    },
+                    "amount_minor": {
+                        "type": "integer",
+                        "description": "Or the amount in minor units."
+                    },
+                    "method": {
+                        "type": "string",
+                        "enum": [
+                            "cash",
+                            "bank_transfer",
+                            "cliq",
+                            "card",
+                            "cheque",
+                            "whity_pay",
+                            "other"
+                        ],
+                        "description": "Default: bank_transfer. It picks the account the money goes to."
+                    },
+                    "account_id": {
+                        "type": "integer",
+                        "description": "The bank or cash account it went to, instead of the method's."
+                    },
+                    "reference": {
+                        "type": "string",
+                        "description": "The bank's or provider's reference."
+                    },
+                    "cheque_number": {
+                        "type": "string",
+                        "description": "Needed for a cheque."
+                    },
+                    "cheque_bank": {
+                        "type": "string",
+                        "description": "The bank the cheque is drawn on."
+                    },
+                    "cheque_due_on": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. A later date keeps it on Cheques to collect until deposited."
+                    },
+                    "fee_minor": {
+                        "type": "integer",
+                        "description": "What a card or Whity Pay provider kept, in minor units."
+                    },
+                    "invoice_id": {
+                        "type": "integer",
+                        "description": "Settle this invoice with it."
+                    },
+                    "allocations": {
+                        "type": "array",
+                        "description": "Or settle several invoices.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "invoice_id": {
+                                    "type": "integer"
+                                },
+                                "amount_minor": {
+                                    "type": "integer",
+                                    "description": "Default: all that fits."
+                                }
+                            },
+                            "required": [
+                                "invoice_id"
+                            ]
+                        }
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Up to 2000 characters."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "Retrying with the same key returns the same payment."
+                    }
+                },
+                "required": [
+                    "contact_id"
+                ]
+            },
             "AccountingPeriod": {
                 "type": "object",
                 "properties": {
@@ -99643,6 +101320,47 @@
                     "name",
                     "direction",
                     "rate_bp"
+                ]
+            },
+            "AccountingTransferRequest": {
+                "type": "object",
+                "properties": {
+                    "from_account_id": {
+                        "type": "integer",
+                        "description": "Where the money left: cash, a bank, or Money at payment providers."
+                    },
+                    "to_account_id": {
+                        "type": "integer",
+                        "description": "Where it arrived."
+                    },
+                    "amount": {
+                        "type": "string",
+                        "description": "In normal units, such as \"500.000\"."
+                    },
+                    "amount_minor": {
+                        "type": "integer",
+                        "description": "Or the amount in minor units."
+                    },
+                    "paid_on": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD. Default: today."
+                    },
+                    "reference": {
+                        "type": "string",
+                        "description": "The bank's or provider's reference."
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Up to 2000 characters."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "description": "Retrying with the same key returns the same transfer."
+                    }
+                },
+                "required": [
+                    "from_account_id",
+                    "to_account_id"
                 ]
             },
             "AccountingTrialBalance": {

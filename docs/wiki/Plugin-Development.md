@@ -2209,6 +2209,7 @@ What to know:
 - **Refusals** throw `AccountingRejected` with a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`).
 - **Listen or refuse.** `accounting.entry.posted` (and `.async` after commit) tells you what posted; `accounting.entry.posting` runs before, inside the transaction; throw `HookVetoException` to refuse.
 - **Invoice instead of posting by hand (SDK 1.155).** A plugin that sells (rentals, bookings, subscriptions) drafts a sales invoice with `$books->invoices()->createDraft([...], $profileId, 'booking-' . $id)` and issues it with `issue()`: core numbers it, taxes each line from its tax category (`$books->taxes()`), posts it and shows it in the customer's invoices. Credit it with `credit()`; an issued invoice is never edited. `accounting.invoice.issuing` lets a plugin refuse one (a credit limit).
+- **Record what was paid (SDK 1.156).** A payment plugin records each payment that succeeded with `$books->payments()->recordReceived(new PaymentRequest($profileId, $customerId, $amountMinor, 'whity_pay', invoiceId: $invoiceId, feeMinor: $fee, externalRef: $providerPaymentId))`; the same `externalRef` records once, so a webhook delivered twice is harmless. When the provider pays out, `recordTransfer($clearing->id, $bank->id, $amountMinor, $profileId)` moves it from Money at payment providers to the bank.
 
 ## Step 13 — Declare it in `plugin.json` instead (SDK 1.47)
 

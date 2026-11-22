@@ -145,6 +145,7 @@ final class CoreTables
         'acc_lines' => '345_create_accounting_ledger.php',
         'acc_manual_entries' => '345_create_accounting_ledger.php',
         'acc_manual_entry_lines' => '345_create_accounting_ledger.php',
+        'acc_payments' => '351_create_accounting_payments.php',
         'acc_periods' => '344_create_accounting_chart.php',
         'acc_tax_codes' => '350_create_accounting_invoices.php',
         // Inventory (WHIT-1232, design section 31).

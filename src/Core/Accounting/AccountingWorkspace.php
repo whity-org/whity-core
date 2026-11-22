@@ -39,6 +39,8 @@ final class AccountingWorkspace
         CorePermissions::ACCOUNTING_CLOSE,
         CorePermissions::INVOICES_READ,
         CorePermissions::INVOICES_WRITE,
+        CorePermissions::PAYMENTS_READ,
+        CorePermissions::PAYMENTS_WRITE,
         CorePermissions::CONTACTS_READ,
     ];
 
