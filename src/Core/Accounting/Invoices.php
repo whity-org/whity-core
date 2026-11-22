@@ -1147,6 +1147,17 @@ final class Invoices
         ];
     }
 
+    /**
+     * Fires an invoice event (and its `.async` twin) for something that
+     * happened to it outside this service: a payment settled it.
+     *
+     * @param array<string, mixed> $extra
+     */
+    public function announce(string $event, int $tenantId, int $id, ?int $actor, array $extra = []): void
+    {
+        $this->notify($event, $tenantId, $id, $actor, $extra);
+    }
+
     /** @param array<string, mixed> $extra */
     private function notify(string $event, int $tenantId, int $id, ?int $actor, array $extra = []): void
     {

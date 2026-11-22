@@ -266,6 +266,10 @@
     "en": "Show the workspace's books",
     "ar": "عرض دفاتر مساحة العمل"
   },
+  "get_api_accounting_customers_id_statement": {
+    "en": "A customer's statement",
+    "ar": "كشف حساب عميل"
+  },
   "get_api_accounting_entries": {
     "en": "List journal entries",
     "ar": "عرض القيود"
@@ -298,9 +302,21 @@
     "en": "Show a draft journal entry",
     "ar": "عرض قيد يدوي"
   },
+  "get_api_accounting_payments": {
+    "en": "List payments",
+    "ar": "عرض الدفعات"
+  },
+  "get_api_accounting_payments_id": {
+    "en": "Show a payment",
+    "ar": "عرض دفعة"
+  },
   "get_api_accounting_periods": {
     "en": "List the months of the books",
     "ar": "عرض الفترات المحاسبية"
+  },
+  "get_api_accounting_reports_aged_receivables": {
+    "en": "Aged receivables",
+    "ar": "أعمار الذمم المدينة"
   },
   "get_api_accounting_reports_trial_balance": {
     "en": "Show the trial balance",
@@ -1503,6 +1519,22 @@
     "en": "Post a journal entry to the books",
     "ar": "ترحيل قيد إلى الدفاتر"
   },
+  "post_api_accounting_payments": {
+    "en": "Record a payment received",
+    "ar": "تسجيل دفعة مقبوضة"
+  },
+  "post_api_accounting_payments_id_allocations": {
+    "en": "Settle an invoice with a payment",
+    "ar": "تسوية فاتورة بدفعة"
+  },
+  "post_api_accounting_payments_id_bounce": {
+    "en": "Record a bounced cheque",
+    "ar": "تسجيل شيك مرتجع"
+  },
+  "post_api_accounting_payments_id_deposit": {
+    "en": "Deposit a cheque",
+    "ar": "إيداع شيك"
+  },
   "post_api_accounting_periods_id_close": {
     "en": "Close a month",
     "ar": "إقفال شهر"
@@ -1522,6 +1554,10 @@
   "post_api_accounting_tax_codes_id_restore": {
     "en": "Restore a tax code",
     "ar": "استعادة رمز ضريبة"
+  },
+  "post_api_accounting_transfers": {
+    "en": "Move money between accounts",
+    "ar": "تحويل مبلغ بين الحسابات"
   },
   "post_api_affiliates": {
     "en": "Create an affiliate",

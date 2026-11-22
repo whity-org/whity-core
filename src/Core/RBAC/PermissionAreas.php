@@ -61,6 +61,7 @@ final class PermissionAreas
         'quotes' => ['quotes', 'Quotes', self::GROUP_WORKSPACE],
         'accounting' => ['accounting', 'Accounting', self::GROUP_WORKSPACE],
         'invoices' => ['invoices', 'Invoices', self::GROUP_WORKSPACE],
+        'payments' => ['payments', 'Payments', self::GROUP_WORKSPACE],
         'fields' => ['fields', 'Your own fields', self::GROUP_PEOPLE],
         'tasks' => ['tasks', 'Tasks and boards', self::GROUP_PEOPLE],
         'time_windows' => ['time_windows', 'Time windows', self::GROUP_DOCUMENTS],

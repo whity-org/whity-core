@@ -7,6 +7,7 @@ namespace Whity\Sdk\Context;
 use Whity\Sdk\Accounting\Accounts;
 use Whity\Sdk\Accounting\Invoices;
 use Whity\Sdk\Accounting\Ledger;
+use Whity\Sdk\Accounting\Payments;
 use Whity\Sdk\Accounting\Periods;
 use Whity\Sdk\Accounting\Reports;
 use Whity\Sdk\Accounting\Taxes;
@@ -38,4 +39,7 @@ interface AccountingScope
 
     /** Tax codes and the arithmetic of a line, read-only (SDK 1.155). */
     public function taxes(): Taxes;
+
+    /** Payments received, allocations and transfers; your plugin's payments are its own (SDK 1.156). */
+    public function payments(): Payments;
 }
