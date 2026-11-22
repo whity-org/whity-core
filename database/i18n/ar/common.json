@@ -335,7 +335,6 @@
         "sidebar.notifications": "الإشعارات",
         "sidebar.openNav": "فتح التنقّل",
         "sidebar.tenantSwitcher.create": "أنشئ مساحة عمل",
-        "sidebar.tenantSwitcher.error": "تعذّر تبديل مساحة العمل",
         "sidebar.tenantSwitcher.find": "ابحث عن مساحة عمل",
         "sidebar.tenantSwitcher.noResults": "لا توجد مساحة عمل مطابقة",
         "sidebar.tenantSwitcher.owner": "المالك",
@@ -448,6 +447,13 @@
         "workspacePay.opening": "جارٍ فتح صفحة البطاقة…",
         "workspacePay.skip": "ليس الآن",
         "workspacePay.thisWorkspace": "مساحة العمل هذه",
-        "workspacePay.title": "أضف بطاقة لـ {workspace}"
+        "workspacePay.title": "أضف بطاقة لـ {workspace}",
+        "workspaceSwitch.refused.confined": "تسجيل الدخول هذا يعمل فقط في مساحة العمل التي سجّلت الدخول إليها. سجّل الدخول عبر Whity ID لفتح مساحات عملك الأخرى.",
+        "workspaceSwitch.refused.notMember": "لم تعد عضواً في مساحة العمل هذه. اطلب من أحد مالكيها إضافتك من جديد.",
+        "workspaceSwitch.refused.other": "تعذّر فتح مساحة العمل هذه. حاول مرة أخرى.",
+        "workspaceSwitch.refused.paused": "مساحة العمل هذه متوقفة مؤقتاً حتى يدفع أحد المالكين.",
+        "workspaceSwitch.refused.signedOut": "انتهت جلسة تسجيل الدخول. سجّل الدخول من جديد، ثم افتح مساحة العمل.",
+        "workspaceSwitch.refused.tooMany": "محاولات كثيرة متتالية. انتظر دقيقة، ثم حاول مرة أخرى.",
+        "workspaceSwitch.refused.unreachable": "تعذّر الوصول إلى Whity. تحقّق من اتصالك، ثم حاول مرة أخرى."
     }
 }
