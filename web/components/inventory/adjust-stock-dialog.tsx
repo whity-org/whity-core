@@ -8,6 +8,10 @@
  * difference. A change worth more than the workspace's value waits for
  * approval; the rest goes into the stock history at once and can be undone
  * from there. One main button.
+ *
+ * For an item that keeps batches (WHIT-1235), stock added names its batch
+ * (and its expiry when the item goes off); stock taken out may name one, or
+ * the batch that expires first is taken.
  */
 
 import { useMemo, useState } from 'react';
@@ -63,6 +67,9 @@ export function AdjustStockDialog({
   const { reasons: allReasons } = useReasons();
   const [reason, setReason] = useState<string>('damaged');
   const [note, setNote] = useState('');
+  const [batchCode, setBatchCode] = useState('');
+  const [expiresOn, setExpiresOn] = useState('');
+  const tracked = item.tracking !== 'none';
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
 
@@ -95,6 +102,8 @@ export function AdjustStockDialog({
               variant_id: Number(variantId),
               location_id: Number(placeId),
               change: (direction === 'out' ? '-' : '') + clean,
+              ...(tracked && batchCode.trim() !== '' ? { lot_code: batchCode.trim() } : {}),
+              ...(tracked && direction === 'in' && expiresOn !== '' ? { expires_on: expiresOn } : {}),
             },
           ],
         })
@@ -184,6 +193,33 @@ export function AdjustStockDialog({
               onChange={(e) => setAmount(e.target.value)}
             />
           </div>
+          {tracked && (
+            <div className="grid gap-4 sm:grid-cols-2" data-testid="adjust-batch">
+              <Input
+                id="adjust-batch"
+                dir="ltr"
+                className="font-mono"
+                label={item.tracking === 'serial' ? t('inventory.field.serial', 'Serial number') : t('inventory.field.batch', 'Batch code')}
+                helperText={
+                  direction === 'out'
+                    ? t('inventory.adjust.batchOutHint', 'Leave it empty to take the batch that expires first.')
+                    : undefined
+                }
+                value={batchCode}
+                onChange={(e) => setBatchCode(e.target.value)}
+              />
+              {direction === 'in' && item.expires && (
+                <Input
+                  id="adjust-expiry"
+                  type="date"
+                  dir="ltr"
+                  label={t('inventory.field.expiresOn', 'Expires on')}
+                  value={expiresOn}
+                  onChange={(e) => setExpiresOn(e.target.value)}
+                />
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
             <label className="text-sm font-medium" htmlFor="adjust-reason">
               {t('inventory.field.reason', 'Why')}

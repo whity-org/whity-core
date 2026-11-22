@@ -47225,7 +47225,7 @@
                 "tags": [
                     "inventory"
                 ],
-                "description": "Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).",
+                "description": "Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box). A GS1 barcode (GS1-128, DataMatrix or QR, raw or with identifiers in brackets) is found by its GTIN, and `scanned` says the batch, expiry, production date and count it carries (WHIT-1235).",
                 "parameters": [
                     {
                         "name": "code",
@@ -47256,6 +47256,47 @@
                                                 },
                                                 "unit": {
                                                     "type": "string"
+                                                },
+                                                "scanned": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "gtin": {
+                                                            "type": "string"
+                                                        },
+                                                        "lot_code": {
+                                                            "type": "string",
+                                                            "nullable": true,
+                                                            "description": "The batch (AI 10) or serial number (AI 21)."
+                                                        },
+                                                        "lot_id": {
+                                                            "type": "integer",
+                                                            "nullable": true,
+                                                            "description": "That batch, when it is already known."
+                                                        },
+                                                        "expires_on": {
+                                                            "type": "string",
+                                                            "nullable": true,
+                                                            "description": "From AI 17 (or 15), or the known batch."
+                                                        },
+                                                        "made_on": {
+                                                            "type": "string",
+                                                            "nullable": true
+                                                        },
+                                                        "count": {
+                                                            "type": "integer",
+                                                            "nullable": true,
+                                                            "description": "How many, from AI 30 or 37."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "gtin",
+                                                        "lot_code",
+                                                        "lot_id",
+                                                        "expires_on",
+                                                        "made_on",
+                                                        "count"
+                                                    ],
+                                                    "description": "Only for a GS1 barcode."
                                                 }
                                             },
                                             "required": [
@@ -88497,6 +88538,338 @@
                 ]
             }
         },
+        "/api/v1/themes/{themeId}/versions": {
+            "get": {
+                "operationId": "get_api_v1_themes_themeid_versions",
+                "summary": "List a theme's versions",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The history of one of this workspace's own themes (imported, made in the editor or restored), newest first: each version, how it came in, when and who saved it, and which is in use. Whity's and plugins' themes have no history here.",
+                "parameters": [
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The theme's id, like acme.harbour",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The versions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeVersionsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This workspace has no theme of its own with that id",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/{themeId}/versions/{version}": {
+            "get": {
+                "operationId": "get_api_v1_themes_themeid_versions_version",
+                "summary": "Get one version of a theme",
+                "tags": [
+                    "theme"
+                ],
+                "description": "That version's theme file, for comparing it with another (POST /api/themes/compare).",
+                "parameters": [
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The theme's id, like acme.harbour",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "description": "A version number like 1.2.0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The theme file",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemeVersionFileResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such version",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/{themeId}/versions/{version}/restore": {
+            "post": {
+                "operationId": "post_api_v1_themes_themeid_versions_version_restore",
+                "summary": "Restore an earlier version of a theme",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Saves that version's file as the next version, numbered past the newest, so the history only grows. Workspaces using the theme see it at once.",
+                "parameters": [
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "themeId",
+                        "in": "path",
+                        "required": true,
+                        "description": "The theme's id, like acme.harbour",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "description": "A version number like 1.2.0",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Restored as a new version",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/RestoreThemeVersionResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such version",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "That version is no longer a valid theme",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/time-window-types": {
             "get": {
                 "operationId": "get_api_v1_time_window_types",
@@ -129150,6 +129523,35 @@
                     "revoked"
                 ]
             },
+            "RestoreThemeVersionResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "string",
+                                "description": "The new version number."
+                            },
+                            "restored_from": {
+                                "type": "string",
+                                "description": "The version it was made from."
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "version",
+                            "restored_from"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "Role": {
                 "type": "object",
                 "properties": {
@@ -135440,6 +135842,85 @@
                             "filename",
                             "media_type",
                             "content"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemeVersionFileResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The theme file (schemas/theme/v1.json)."
+                            }
+                        },
+                        "required": [
+                            "theme"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemeVersionsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "theme_id": {
+                                "type": "string"
+                            },
+                            "current": {
+                                "type": "string",
+                                "description": "The version in use."
+                            },
+                            "versions": {
+                                "type": "array",
+                                "description": "Newest first.",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "version": {
+                                            "type": "string"
+                                        },
+                                        "source": {
+                                            "type": "string",
+                                            "description": "import, editor or restore."
+                                        },
+                                        "saved_at": {
+                                            "type": "string"
+                                        },
+                                        "saved_by": {
+                                            "type": "string",
+                                            "nullable": true,
+                                            "description": "The name of the person who saved it, when known."
+                                        },
+                                        "current": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "version",
+                                        "source",
+                                        "saved_at",
+                                        "current"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "theme_id",
+                            "current",
+                            "versions"
                         ]
                     }
                 },
