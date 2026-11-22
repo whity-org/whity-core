@@ -52,6 +52,9 @@ final class PluginJobs
      * @param \Whity\Core\Messaging\MessageChannelRegistry|null $messageChannels
      *                                      The worker's channels, so a plugin's channel
      *                                      can send what Messages queued (ADR 0016).
+     * @param (\Closure(string): bool)|null $killSwitch
+     *                                      Which plugins a signed revocation list
+     *                                      killed, so their code is never loaded (WHIT-1338).
      * @return PluginLoader|null The loader, or null when plugins couldn't load.
      */
     public static function register(
@@ -62,6 +65,7 @@ final class PluginJobs
         ?AuditLogger $auditLogger = null,
         ?array $documentRegistries = null,
         ?\Whity\Core\Messaging\MessageChannelRegistry $messageChannels = null,
+        ?\Closure $killSwitch = null,
     ): ?PluginLoader {
         $pluginDir ??= dirname(__DIR__, 3) . '/plugins';
 
@@ -88,6 +92,10 @@ final class PluginJobs
             }
             if ($messageChannels !== null) {
                 $loader->setMessageChannels($messageChannels);
+            }
+            // WHIT-1338: a killed plugin's code doesn't run in the queue worker.
+            if ($killSwitch !== null) {
+                $loader->setKillSwitch($killSwitch);
             }
             $loader->load();
             $loader->collectJobs($registry);

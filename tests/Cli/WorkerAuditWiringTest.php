@@ -58,7 +58,8 @@ final class WorkerAuditWiringTest extends TestCase
     public function testThePluginLoaderIsGivenTheWiredHookManagerAndWriter(): void
     {
         self::assertMatchesRegularExpression(
-            '/PluginJobs::register\(\s*\$registry,\s*null,\s*\$this->logger,\s*\$hookManager,\s*\$auditLogger(,\s*\$documentRegistries(,\s*\$messageChannels)?)?\s*\)/',
+            // The kill switch (WHIT-1338) may follow as the last argument.
+            '/PluginJobs::register\(\s*\$registry,\s*null,\s*\$this->logger,\s*\$hookManager,\s*\$auditLogger(,\s*\$documentRegistries(,\s*\$messageChannels(,\s*static fn \(string \$name\): bool => \$killList->isKilled\(\$name\))?)?)?\s*\)/',
             $this->queueWorkCommand(),
             'PluginJobs::register() must receive the worker\'s hook manager and audit writer, '
             . 'or a plugin dispatching its declared event from inside a job produces no trail '
