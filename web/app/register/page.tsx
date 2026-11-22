@@ -114,7 +114,7 @@ export default function RegisterPage() {
     if (isMounted && isAuthenticated()) {
       router.push(homePath);
     }
-  }, [isAuthenticated, router, isMounted]);
+  }, [isAuthenticated, router, isMounted, homePath]);
 
   const validateFields = (): boolean => {
     const errors: { email?: string; password?: string; tenantName?: string } = {};

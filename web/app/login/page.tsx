@@ -198,7 +198,7 @@ export default function LoginPage() {
     if (isMounted && isAuthenticated()) {
       router.push(returnTo.next ?? homePath);
     }
-  }, [isAuthenticated, router, isMounted, returnTo.next]);
+  }, [isAuthenticated, router, isMounted, returnTo.next, homePath]);
 
   // Surface the SSO return markers the backend appends on a hosted-login bounce
   // (…/login?sso_error=<reason> or ?sso=select), then strip them from the URL so

@@ -20,7 +20,7 @@ export default function Home() {
         router.push('/login');
       }
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, router, homePath]);
 
   return (
     <div className="flex items-center justify-center min-h-screen">
