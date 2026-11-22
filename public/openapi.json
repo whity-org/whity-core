@@ -45549,7 +45549,7 @@
                 "tags": [
                     "inventory"
                 ],
-                "description": "Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).",
+                "description": "Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box). A GS1 barcode (GS1-128, DataMatrix or QR, raw or with identifiers in brackets) is found by its GTIN, and `scanned` says the batch, expiry, production date and count it carries (WHIT-1235).",
                 "parameters": [
                     {
                         "name": "code",
@@ -45580,6 +45580,47 @@
                                                 },
                                                 "unit": {
                                                     "type": "string"
+                                                },
+                                                "scanned": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "gtin": {
+                                                            "type": "string"
+                                                        },
+                                                        "lot_code": {
+                                                            "type": "string",
+                                                            "nullable": true,
+                                                            "description": "The batch (AI 10) or serial number (AI 21)."
+                                                        },
+                                                        "lot_id": {
+                                                            "type": "integer",
+                                                            "nullable": true,
+                                                            "description": "That batch, when it is already known."
+                                                        },
+                                                        "expires_on": {
+                                                            "type": "string",
+                                                            "nullable": true,
+                                                            "description": "From AI 17 (or 15), or the known batch."
+                                                        },
+                                                        "made_on": {
+                                                            "type": "string",
+                                                            "nullable": true
+                                                        },
+                                                        "count": {
+                                                            "type": "integer",
+                                                            "nullable": true,
+                                                            "description": "How many, from AI 30 or 37."
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "gtin",
+                                                        "lot_code",
+                                                        "lot_id",
+                                                        "expires_on",
+                                                        "made_on",
+                                                        "count"
+                                                    ],
+                                                    "description": "Only for a GS1 barcode."
                                                 }
                                             },
                                             "required": [

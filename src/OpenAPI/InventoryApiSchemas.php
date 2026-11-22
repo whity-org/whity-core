@@ -77,13 +77,23 @@ final class InventoryApiSchemas
             ]),
             self::route('GET', '/api/inventory/items/lookup', 'inventory:read', [
                 'summary' => 'Find the item a scanned barcode or SKU belongs to',
-                'description' => 'Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).',
+                'description' => 'Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box). '
+                    . 'A GS1 barcode (GS1-128, DataMatrix or QR, raw or with identifiers in brackets) is found by its GTIN, '
+                    . 'and `scanned` says the batch, expiry, production date and count it carries (WHIT-1235).',
                 'tags' => $tags,
                 'parameters' => [self::param('code', 'string', 'The barcode or SKU. Spaces are ignored and Arabic-Indic digits read as Western ones.')],
                 'responses' => [200 => self::json('The match', self::data(self::object([
                     'item' => SchemaBuilder::ref('InventoryItem'),
                     'variant_id' => self::int(),
                     'unit' => self::str(),
+                    'scanned' => self::object([
+                        'gtin' => self::str(),
+                        'lot_code' => self::str(true) + ['description' => 'The batch (AI 10) or serial number (AI 21).'],
+                        'lot_id' => self::int(true) + ['description' => 'That batch, when it is already known.'],
+                        'expires_on' => self::str(true) + ['description' => 'From AI 17 (or 15), or the known batch.'],
+                        'made_on' => self::str(true),
+                        'count' => self::int(true) + ['description' => 'How many, from AI 30 or 37.'],
+                    ], ['gtin', 'lot_code', 'lot_id', 'expires_on', 'made_on', 'count']) + ['description' => 'Only for a GS1 barcode.'],
                 ], ['item', 'variant_id', 'unit'])))] + $notFound + self::auth(),
             ]),
             self::route('GET', '/api/inventory/items/{id:\d+}', 'inventory:read', [

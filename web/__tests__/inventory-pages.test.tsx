@@ -428,3 +428,77 @@ describe('/inventory/items/[id]', () => {
     expect(screen.queryByTestId('item-edit')).toBeNull();
   });
 });
+
+describe('batches and expiry (WHIT-1235)', () => {
+  const milkLot = (over: Record<string, unknown>) => ({
+    id: 81, variant_id: 70, item_id: 7, item_name: 'Flour', item_names: { en: 'Flour', ar: 'طحين' }, sku: 'FLR-25', code: 'B-0412',
+    is_serial: false, made_on: null, expires_on: '2000-01-31', supplier_contact_id: null, supplier_name: null, notes: '',
+    on_hand: '20.000', on_hand_steps: 20000, unit: 'kg', places: [{ location_id: 1, on_hand: '20.000' }], created_at: '2026-11-19 08:00:00',
+    ...over,
+  });
+  const withLots = (lots: unknown[], tracked = true) =>
+    GET.mockImplementation(async (path: string, opts?: { params?: { query?: { virtual?: string } } }) => {
+      if (path === '/api/v1/inventory/items/{id}') return ok({ data: { ...flour, tracking: tracked ? 'lot' : 'none', expires: tracked } });
+      if (path === '/api/v1/inventory/lots' || path === '/api/v1/inventory/lots/expiring') return ok({ data: lots });
+      if (path === '/api/v1/inventory/locations' && opts?.params?.query?.virtual !== 'true') {
+        return ok({ data: [place(1, 'Central kitchen'), place(3, 'Sweifieh')] });
+      }
+      return routeGet(path);
+    });
+
+  it('lists an item\'s batches soonest first, an expired one marked, with batch labels to print', async () => {
+    permissions = ['inventory:read', 'inventory:write', 'stock:adjust', 'documents:render'];
+    withLots([milkLot({}), milkLot({ id: 82, code: 'B-0907', expires_on: '2999-12-31' })]);
+    await renderItemPage();
+    const batches = await screen.findByTestId('item-batches');
+    expect(within(batches).getByText('B-0412')).toBeInTheDocument();
+    expect(within(screen.getByTestId('batch-B-0412')).getByText('Expired')).toBeInTheDocument();
+    expect(within(screen.getByTestId('batch-B-0907')).queryByText('Expired')).toBeNull();
+    expect(screen.getByTestId('item-print-batch-labels')).toBeInTheDocument();
+  });
+
+  it('shows no batches for an item that doesn\'t keep them', async () => {
+    withLots([], false);
+    await renderItemPage();
+    await screen.findByTestId('item-stock');
+    expect(screen.queryByTestId('item-batches')).toBeNull();
+  });
+
+  it('lists what is expiring on the Batches tab', async () => {
+    withLots([milkLot({})]);
+    render(<InventoryPage />);
+    fireEvent.mouseDown(await screen.findByTestId('inventory-tab-batches'));
+    fireEvent.click(screen.getByTestId('inventory-tab-batches'));
+    const tab = await screen.findByTestId('inventory-batches');
+    expect(await within(tab).findByText('B-0412')).toBeInTheDocument();
+    expect(within(tab).getByText('Expired')).toBeInTheDocument();
+  });
+
+  it('receives an item that keeps batches with its batch code and expiry', async () => {
+    permissions = ['purchases:read', 'purchases:write'];
+    withLots([]);
+    POST.mockResolvedValueOnce(ok({ data: purchaseOrder({ status: 'done' }) }));
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <PurchaseOrderPage params={Promise.resolve({ id: '60' })} />
+        </Suspense>
+      );
+    });
+    fireEvent.click(await screen.findByTestId('po-receive'));
+    fireEvent.change(await screen.findByLabelText('Batch code'), { target: { value: 'B-0412' } });
+    // The date picker is backed by a native date input, where the change comes from.
+    const expiry = screen.getByTestId('po-receive-batch-600').querySelector('input[type="date"]');
+    expect(expiry).not.toBeNull();
+    fireEvent.change(expiry as HTMLInputElement, { target: { value: '2027-03-31' } });
+    fireEvent.click(screen.getByTestId('po-receive-save'));
+    await waitFor(() =>
+      expect(POST).toHaveBeenLastCalledWith(
+        '/api/v1/inventory/purchase-orders/{id}/receive',
+        expect.objectContaining({
+          body: expect.objectContaining({ lines: [{ line_id: 600, quantity: '24', lot_code: 'B-0412', expires_on: '2027-03-31' }] }),
+        })
+      )
+    );
+  });
+});

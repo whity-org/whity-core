@@ -8,7 +8,9 @@
  * - Stock: each item against each place, with its reorder level; a figure
  *   below zero or under its place's level is red, with "Low at <place>" or
  *   "Below reorder" beside it (IV.8, IV.11). Items and Below reorder lead the
- *   numbers; Expiring and Stock value join with lots (P4) and cost (P7).
+ *   numbers; Expiring soon joins when batches are expiring (P4), Stock value
+ *   with cost (P7).
+ * - Batches (P4, WHIT-1235): what is expiring, soonest first.
  * - Items: the list, with search over names in both languages, SKUs and
  *   barcodes, and a kind filter.
  * - Places: warehouses, shops and vans.
@@ -34,6 +36,7 @@ import { ItemFormDialog, kindLabel } from '@/components/inventory/item-form-dial
 import { PlaceFormDialog } from '@/components/inventory/place-form-dialog';
 import { CountStartDialog } from '@/components/inventory/count-start-dialog';
 import { CountsTab, TransfersTab } from '@/components/inventory/operations-tabs';
+import { ExpiringBatches } from '@/components/inventory/expiring-batches';
 import { ReceiveTransferDialog } from '@/components/inventory/receive-transfer-dialog';
 import { TransferDialog } from '@/components/inventory/transfer-dialog';
 import { PurchaseOrderDialog } from '@/components/inventory/purchase-order-dialog';
@@ -71,8 +74,8 @@ import {
   type ItemKind,
 } from '@/lib/inventory/api';
 
-type Tab = 'stock' | 'items' | 'places' | 'counts' | 'transfers' | 'purchases';
-const TABS: Tab[] = ['stock', 'items', 'places', 'counts', 'transfers', 'purchases'];
+type Tab = 'stock' | 'batches' | 'items' | 'places' | 'counts' | 'transfers' | 'purchases';
+const TABS: Tab[] = ['stock', 'batches', 'items', 'places', 'counts', 'transfers', 'purchases'];
 const PER_PAGE = 50;
 
 export default function InventoryPage() {
@@ -113,7 +116,7 @@ export default function InventoryPage() {
   }, [search]);
 
   const meta = useFetch(async () => {
-    const [units, places, levels, firstItems, rules, categories, settings] = await Promise.all([
+    const [units, places, levels, firstItems, rules, categories, settings, expiring] = await Promise.all([
       inventoryApi.units(),
       inventoryApi.locations(),
       inventoryApi.levels({ nonzero: true }),
@@ -121,8 +124,10 @@ export default function InventoryPage() {
       inventoryApi.reorderRules(),
       inventoryApi.categories(),
       inventoryApi.settings().catch(() => null),
+      inventoryApi.expiringLots().catch(() => []),
     ]);
     return {
+      expiring,
       units,
       places,
       levels,
@@ -385,6 +390,10 @@ export default function InventoryPage() {
         <Tabs value={tab} onValueChange={(v) => setTab(v as Tab)}>
           <TabsList>
             <TabsTrigger value="stock">{t('inventory.tab.stock', 'Stock')}</TabsTrigger>
+            <TabsTrigger value="batches" data-testid="inventory-tab-batches">
+              {t('inventory.tab.batches', 'Batches')}
+              {meta.data && meta.data.expiring.length > 0 && <span className="ms-2 font-mono text-xs">{meta.data.expiring.length}</span>}
+            </TabsTrigger>
             <TabsTrigger value="items">
               {t('inventory.tab.items', 'Items')}
               {meta.data && <span className="ms-2 font-mono text-xs">{meta.data.itemTotal}</span>}
@@ -422,6 +431,16 @@ export default function InventoryPage() {
                     : t('inventory.kpi.allAbove', 'Everything is above its level'),
               tone: belowItems.length > 0 ? 'bad' : undefined,
             },
+            ...(meta.data.expiring.length > 0
+              ? [
+                  {
+                    label: t('inventory.kpi.expiring', 'Expiring soon'),
+                    value: String(meta.data.expiring.length),
+                    note: t('inventory.kpi.expiringNote', 'Batches to sell or use first'),
+                    tone: 'bad' as const,
+                  },
+                ]
+              : []),
           ]}
         />
       )}
@@ -526,6 +545,8 @@ export default function InventoryPage() {
             />
           )}
         </>
+      ) : tab === 'batches' ? (
+        <ExpiringBatches places={places} windowDays={meta.data?.settings?.expiry_warning_days ?? 7} />
       ) : tab === 'counts' ? (
         <CountsTab counts={counts} places={places} />
       ) : tab === 'transfers' ? (

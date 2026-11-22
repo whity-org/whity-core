@@ -6644,7 +6644,7 @@ export interface paths {
         };
         /**
          * Find the item a scanned barcode or SKU belongs to
-         * @description Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box).
+         * @description Answers the item, the variant, and the unit the barcode stands for (a box barcode means a box). A GS1 barcode (GS1-128, DataMatrix or QR, raw or with identifiers in brackets) is found by its GTIN, and `scanned` says the batch, expiry, production date and count it carries (WHIT-1235).
          */
         get: operations["get_api_v1_inventory_items_lookup"];
         put?: never;
@@ -60721,6 +60721,19 @@ export interface operations {
                             item: components["schemas"]["InventoryItem"];
                             variant_id: number;
                             unit: string;
+                            /** @description Only for a GS1 barcode. */
+                            scanned?: {
+                                gtin: string;
+                                /** @description The batch (AI 10) or serial number (AI 21). */
+                                lot_code: string | null;
+                                /** @description That batch, when it is already known. */
+                                lot_id: number | null;
+                                /** @description From AI 17 (or 15), or the known batch. */
+                                expires_on: string | null;
+                                made_on: string | null;
+                                /** @description How many, from AI 30 or 37. */
+                                count: number | null;
+                            };
                         };
                     };
                 };
