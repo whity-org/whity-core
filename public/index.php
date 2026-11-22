@@ -5882,6 +5882,10 @@ $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|su
 $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/run',            [$inventoryImportHandler, 'runImport'],  null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('POST',   '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/undo',           [$inventoryImportHandler, 'undo'],       null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/imports/{kind:items|opening_stock|supplier_prices}/{id:\d+}/skipped.csv',    [$inventoryImportHandler, 'skippedCsv'], null, null, CorePermissions::INVENTORY_WRITE);
+// WHIT-1326: every kind the shared import screen offers (design section 34 §6.5).
+$importKinds = new \Whity\Core\Import\ImportKinds();
+\Whity\Core\Import\CoreImportKinds::register($importKinds, $inventoryLocations, $contactRepository);
+$router->register('GET',    '/api/imports/kinds',                                [new \Whity\Api\ImportKindsApiHandler($importKinds, $roleChecker), 'list']);
 $router->register('GET',    '/api/inventory/units',                            [$inventoryHandler, 'listUnits'],      null, null, CorePermissions::INVENTORY_READ);
 $router->register('POST',   '/api/inventory/units',                              [$inventoryHandler, 'createUnit'],     null, null, CorePermissions::INVENTORY_WRITE);
 $router->register('GET',    '/api/inventory/categories',                         [$inventoryHandler, 'listCategories'], null, null, CorePermissions::INVENTORY_READ);
