@@ -1355,6 +1355,14 @@
       "since": "0.2.28"
     },
     {
+      "path": "/quote/:token",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.31"
+    },
+    {
       "path": "/register",
       "kind": "page",
       "area": "auth",
