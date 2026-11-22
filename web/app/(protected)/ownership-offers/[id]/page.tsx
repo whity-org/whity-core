@@ -22,6 +22,7 @@ import {
   ConfirmItsYouDialog,
   isIdentityCheckFailure,
   startIdentityCheck,
+  useFreshSignInReturn,
   type IdentityCheck,
 } from '@/components/security/confirm-its-you-dialog';
 import { useRefusalText } from '@/lib/ownership-words';
@@ -60,6 +61,8 @@ export default function OwnershipOfferPage() {
   const [check, setCheck] = useState<IdentityCheck | null>(null);
   const [busy, setBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // Back from signing in again: the accept dialog again, ready to approve.
+  const signInOutcome = useFreshSignInReturn<IdentityCheck>(setCheck);
   const [problem, setProblem] = useState<string | null>(null);
 
   // `{ offer: null }` is "not mine, or gone"; `null` from useFetch is still loading.
@@ -258,6 +261,8 @@ export default function OwnershipOfferPage() {
         check={check}
         busy={busy}
         error={codeError}
+        resume={check}
+        signInOutcome={signInOutcome}
         onCancel={() => setCheck(null)}
         onClearError={() => setCodeError(null)}
         onConfirm={(code) => void accept(code)}

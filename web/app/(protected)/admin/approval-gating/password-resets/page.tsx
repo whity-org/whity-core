@@ -19,6 +19,7 @@ import {
   ConfirmItsYouDialog,
   isIdentityCheckFailure,
   startIdentityCheck,
+  useFreshSignInReturn,
   type IdentityCheck,
 } from '@/components/security/confirm-its-you-dialog';
 
@@ -72,6 +73,8 @@ export default function PasswordResetApprovalsPage() {
   // AG.1: then "confirm it's you", whose code goes with the approval.
   const [checking, setChecking] = useState<{ item: PendingPasswordReset; check: IdentityCheck } | null>(null);
   const [codeError, setCodeError] = useState<string | null>(null);
+  // Back from signing in again: the same reset, ready to approve.
+  const signInOutcome = useFreshSignInReturn<{ item: PendingPasswordReset; check: IdentityCheck }>(setChecking);
   const dates = useDateDisplay();
 
   const load = useCallback(async () => {
@@ -343,6 +346,8 @@ export default function PasswordResetApprovalsPage() {
         check={checking?.check ?? null}
         busy={checking !== null && busyId === checking.item.id}
         error={codeError}
+        resume={checking}
+        signInOutcome={signInOutcome}
         onCancel={() => setChecking(null)}
         onClearError={() => setCodeError(null)}
         onConfirm={(code) => {

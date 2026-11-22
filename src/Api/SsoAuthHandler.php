@@ -206,21 +206,21 @@ final class SsoAuthHandler
         $signingTenantId = is_int($flow['reauth_tenant_id'] ?? null) ? $flow['reauth_tenant_id'] : -1;
         $routeId = (int) ($flow['reauth_route_id'] ?? 0);
         $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
-        $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
-        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
-        $back = static fn (string $outcome): Response => new Response(302, '', [
-            'Location' => $base . $returnTo . ($purpose !== null ? '?identity_check=' : '?signing=') . rawurlencode($outcome),
-        ]);
+        $back = function (string $outcome, ?string $detail = null) use ($flow): Response {
+            $this->logReauth($outcome, $flow, $detail);
+
+            return $this->reauthBack($flow, $outcome);
+        };
 
         if ($this->identities === null || $this->signingChallenges === null || $signingTenantId < 0 || ($routeId <= 0 && $purpose === null)) {
-            return $back('sign_in_failed');
+            return $back('sign_in_failed', 'not_wired');
         }
 
         $link = $tenantId === 0
             ? $this->identities->findGlobalByIssuerSubject($identity->issuer, $identity->subject)
             : $this->identities->findByProviderSubject($providerId, $identity->subject);
         if ($link === null || (int) $link['profile_id'] !== $profileId) {
-            return $back('sign_in_mismatch');
+            return $back('sign_in_mismatch', $link === null ? 'not_linked' : 'other_profile');
         }
 
         $authTime = $identity->claims['auth_time'] ?? null;
@@ -229,11 +229,16 @@ final class SsoAuthHandler
             || $authTime > $now + 60
             || $now - $authTime > \Whity\Core\Document\Signing\SigningChallengeRepository::FRESH_SIGN_IN_TTL
         ) {
-            return $back('sign_in_not_fresh');
+            return $back('sign_in_not_fresh', is_int($authTime) ? 'auth_time_age=' . ($now - $authTime) : 'no_auth_time');
         }
 
         if ($purpose !== null) {
-            $this->signingChallenges->recordGateFreshSignIn($signingTenantId, $profileId, \Whity\Core\Security\IdentityCheck::key($purpose));
+            // Kept where the approval's check looks for it, whichever workspace is open now.
+            $this->signingChallenges->recordGateFreshSignIn(
+                \Whity\Core\Security\IdentityCheck::FRESH_SIGN_IN_TENANT,
+                $profileId,
+                \Whity\Core\Security\IdentityCheck::key($purpose),
+            );
         } else {
             $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId, $routeId);
         }
@@ -321,14 +326,22 @@ final class SsoAuthHandler
         if ($this->query('reauth') === 'sign') {
             $reauth = $this->reauthTarget();
             if ($reauth === null) {
+                $this->logReauth('reauth_unavailable', null, $this->reauthRefusal(), 'sign');
                 return $this->fail('reauth_unavailable');
             }
         } elseif ($this->query('reauth') === 'gate') {
             // Confirming a gated approval (WHIT-1147).
             $reauth = $this->reauthGateTarget();
             if ($reauth === null) {
+                $this->logReauth('reauth_unavailable', null, $this->reauthRefusal(), 'gate');
                 return $this->fail('reauth_unavailable');
             }
+        }
+        if ($reauth !== null) {
+            $this->logReauth('started', [
+                'reauth_profile_id' => $reauth['profile_id'],
+                'reauth_purpose' => $reauth['purpose'] ?? null,
+            ]);
         }
 
         $joinSlug = $reauth === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
@@ -436,6 +449,19 @@ final class SsoAuthHandler
      */
     public function callback(Request $request, array $params): Response
     {
+        $this->reauthCallback = null;
+        try {
+            return $this->handleCallback($request, $params);
+        } finally {
+            $this->reauthCallback = null;
+        }
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    private function handleCallback(Request $request, array $params): Response
+    {
         if (!$this->ssoEnabled()) {
             return $this->fail('sso_disabled');
         }
@@ -455,10 +481,20 @@ final class SsoAuthHandler
         if ($flow === null || ($flow['type'] ?? null) !== 'oidc_flow') {
             return $this->fail('expired');
         }
+        if (is_int($flow['reauth_profile_id'] ?? null)) {
+            $this->reauthCallback = $flow;
+        }
 
         // The provider may signal an error (user denied consent, etc.).
-        if ($this->query('error') !== null) {
-            return $this->fail('denied');
+        $providerError = $this->query('error');
+        if ($providerError !== null) {
+            // The provider's error code (e.g. login_required) is logged for a reauth: it says
+            // whether the provider refused the fresh sign-in itself.
+            return $this->fail(
+                $this->reauthCallback !== null && preg_match('/^[a-z_]{1,40}$/', $providerError) === 1
+                    ? 'denied:' . $providerError
+                    : 'denied'
+            );
         }
 
         // CSRF/replay: the echoed state MUST equal the state minted into the cookie.
@@ -1103,9 +1139,76 @@ final class SsoAuthHandler
         return new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_NO_WORKSPACE)]);
     }
 
-    /** Bounce to the login page with a generic, non-enumerating SSO marker. */
+    /**
+     * Bounce to the login page with a generic, non-enumerating SSO marker.
+     *
+     * A callback for signing in AGAIN (to sign, or to confirm a gated approval) goes back to the
+     * page it came from with `sign_in_failed` instead: that person is already signed in, and the
+     * login page left them signing in afresh with nothing recorded (WHIT-1371).
+     */
     private function fail(string $reason): Response
     {
+        $reauth = $this->reauthCallback;
+        if ($reauth !== null) {
+            $this->logReauth('sign_in_failed', $reauth, $reason);
+
+            return $this->reauthBack($reauth, 'sign_in_failed');
+        }
+
         return new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_LOGIN) . '?sso_error=' . $reason]);
+    }
+
+    /**
+     * What the reauth callback in progress came from, read from the signed flow cookie; null for
+     * any other callback. Reset per request: workers keep this object between requests.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $reauthCallback = null;
+
+    /**
+     * Back to the page that asked for the sign-in, with the outcome it explains.
+     *
+     * @param array<string, mixed> $flow
+     */
+    private function reauthBack(array $flow, string $outcome): Response
+    {
+        $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
+        $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
+        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
+
+        return new Response(302, '', [
+            'Location' => $base . $returnTo . ($purpose !== null ? '?identity_check=' : '?signing=') . rawurlencode($outcome),
+        ]);
+    }
+
+    /**
+     * One line per signing-in-again outcome, so a failure can be traced (WHIT-1371). Only the
+     * person's id, the approval's kind (never its subject), the outcome and a short reason: no
+     * token, code, email or subject.
+     *
+     * @param array<string, mixed>|null $flow
+     */
+    private function logReauth(string $outcome, ?array $flow, ?string $detail = null, ?string $mode = null): void
+    {
+        $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
+        // Scrubbed like every log line here; it carries no secret to begin with.
+        \Whity\Core\Log\ScrubbedErrorLog::write('[sso.reauth] ' . json_encode([
+            'outcome'    => $outcome,
+            'mode'       => $mode ?? ($purpose !== null ? 'gate' : 'sign'),
+            'kind'       => $purpose !== null ? strstr($purpose, ':', true) : null,
+            'profile_id' => is_int($flow['reauth_profile_id'] ?? null) ? $flow['reauth_profile_id'] : null,
+            'detail'     => $detail,
+        ], JSON_UNESCAPED_SLASHES));
+    }
+
+    /** Why a `?reauth=` start was refused, for the log. */
+    private function reauthRefusal(): string
+    {
+        if ($this->sessions === null || $this->identities === null || $this->signingChallenges === null) {
+            return 'not_wired';
+        }
+
+        return $this->sessions->validateAccessToken() === null ? 'no_session' : 'bad_request';
     }
 }
