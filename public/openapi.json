@@ -11259,6 +11259,83 @@
                 ]
             }
         },
+        "/api/v1/calendar/price-list": {
+            "get": {
+                "operationId": "get_api_v1_calendar_price_list",
+                "summary": "The price list as a page to print",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).",
+                "responses": {
+                    "200": {
+                        "description": "The page",
+                        "content": {
+                            "text/html": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/rooms": {
             "get": {
                 "operationId": "get_api_v1_calendar_rooms",
@@ -82195,6 +82272,123 @@
                 ]
             }
         },
+        "/api/v1/themes/compare": {
+            "post": {
+                "operationId": "post_api_v1_themes_compare",
+                "summary": "Compare two themes side by side",
+                "tags": [
+                    "theme"
+                ],
+                "description": "The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CompareThemesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What changes and both previews",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CompareThemesResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The themes are larger than 64 KB together",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "One of the themes has problems; the error says which",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/themes/convert": {
             "post": {
                 "operationId": "post_api_v1_themes_convert",
@@ -82467,6 +82661,123 @@
                     },
                     "422": {
                         "description": "Unknown format",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/themes/package": {
+            "post": {
+                "operationId": "post_api_v1_themes_package",
+                "summary": "Package a theme for the store",
+                "tags": [
+                    "theme"
+                ],
+                "description": "Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file's sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store's publisher API. Whity's own themes cannot be packaged. Nothing is saved.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PackageThemeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The package, its name and its sha256",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ThemePackageResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "413": {
+                        "description": "The theme is larger than 32 KB",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The theme has problems, or is one of Whity's own",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -95766,6 +96077,11 @@
                     "needs_approval": {
                         "type": "boolean",
                         "description": "A customer's booking is a request staff accept first."
+                    },
+                    "item_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The inventory service item that holds its name and price (WHIT-1334)."
                     }
                 },
                 "required": [
@@ -98529,6 +98845,78 @@
                 "properties": {
                     "data": {
                         "$ref": "#/components/schemas/CodePluginAccess"
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "CompareThemesRequest": {
+                "type": "object",
+                "properties": {
+                    "before": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The older theme file, such as the installed version."
+                    },
+                    "after": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The newer theme file, such as a file to import or the editor's draft."
+                    }
+                },
+                "required": [
+                    "before",
+                    "after"
+                ]
+            },
+            "CompareThemesResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "changes": {
+                                "type": "array",
+                                "description": "What the newer theme changes, field by field.",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "field": {
+                                            "type": "string"
+                                        },
+                                        "from": {
+                                            "type": "string",
+                                            "nullable": true
+                                        },
+                                        "to": {
+                                            "type": "string",
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "field",
+                                        "from",
+                                        "to"
+                                    ]
+                                }
+                            },
+                            "before": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The older theme compiled: light, dark, vars, fonts, adjustments."
+                            },
+                            "after": {
+                                "type": "object",
+                                "additionalProperties": true,
+                                "description": "The newer theme compiled, the same way."
+                            }
+                        },
+                        "required": [
+                            "changes",
+                            "before",
+                            "after"
+                        ]
                     }
                 },
                 "required": [
@@ -116805,6 +117193,19 @@
                     "data"
                 ]
             },
+            "PackageThemeRequest": {
+                "type": "object",
+                "properties": {
+                    "theme": {
+                        "type": "object",
+                        "additionalProperties": true,
+                        "description": "The theme file to package, as saved (schemas/theme/v1.json)."
+                    }
+                },
+                "required": [
+                    "theme"
+                ]
+            },
             "Pagination": {
                 "type": "object",
                 "properties": {
@@ -127511,6 +127912,48 @@
                         "additionalProperties": {
                             "type": "string"
                         }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "ThemePackageResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "plugin": {
+                                "type": "string",
+                                "description": "The plugin's name in the package, like AcmeHarbourTheme."
+                            },
+                            "filename": {
+                                "type": "string"
+                            },
+                            "media_type": {
+                                "type": "string"
+                            },
+                            "sha256": {
+                                "type": "string",
+                                "description": "The zip's sha256, which the store checks."
+                            },
+                            "size_bytes": {
+                                "type": "integer"
+                            },
+                            "content_base64": {
+                                "type": "string",
+                                "description": "The zip, base64-encoded."
+                            }
+                        },
+                        "required": [
+                            "plugin",
+                            "filename",
+                            "media_type",
+                            "sha256",
+                            "size_bytes",
+                            "content_base64"
+                        ]
                     }
                 },
                 "required": [

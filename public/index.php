@@ -5561,6 +5561,7 @@ $walkinsHandler = new \Whity\Api\WalkinsApiHandler(
     $calendarBookingService,
     $languageRegistry,
 );
+$router->register('GET',    '/api/calendar/price-list',                     [$walkinsHandler, 'priceList'],        null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/walkins',                        [$walkinsHandler, 'list'],             null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('POST',   '/api/calendar/walkins',                        [$walkinsHandler, 'add'],              null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('GET',    '/api/calendar/walkins/services',               [$walkinsHandler, 'services'],         null, null, CorePermissions::CALENDAR_FRONT_DESK);
@@ -5602,6 +5603,7 @@ $hookManager->listen('navigation.register', function ($data, $context) use ($cal
     }
     $items = $data['items'] ?? [];
     $items[] = \Whity\Core\Calendar\FrontDeskFeatures::navigationItem($languageRegistry->getCurrentLanguageCode());
+    $items[] = \Whity\Core\Calendar\FrontDeskFeatures::printablesNavigationItem($languageRegistry->getCurrentLanguageCode());
 
     return ['items' => $items];
 });
@@ -5705,6 +5707,25 @@ $inventoryItems = new \Whity\Core\Inventory\ItemService(
     $customFieldService,
     $hookManager,
 );
+
+// WHIT-1334 (SL.8): an item changed in inventory is copied onto its calendar
+// service, and a service saved in the calendar writes its item.
+$calendarServiceItems = new \Whity\Core\Calendar\ServiceItems($db->getPdo(), $calendarServiceRepository, $inventoryItems);
+$calendarHandler->setServiceItems($calendarServiceItems);
+$walkinsHandler->setPriceList(new \Whity\Core\Calendar\PriceList($calendarServiceRepository, $inventoryItems, $settingsService));
+foreach ([\Whity\Sdk\Hooks\Events::INVENTORY_ITEM_UPDATED, \Whity\Sdk\Hooks\Events::INVENTORY_ITEM_ARCHIVED] as $itemEvent) {
+    $hookManager->listen($itemEvent, function ($data) use ($calendarServiceItems) {
+        if (is_array($data) && is_int($data['tenant_id'] ?? null) && is_int($data['item_id'] ?? null)) {
+            try {
+                $calendarServiceItems->fromItem($data['tenant_id'], $data['item_id']);
+            } catch (\Throwable $e) {
+                error_log('[calendar] item ' . $data['item_id'] . ' not copied to its service: ' . $e->getMessage());
+            }
+        }
+
+        return $data;
+    });
+}
 $customFieldRecordTypes->register(new \Whity\Core\CustomFields\CustomFieldRecordType(
     \Whity\Core\Inventory\ItemService::RECORD_TYPE,
     'Items',
@@ -6542,6 +6563,8 @@ $router->register('POST',   '/api/themes/tokens',     [$themesHandler, 'tokens']
 $router->register('POST',   '/api/themes',            [$themesHandler, 'import'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes/convert',    [$themesHandler, 'convert'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('POST',   '/api/themes/preview',    [$themesHandler, 'preview'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST',   '/api/themes/compare',    [$themesHandler, 'compare'], null, null, CorePermissions::SETTINGS_READ);
+$router->register('POST',   '/api/themes/package',    [$themesHandler, 'package'], null, null, CorePermissions::SETTINGS_WRITE);
 $router->register('GET',    '/api/themes/{themeId}',  [$themesHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('DELETE', '/api/themes/{themeId}',  [$themesHandler, 'delete'], null, null, CorePermissions::SETTINGS_WRITE);
 

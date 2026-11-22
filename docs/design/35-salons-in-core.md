@@ -95,7 +95,7 @@ Every `calendar_services` row gets an `item_id` to an `inv_items` row with `kind
 
 ### 5.2 The page
 
-`GET /api/calendar/price-list`: a whole A4 HTML page with its own strict CSP (as Salons), every active service item linked to a bookable service, in English and Arabic, with its length and price, under the workspace's name, phone and brand colour. Permission `calendar:read`. It moves to a document starter (`editor.price_list`, section 16) when the brand team's card arrives. The booking QR poster stays in Calendar › Settings.
+`GET /api/calendar/price-list`: a whole A4 HTML page with its own strict CSP (as Salons), every active service item linked to a bookable service, in English and Arabic, with its length and price, under the workspace's name, phone and brand colour. Permission `calendar:read`. It moves to a document starter (`editor.price_list`, section 16) when the brand team's card arrives. The booking QR poster stays in Calendar › Settings. Both open from a "Print for the front desk" block screen, in the menu beside Walk-ins while walk-ins are on.
 
 ## 6. Moving the data
 

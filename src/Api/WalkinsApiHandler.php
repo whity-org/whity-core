@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use Whity\Core\Calendar\BookingService;
 use Whity\Core\Calendar\CalendarRejectedException;
+use Whity\Core\Calendar\PriceList;
 use Whity\Core\Calendar\WalkinQueue;
 use Whity\Core\i18n\LanguageRegistry;
 use Whity\Core\Request;
@@ -29,6 +30,40 @@ final class WalkinsApiHandler
         private readonly BookingService $booking,
         private readonly LanguageRegistry $languages,
     ) {
+    }
+
+    private ?PriceList $priceList = null;
+
+    /** WHIT-1334 (SL.8): the price list page, wired once inventory's items are built. */
+    public function setPriceList(PriceList $priceList): void
+    {
+        $this->priceList = $priceList;
+    }
+
+    /**
+     * The price list as a whole page to print (SL.8), with its own strict
+     * policy. Needs `calendar:read` only, and no walk-ins switch.
+     */
+    public function priceList(Request $request): Response
+    {
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null || $this->priceList === null) {
+            return Response::error('Open a workspace to print its price list.', 403);
+        }
+        try {
+            $page = $this->priceList->page($tenantId, $this->language());
+        } catch (\Throwable $e) {
+            error_log('[WalkinsApiHandler] price list failed: ' . $e->getMessage());
+
+            return Response::error('The price list could not be made', 500);
+        }
+
+        return new Response(200, $page['html'], [
+            'Content-Type' => 'text/html; charset=utf-8',
+            'Cache-Control' => 'no-store',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-" . $page['nonce'] . "'; frame-ancestors 'none'",
+        ]);
     }
 
     /** Who is waiting, first come first served. */
