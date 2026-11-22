@@ -393,6 +393,24 @@ final class CoreApiSchemas
             ],
         ];
 
+        // POST /api/auth/operator-link — OperatorLinkHandler::open() (WHIT-1350)
+        // Opens the one-time link `whity-cli auth operator-link <email>` printed.
+        $operatorLinkRoute = [
+            'method' => 'POST',
+            'path' => '/api/auth/operator-link',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Sign a platform operator in with a one-time link printed on the server',
+                'tags' => ['auth'],
+                'request' => 'OperatorLinkRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Session issued in the system workspace; next is the page to open', 'OperatorLinkResponse'),
+                    410 => self::errorResponse('The link expired, was already used, or is not for a platform operator'),
+                ],
+            ],
+        ];
+
         // GET /api/auth/select-tenant — AuthHandler::handlePendingSelection()
         // WHIT-672: the choices a pending (cookie) selection may pick from.
         $pendingSelectionRoute = [
@@ -650,6 +668,7 @@ final class CoreApiSchemas
             $loginRoute,
             $login2faRoute,
             $selectTenantRoute,
+            $operatorLinkRoute,
             $pendingSelectionRoute,
             $switchTenantRoute,
             $getMeRoute,
@@ -5306,6 +5325,15 @@ final class CoreApiSchemas
             'SessionUserResponse' => self::object([
                 'user' => $sessionUser,
             ] + $tokenPair, ['user']),
+
+            // POST /api/auth/operator-link — the one-time link's token (WHIT-1350)
+            'OperatorLinkRequest' => self::object([
+                'token' => self::str(),
+            ], ['token']),
+            'OperatorLinkResponse' => self::object([
+                'user' => $sessionUser,
+                'next' => self::str(),
+            ] + $tokenPair, ['user', 'next']),
 
             // POST /api/auth/switch-tenant — request body (WC-f8164c87)
             'SwitchTenantRequest' => self::object([

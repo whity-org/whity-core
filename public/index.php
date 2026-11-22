@@ -1879,6 +1879,17 @@ $router->register('GET', '/api/me', [$authHandler, 'handleMe'], null);
 $router->register('PATCH', '/api/me', [$authHandler, 'handleUpdateMe'], null);
 $router->register('POST', '/api/auth/refresh', [$authHandler, 'handleRefresh'], null);
 $router->register('POST', '/api/auth/logout', [$authHandler, 'handleLogout'], null);
+// WHIT-1350: the one-time sign-in link `whity-cli auth operator-link <email>`
+// prints for a platform operator with no Whity ID. Public: the signed,
+// single-use, 15-minute token is the credential. Not behind the password
+// guard: it is the way in when password sign-in is off.
+$router->register('POST', '/api/auth/operator-link', [new \Whity\Api\OperatorLinkHandler(
+    $db->getPdo(),
+    $jwtParser,
+    new DatabaseSharedStore($db->getPdo()),
+    $authHandler,
+    $auditLogger,
+), 'open'], null);
 // WC-b-logout-others: sign out of all OTHER sessions & devices (bump token_epoch
 // then re-mint the current session). Self-authenticating like /me and refresh.
 $router->register('POST', '/api/me/logout-others', [$authHandler, 'handleLogoutOthers'], null);
@@ -6866,6 +6877,8 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
     // #2355: signing in from a form's public link joins the form's workspace.
     $formRepository,
+    // WHIT-1350: linking the operator's provider from Settings › Security is audited.
+    $auditLogger,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
@@ -6925,7 +6938,7 @@ $router->register('POST',   '/api/me/ownership-offers/{id:\d+}/decline',     [$w
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the
 // access token (cookie or Bearer), scoped to the caller's profile.
-$meIdentitiesHandler = new \Whity\Api\MeIdentitiesApiHandler($tokenValidator, $externalIdentityRepository, $db->getPdo());
+$meIdentitiesHandler = new \Whity\Api\MeIdentitiesApiHandler($tokenValidator, $externalIdentityRepository, $db->getPdo(), $settingsService);
 $router->register('GET',    '/api/me/identities',            [$meIdentitiesHandler, 'list'],   null);
 $router->register('DELETE', '/api/me/identities/{id:\d+}',   [$meIdentitiesHandler, 'unlink'], null);
 
