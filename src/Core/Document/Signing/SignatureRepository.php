@@ -29,16 +29,26 @@ final class SignatureRepository
         'consent_version', 'appearance_hash',
     ];
 
+    /**
+     * The further facts a STAMP record's seal covers (#1729). A signature's
+     * sealed text is unchanged, so every seal made before stamps still checks.
+     */
+    public const STAMP_SEALED_FIELDS = ['kind', 'stamp_id', 'stamp_name', 'stamp_legal_name'];
+
+    public const KIND_SIGNATURE = 'signature';
+    public const KIND_STAMP = 'stamp';
+
     private const INTS = [
         'tenant_id', 'document_id', 'route_id', 'event_id', 'step_id', 'subject_id', 'subject_version',
-        'signer_profile_id',
+        'signer_profile_id', 'stamp_id',
     ];
 
     private const COLUMNS = 's.id, s.tenant_id, s.document_id, s.route_id, s.event_id, s.step_id,
         s.subject_type, s.subject_id, s.subject_version, s.content_hash, s.signer_profile_id,
         s.signer_name, s.signer_email, s.capacity, s.on_behalf_of, s.confirmed_by, s.signed_at,
         s.ip_address, s.user_agent, s.consent_version, s.appearance, s.appearance_hash,
-        s.record_hash, s.seal, s.seal_key_id, e.entry_hash AS event_entry_hash';
+        s.record_hash, s.seal, s.seal_key_id, s.kind, s.stamp_id, s.stamp_name, s.stamp_legal_name,
+        e.entry_hash AS event_entry_hash';
 
     public function __construct(private readonly PDO $db)
     {
@@ -51,8 +61,10 @@ final class SignatureRepository
      */
     public static function sealedMessage(array $record, ?string $eventEntryHash): string
     {
+        $isStamp = ($record['kind'] ?? self::KIND_SIGNATURE) === self::KIND_STAMP;
+        $fields = $isStamp ? array_merge(self::SEALED_FIELDS, self::STAMP_SEALED_FIELDS) : self::SEALED_FIELDS;
         $facts = [];
-        foreach (self::SEALED_FIELDS as $field) {
+        foreach ($fields as $field) {
             $value = $record[$field] ?? null;
             if ($value === null) {
                 $facts[$field] = null;
@@ -84,15 +96,21 @@ final class SignatureRepository
                  (tenant_id, document_id, route_id, event_id, step_id, subject_type, subject_id,
                   subject_version, content_hash, signer_profile_id, signer_name, signer_email,
                   capacity, on_behalf_of, confirmed_by, signed_at, ip_address, user_agent,
-                  consent_version, appearance, appearance_hash, record_hash, seal, seal_key_id)
+                  consent_version, appearance, appearance_hash, record_hash, seal, seal_key_id,
+                  kind, stamp_id, stamp_name, stamp_legal_name)
              VALUES (:tenant_id, :document_id, :route_id, :event_id, :step_id, :subject_type, :subject_id,
                      :subject_version, :content_hash, :signer_profile_id, :signer_name, :signer_email,
                      :capacity, :on_behalf_of, :confirmed_by, :signed_at, :ip_address, :user_agent,
-                     :consent_version, :appearance, :appearance_hash, :record_hash, :seal, :seal_key_id)'
+                     :consent_version, :appearance, :appearance_hash, :record_hash, :seal, :seal_key_id,
+                     :kind, :stamp_id, :stamp_name, :stamp_legal_name)'
         );
         $params = [];
         foreach (array_merge(self::SEALED_FIELDS, ['appearance', 'record_hash', 'seal', 'seal_key_id']) as $field) {
             $params[':' . $field] = $record[$field] ?? null;
+        }
+        $params[':kind'] = ($record['kind'] ?? self::KIND_SIGNATURE) === self::KIND_STAMP ? self::KIND_STAMP : self::KIND_SIGNATURE;
+        foreach (['stamp_id', 'stamp_name', 'stamp_legal_name'] as $field) {
+            $params[':' . $field] = $params[':kind'] === self::KIND_STAMP ? ($record[$field] ?? null) : null;
         }
         $stmt->execute($params);
 

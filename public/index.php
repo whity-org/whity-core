@@ -4487,6 +4487,7 @@ $signingService = new \Whity\Core\Document\Signing\SigningService(
     $signingChallengeRepository,
     $instanceSealKeys,
     new \Whity\Core\Document\Signing\SigningCodeMailer($brandedEmailSender),
+    $companyStampRepository = new \Whity\Core\Document\Signing\CompanyStampRepository($db->getPdo()),
 );
 $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
     $documentRepository,
@@ -4501,10 +4502,22 @@ $documentSigningHandler = new \Whity\Api\DocumentSigningApiHandler(
 $router->register('GET',    '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing',      [$documentSigningHandler, 'context'],         null);
 $router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/signing/code', [$documentSigningHandler, 'sendCode'],        null);
 $router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/sign',         [$documentSigningHandler, 'sign'],            null);
+$router->register('GET',    '/api/documents/{id:\d+}/routes/{routeId:\d+}/stamping',     [$documentSigningHandler, 'stampContext'],    null);
+$router->register('POST',   '/api/documents/{id:\d+}/routes/{routeId:\d+}/stamp',        [$documentSigningHandler, 'stamp'],           null);
 $router->register('GET',    '/api/documents/{id:\d+}/audit',                              [$documentSigningHandler, 'audit'],           null);
 $router->register('GET',    '/api/me/signature',                                          [$documentSigningHandler, 'savedSignature'],  null);
 $router->register('PUT',    '/api/me/signature',                                          [$documentSigningHandler, 'saveSignature'],   null);
 $router->register('DELETE', '/api/me/signature',                                          [$documentSigningHandler, 'deleteSignature'], null);
+// Company stamps (#1729): anyone who reads documents can list them, so a
+// route's author can choose one; documents:stamps changes them.
+$companyStampsHandler = new \Whity\Api\CompanyStampsApiHandler($companyStampRepository);
+$router->register('GET',    '/api/document-stamps',                    [$companyStampsHandler, 'list'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('POST',   '/api/document-stamps',                    [$companyStampsHandler, 'create'],     null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('GET',    '/api/document-stamps/{id:\d+}',           [$companyStampsHandler, 'show'],       null, null, CorePermissions::DOCUMENTS_READ);
+$router->register('PATCH',  '/api/document-stamps/{id:\d+}',           [$companyStampsHandler, 'update'],     null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('PUT',    '/api/document-stamps/{id:\d+}/holders',   [$companyStampsHandler, 'setHolders'], null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('POST',   '/api/document-stamps/{id:\d+}/archive',   [$companyStampsHandler, 'archive'],    null, null, CorePermissions::DOCUMENTS_STAMPS);
+$router->register('POST',   '/api/document-stamps/{id:\d+}/restore',   [$companyStampsHandler, 'restore'],    null, null, CorePermissions::DOCUMENTS_STAMPS);
 $router->register('GET',    '/api/signing-keys',                                          [$documentSigningHandler, 'publishedKeys'],   null);
 
 // 13a-nonies-quater. NAMED USER GROUPS (#999). A group is a named, reusable RULE

@@ -30,6 +30,8 @@ use Whity\Http\JsonBody;
  *   GET    /api/documents/{id}/routes/{routeId}/signing        (session)
  *   POST   /api/documents/{id}/routes/{routeId}/signing/code   (session)
  *   POST   /api/documents/{id}/routes/{routeId}/sign           (session)
+ *   GET    /api/documents/{id}/routes/{routeId}/stamping       (session)
+ *   POST   /api/documents/{id}/routes/{routeId}/stamp          (session)
  *   GET    /api/documents/{id}/audit                           (session)
  *   GET    /api/me/signature                                   (session)
  *   PUT    /api/me/signature                                   (session)
@@ -134,6 +136,68 @@ final class DocumentSigningApiHandler
 
         return Response::json([
             // The signer's own record, so their own details are included.
+            'data' => SigningService::present($outcome['signature']),
+            'event' => RoutingPresenter::event($outcome['event']),
+            'decided' => $outcome['decided'],
+            'resolved' => $outcome['resolved'],
+            'delivered' => $outcome['delivered'],
+        ], 201);
+    }
+
+    /**
+     * GET .../stamping — what a stamp holder sees before applying a company
+     * stamp on a `stamp` step (#1729).
+     *
+     * @param array<string, string> $params
+     */
+    public function stampContext(Request $request, array $params): Response
+    {
+        $resolved = $this->resolveRoute($request, $params);
+        if ($resolved instanceof Response) {
+            return $resolved;
+        }
+        [$tenantId, $callerId, , $route] = $resolved;
+
+        return Response::json(['data' => $this->signing->stampContext($tenantId, $callerId, $route)]);
+    }
+
+    /**
+     * POST .../stamp — apply the company stamp the caller's open `stamp` step
+     * asks for (#1729). The caller must hold the stamp; consent and the second
+     * check are as for signing. No drawn signature: the stamp's image is applied.
+     *
+     * @param array<string, string> $params
+     */
+    public function stamp(Request $request, array $params): Response
+    {
+        $resolved = $this->resolveRoute($request, $params);
+        if ($resolved instanceof Response) {
+            return $resolved;
+        }
+        [$tenantId, $callerId, , $route] = $resolved;
+
+        $body = JsonBody::parsed($request);
+        try {
+            $outcome = $this->signing->stamp(
+                $tenantId,
+                $callerId,
+                $route,
+                [
+                    'content_hash' => $body['content_hash'] ?? null,
+                    'consent' => $body['consent'] ?? null,
+                    'consent_version' => $body['consent_version'] ?? null,
+                    'second_factor' => $body['second_factor'] ?? null,
+                ],
+                ClientIp::fromRequest($request),
+                $request->getHeader('User-Agent'),
+            );
+        } catch (SigningRefusedException $e) {
+            return self::refusal($e);
+        } catch (RoutingRejectedException $e) {
+            return Response::error($e->clientMessage, 422);
+        }
+
+        return Response::json([
             'data' => SigningService::present($outcome['signature']),
             'event' => RoutingPresenter::event($outcome['event']),
             'decided' => $outcome['decided'],

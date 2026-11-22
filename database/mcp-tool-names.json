@@ -533,6 +533,14 @@
     "en": "See one published version of a template",
     "ar": "عرض إصدار منشور من قالب"
   },
+  "get_api_document_stamps": {
+    "en": "List company stamps",
+    "ar": "عرض أختام الشركة"
+  },
+  "get_api_document_stamps_id": {
+    "en": "Show a company stamp",
+    "ar": "عرض ختم الشركة"
+  },
   "get_api_document_template_slots": {
     "en": "See which templates the plugins use for each purpose",
     "ar": "عرض القوالب التي تستخدمها الإضافات"
@@ -1222,6 +1230,10 @@
     "en": "Change who can see a document",
     "ar": "تغيير من يستطيع رؤية مستند"
   },
+  "patch_api_document_stamps_id": {
+    "en": "Change a company stamp",
+    "ar": "تعديل ختم الشركة"
+  },
   "patch_api_document_themes_ref": {
     "ar": "تعديل سمة مستندات"
   },
@@ -1604,6 +1616,18 @@
   },
   "post_api_document_sources_id_suggestions_sid_decision": {
     "ar": "قبول اقتراح أو رفضه"
+  },
+  "post_api_document_stamps": {
+    "en": "Add a company stamp",
+    "ar": "إضافة ختم للشركة"
+  },
+  "post_api_document_stamps_id_archive": {
+    "en": "Archive a company stamp",
+    "ar": "أرشفة ختم الشركة"
+  },
+  "post_api_document_stamps_id_restore": {
+    "en": "Restore a company stamp",
+    "ar": "استعادة ختم الشركة"
   },
   "post_api_document_themes": {
     "ar": "إنشاء سمة مستندات"
@@ -2173,6 +2197,10 @@
   "put_api_document_sources_id_draft": {
     "en": "Save a document's draft",
     "ar": "حفظ مسودة مستند"
+  },
+  "put_api_document_stamps_id_holders": {
+    "en": "Choose who holds a company stamp",
+    "ar": "اختيار من يحمل ختم الشركة"
   },
   "put_api_document_template_slots_key": {
     "en": "Choose a template for a plugin, or clear it",
