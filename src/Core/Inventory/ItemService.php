@@ -164,17 +164,60 @@ final class ItemService
     }
 
     /**
-     * What a scanned code means: a barcode first, then a SKU.
+     * What a scanned code means: a barcode first, then a SKU, then a GS1
+     * barcode's GTIN, with the batch, expiry and count it carries.
      *
-     * @return array{item: array<string, mixed>, variant_id: int, unit: string}|null
+     * @return array{item: array<string, mixed>, variant_id: int, unit: string, scanned?: array{gtin: string, lot_code: ?string, lot_id: ?int, expires_on: ?string, made_on: ?string, count: ?int}}|null
      */
     public function lookup(int $tenantId, string $code): ?array
     {
+        $raw = $code;
         $code = self::barcodeText($code);
         if ($code === '') {
             return null;
         }
-        $hit = $this->db->one(
+        $hit = $this->findCode($tenantId, $code);
+        $gs1 = null;
+        if ($hit === null && ($gs1 = Gs1Barcode::parse($raw)) !== null) {
+            // A GS1 barcode carries the product's GTIN with its batch and expiry (WHIT-1235).
+            foreach (Gs1Barcode::gtinForms($gs1['gtin']) as $form) {
+                if (($hit = $this->findCode($tenantId, $form)) !== null) {
+                    break;
+                }
+            }
+        }
+        if ($hit === null) {
+            return null;
+        }
+        $item = $this->show($tenantId, (int) $hit['item_id']);
+        $found = [
+            'item' => $item,
+            'variant_id' => (int) $hit['variant_id'],
+            'unit' => is_string($hit['unit_code']) ? $hit['unit_code'] : (string) $item['base_unit']['code'],
+        ];
+        if ($gs1 !== null) {
+            $lotCode = $gs1['serial'] ?? $gs1['lot'];
+            $lot = $lotCode === null ? null : $this->db->one(
+                'SELECT id, expires_on FROM inv_lots WHERE tenant_id = :tenant_id AND variant_id = :variant_id AND code = :code',
+                [':tenant_id' => $tenantId, ':variant_id' => (int) $hit['variant_id'], ':code' => $lotCode]
+            );
+            $found['scanned'] = [
+                'gtin' => $gs1['gtin'],
+                'lot_code' => $lotCode,
+                'lot_id' => $lot === null ? null : (int) $lot['id'],
+                'expires_on' => $gs1['expires_on'] ?? ($lot !== null && $lot['expires_on'] !== null ? substr((string) $lot['expires_on'], 0, 10) : null),
+                'made_on' => $gs1['made_on'],
+                'count' => $gs1['count'],
+            ];
+        }
+
+        return $found;
+    }
+
+    /** @return array<string, mixed>|null the variant a barcode or SKU names */
+    private function findCode(int $tenantId, string $code): ?array
+    {
+        return $this->db->one(
             'SELECT v.id AS variant_id, v.item_id, u.code AS unit_code
                FROM inv_barcodes b
                JOIN inv_variants v ON v.tenant_id = b.tenant_id AND v.id = b.variant_id
@@ -185,16 +228,6 @@ final class ItemService
             'SELECT v.id AS variant_id, v.item_id, NULL AS unit_code FROM inv_variants v WHERE v.tenant_id = :tenant_id AND v.sku = :code',
             [':tenant_id' => $tenantId, ':code' => $code]
         );
-        if ($hit === null) {
-            return null;
-        }
-        $item = $this->show($tenantId, (int) $hit['item_id']);
-
-        return [
-            'item' => $item,
-            'variant_id' => (int) $hit['variant_id'],
-            'unit' => is_string($hit['unit_code']) ? $hit['unit_code'] : (string) $item['base_unit']['code'],
-        ];
     }
 
     /** Live variants in the workspace, what `inventory.items.max` counts. */

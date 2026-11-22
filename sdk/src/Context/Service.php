@@ -22,6 +22,8 @@ final class Service
     public const HTTP = 'http';
     public const THEMES = 'themes';
     public const INVENTORY = 'inventory';
+    /** Core's books, {@see PluginScope::accounting()} (SDK 1.154, WHIT-1318). */
+    public const ACCOUNTING = 'accounting';
     public const DATABASE = 'database';
 
     private function __construct()
@@ -33,7 +35,7 @@ final class Service
     {
         return [
             self::SETTINGS, self::SECRETS, self::FILES, self::DOCUMENTS, self::NOTIFY, self::JOBS,
-            self::AUDIT, self::HTTP, self::THEMES, self::INVENTORY, self::DATABASE,
+            self::AUDIT, self::HTTP, self::THEMES, self::INVENTORY, self::ACCOUNTING, self::DATABASE,
         ];
     }
 }

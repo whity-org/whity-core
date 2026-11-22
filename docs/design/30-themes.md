@@ -342,7 +342,13 @@ This section first described Whity Studio, a paid tool for making themes. On 21 
 - **Whity's own themes** can't be packaged: make a copy to publish your own.
 - **Direct upload** comes once the Whity ID store module has a publisher API. The store is moving into Whity ID, so the old store plugin gets no upload.
 
-**Next: versions (decided 21 Nov 2026, not built).** Each save of a workspace's own theme keeps its earlier versions: a history list, compare any two with the side-by-side diff, and restore one as a new version. Workspaces using a theme move to a new version when it is published to them. This needs a table for the versions, a migration whose number is asked for at PR time.
+**Versions (built, WHIT-1225).** Every save of a workspace's own theme keeps its version in `theme_versions` (migration 349). That covers imports, the editor and restores. Today's version of each theme became its first.
+- **History:** Branding › Theme › a theme's Versions lists them newest first: the number, how it came in (added from a file, saved in the editor, restored), who saved it by name, and when.
+- **Compare:** any older version opens beside the one in use in the side-by-side diff.
+- **Restore:** brings an older version back as the next version, numbered past the newest, so the history only grows and nothing is lost. Saving the same number again replaces that version.
+- **API:** `GET /api/v1/themes/{id}/versions`, `GET …/versions/{version}` and `POST …/versions/{version}/restore`. Removing a theme removes its history.
+- **Whity's and plugins' themes** have no history here: their versions come with Whity or the plugin.
+- **Publishing a new version to other workspaces** happens through the store package (above). Inside a workspace, a saved version is live at once.
 
 The editor is built last in the order of TH.24, after the per-component overrides. Whether the wider Studio product (records and pages, R.2) moves the same way is for the business-model register, not this spec.
 

@@ -15,6 +15,7 @@ use Whity\Core\Inventory\ItemService;
 use Whity\Core\Inventory\LocationService;
 use Whity\Core\Inventory\LotExpiryJob;
 use Whity\Core\Inventory\LotService;
+use Whity\Core\Inventory\Print\LotLabelFieldProvider;
 use Whity\Core\Inventory\ReasonCatalog;
 use Whity\Core\Inventory\StockLedger;
 use Whity\Core\Inventory\StockOperations;
@@ -220,6 +221,41 @@ final class LotsRealEngineTest extends TestCase
         self::assertSame(['expiring' => 1, 'expired' => 1], $job->handle([]));
         self::assertSame([[Events::STOCK_LOT_EXPIRED, 'OLD', '2'], [Events::STOCK_LOT_EXPIRING, 'SOON', '2']], $heard);
         self::assertSame(['expiring' => 0, 'expired' => 0], $job->handle([]), 'a second run the same day says nothing again');
+    }
+
+    public function testAGs1ScanFindsTheItemAndItsBatch(): void
+    {
+        $milk = $this->milk(['barcode' => '6251234567890']);
+        $this->open($milk, '6', ['lot_code' => 'B-1', 'expires_on' => '2027-03-31']);
+
+        $hit = $this->items->lookup(1, '(01)06251234567890(17)270331(10)B-1');
+        self::assertSame($milk, $hit['variant_id'] ?? null);
+        self::assertSame('B-1', $hit['scanned']['lot_code'] ?? null);
+        self::assertSame($this->lots->findByCode(1, $milk, 'B-1')['id'] ?? null, $hit['scanned']['lot_id'] ?? null);
+        self::assertSame('2027-03-31', $hit['scanned']['expires_on'] ?? null);
+
+        $new = $this->items->lookup(1, "0106251234567890" . "17270415" . "10B-2");
+        self::assertSame('B-2', $new['scanned']['lot_code'] ?? null);
+        self::assertNull($new['scanned']['lot_id'], 'a batch not seen yet');
+        self::assertSame('2027-04-15', $new['scanned']['expires_on'] ?? null);
+
+        self::assertArrayNotHasKey('scanned', $this->items->lookup(1, '6251234567890') ?? [], 'a plain barcode is just the item');
+        self::assertNull($this->items->lookup(1, '(01)09999999999999(10)B-1'));
+    }
+
+    public function testABatchLabelScansBackToTheItemAndTheBatch(): void
+    {
+        $milk = $this->milk(['barcode' => '6251234567890']);
+        $this->open($milk, '6', ['lot_code' => 'B-1', 'expires_on' => '2027-03-31']);
+        $lotId = (string) ($this->lots->findByCode(1, $milk, 'B-1')['id'] ?? 0);
+
+        $label = (new LotLabelFieldProvider($this->pdo))->values(1, self::AMRO, static fn (string $p): bool => true, $lotId);
+
+        self::assertSame('(01)06251234567890(17)270331(10)B-1', $label['values']['lot.barcode'] ?? null);
+        self::assertSame('31 March 2027', $label['values']['lot.expires_on'] ?? null);
+        self::assertSame($milk, $this->items->lookup(1, (string) $label['values']['lot.barcode'])['variant_id'] ?? null, 'scanning the label finds the item');
+        self::assertNull((new LotLabelFieldProvider($this->pdo))->values(2, self::AMRO, static fn (string $p): bool => true, $lotId), 'another workspace');
+        self::assertNull((new LotLabelFieldProvider($this->pdo))->values(1, self::AMRO, static fn (string $p): bool => false, $lotId), 'needs inventory:read');
     }
 
     public function testAnotherWorkspaceDoesNotSeeTheBatches(): void

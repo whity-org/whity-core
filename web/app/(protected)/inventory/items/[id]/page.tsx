@@ -8,7 +8,8 @@
  * the units it is bought or sold in, and the history: every move, newest
  * first, with who made it and why. A stock change can be undone from the
  * history, which posts it the other way; nothing is ever edited. Change is the
- * main button; Change stock is outline. Archiving can be undone, so it asks
+ * main button; Change stock is outline. An item that keeps batches shows them,
+ * soonest expiring first, with batch labels to print (WHIT-1235). Archiving can be undone, so it asks
  * nothing and offers Restore.
  */
 
@@ -22,6 +23,7 @@ import { UserText } from '@/components/ui/user-text';
 import { Breadcrumb } from '@/components/ui/breadcrumb';
 import { AdjustStockDialog } from '@/components/inventory/adjust-stock-dialog';
 import { useReasons } from '@/lib/inventory/use-reasons';
+import { ItemBatches } from '@/components/inventory/item-batches';
 import { ReorderLevels } from '@/components/inventory/reorder-levels';
 import { SupplierPrices } from '@/components/inventory/supplier-prices';
 import { useWorkspaceCurrency } from '@/lib/branding-context';
@@ -68,7 +70,7 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
   const [problem, setProblem] = useState<string | null>(null);
 
   const { data, loading, error, forbidden, refetch } = useFetch(async () => {
-    const [item, levels, moves, places, allPlaces, units, rules] = await Promise.all([
+    const [item, levels, moves, places, allPlaces, units, rules, settings] = await Promise.all([
       inventoryApi.item(itemId),
       inventoryApi.levels({ itemId }),
       inventoryApi.moves({ itemId, limit: 50 }),
@@ -76,8 +78,18 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
       inventoryApi.locations({ virtual: true, inactive: true }),
       inventoryApi.units(),
       inventoryApi.reorderRules(),
+      inventoryApi.settings().catch(() => null),
     ]);
-    return { item, levels, moves: moves.data, places, allPlaces, units, rules: rules.filter((r) => r.item_id === itemId) };
+    return {
+      item,
+      levels,
+      moves: moves.data,
+      places,
+      allPlaces,
+      units,
+      rules: rules.filter((r) => r.item_id === itemId),
+      windowDays: settings?.expiry_warning_days ?? 7,
+    };
   }, [itemId]);
 
   if (!accessLoading && !has(INVENTORY_READ)) {
@@ -297,6 +309,10 @@ export default function InventoryItemPage({ params }: { params: Promise<{ id: st
           </ul>
         </section>
       </div>
+
+      {item.kind !== 'service' && item.tracking !== 'none' && (
+        <ItemBatches item={item} places={allPlaces} windowDays={data.windowDays} canPrint={canPrintLabels && !item.archived} />
+      )}
 
       {item.kind !== 'service' && !item.archived && (
         <ReorderLevels item={item} places={places} rules={rules} canEdit={canWrite} onSaved={refetch} />

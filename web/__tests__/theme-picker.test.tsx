@@ -276,3 +276,42 @@ it('says the server’s reason when a theme file is refused', async () => {
   fireEvent.change(screen.getByLabelText('Add a theme file', { selector: 'input' }), { target: { files: [file] } });
   await waitFor(() => expect(addToast).toHaveBeenCalledWith('density must be one of: compact, standard, comfortable.', 'error'));
 });
+
+// TH.25: a theme's versions, compared and restored.
+it('lists a theme’s versions and restores one as the next version', async () => {
+  const own = { ...list, themes: [...list.themes, { id: 'workspace.sea', version: '1.1.0', name: { en: 'Shore' }, source: 'editor', current: false, preview: { light: swatch, dark: swatch } }] };
+  GET.mockImplementation((path: string) => {
+    if (path === '/api/v1/themes/{themeId}/versions') {
+      return Promise.resolve({
+        data: {
+          data: {
+            theme_id: 'workspace.sea',
+            current: '1.1.0',
+            versions: [
+              { version: '1.1.0', source: 'editor', saved_at: '2026-11-21 10:00:00', saved_by: 'Amro Saleh', current: true },
+              { version: '1.0.0', source: 'import', saved_at: '2026-11-20 09:00:00', saved_by: null, current: false },
+            ],
+          },
+        },
+      });
+    }
+    return Promise.resolve({ data: { data: own } });
+  });
+  POST.mockResolvedValue({ data: { data: { id: 'workspace.sea', version: '1.1.1', restored_from: '1.0.0' } }, error: undefined });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Shore');
+  fireEvent.click(screen.getByRole('button', { name: 'Versions of Shore' }));
+  const history = await screen.findByTestId('theme-history-list');
+  expect(history).toHaveTextContent('1.1.0');
+  expect(history).toHaveTextContent('In use');
+  expect(history).toHaveTextContent('Saved in the editor · Amro Saleh');
+  expect(history).toHaveTextContent('Added from a file');
+  // Only an older version can be compared or restored.
+  expect(screen.getAllByRole('button', { name: 'Restore' })).toHaveLength(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+  await waitFor(() =>
+    expect(POST).toHaveBeenCalledWith('/api/v1/themes/{themeId}/versions/{version}/restore', { params: { path: { themeId: 'workspace.sea', version: '1.0.0' } } }),
+  );
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('Version 1.0.0 is back as version 1.1.1.', 'success'));
+  expect(refresh).toHaveBeenCalled();
+});

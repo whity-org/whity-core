@@ -182,6 +182,7 @@ final class CoreApiSchemas
             InventoryApiSchemas::routes(),
             ImportApiSchemas::routes(),
             SalesApiSchemas::routes(),
+            AccountingApiSchemas::routes(),
             ContactsApiSchemas::customFieldRoutes()
         ));
     }
@@ -4656,6 +4657,38 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The package, its name and its sha256', 'ThemePackageResponse'),
                     413 => self::errorResponse('The theme is larger than 32 KB'),
                     422 => self::errorResponse('The theme has problems, or is one of Whity\'s own'),
+                ] + self::authErrors(),
+            ]),
+            // TH.25: versions of the workspace's own themes.
+            self::permissionRoute('GET', '/api/themes/{themeId}/versions', 'settings:read', [
+                'summary' => 'List a theme\'s versions',
+                'description' => 'The history of one of this workspace\'s own themes (imported, made in the editor or restored), newest first: each version, how it came in, when and who saved it, and which is in use. Whity\'s and plugins\' themes have no history here.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The versions', 'ThemeVersionsResponse'),
+                    404 => self::errorResponse('This workspace has no theme of its own with that id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/themes/{themeId}/versions/{version}', 'settings:read', [
+                'summary' => 'Get one version of a theme',
+                'description' => 'That version\'s theme file, for comparing it with another (POST /api/themes/compare).',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']], ['name' => 'version', 'in' => 'path', 'required' => true, 'description' => 'A version number like 1.2.0', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The theme file', 'ThemeVersionFileResponse'),
+                    404 => self::errorResponse('No such version'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/{themeId}/versions/{version}/restore', 'settings:write', [
+                'summary' => 'Restore an earlier version of a theme',
+                'description' => 'Saves that version\'s file as the next version, numbered past the newest, so the history only grows. Workspaces using the theme see it at once.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']], ['name' => 'version', 'in' => 'path', 'required' => true, 'description' => 'A version number like 1.2.0', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    201 => self::jsonResponse('Restored as a new version', 'RestoreThemeVersionResponse'),
+                    404 => self::errorResponse('No such version'),
+                    422 => self::errorResponse('That version is no longer a valid theme'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
@@ -12566,6 +12599,25 @@ final class CoreApiSchemas
                 'size_bytes' => self::int(),
                 'content_base64' => self::str() + ['description' => 'The zip, base64-encoded.'],
             ], ['plugin', 'filename', 'media_type', 'sha256', 'size_bytes', 'content_base64'])),
+            'ThemeVersionsResponse' => self::dataEnvelope(self::object([
+                'theme_id' => self::str(),
+                'current' => self::str() + ['description' => 'The version in use.'],
+                'versions' => ['type' => 'array', 'description' => 'Newest first.', 'items' => self::object([
+                    'version' => self::str(),
+                    'source' => self::str() + ['description' => 'import, editor or restore.'],
+                    'saved_at' => self::str(),
+                    'saved_by' => self::str(true) + ['description' => 'The name of the person who saved it, when known.'],
+                    'current' => self::bool(),
+                ], ['version', 'source', 'saved_at', 'current'])],
+            ], ['theme_id', 'current', 'versions'])),
+            'ThemeVersionFileResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file (schemas/theme/v1.json).'],
+            ], ['theme'])),
+            'RestoreThemeVersionResponse' => self::dataEnvelope(self::object([
+                'id' => self::str(),
+                'version' => self::str() + ['description' => 'The new version number.'],
+                'restored_from' => self::str() + ['description' => 'The version it was made from.'],
+            ], ['id', 'version', 'restored_from'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
@@ -13177,7 +13229,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components() + AccountingApiSchemas::components();
     }
 
     /**

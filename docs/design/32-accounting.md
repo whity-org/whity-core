@@ -145,7 +145,7 @@ A busy shop's 300 invoices a day with their payments and stock postings write ab
 
 Each workspace gets the chart of its tax pack when accounting is first opened (not at sign-up, so workspaces that never use it carry nothing). The Jordan pack's template is below; it is the core default for every workspace until other packs exist, with names a person understands and the accountant's codes beside them. A workspace can add, rename, recode (until used), archive and regroup accounts. Plugins add accounts they own (`owner_plugin`), archived when the plugin is turned off and the account is empty.
 
-**Jordan default template** (to be reviewed by a Jordanian accountant before A1 ships, Q11). Four-digit codes; the first digit is the type.
+**Jordan default template** (reviewed by the Jordanian accountant the owner named, Bader Ahmad Tamimi, Q11; A1 merges first and the review tunes the chart afterwards, owner, 22 Nov 2026: "yes merge tuning can come later"). Four-digit codes; the first digit is the type.
 
 | Code | English (plain) | Arabic | Type · role |
 | --- | --- | --- | --- |
@@ -284,7 +284,7 @@ Accounts come from `acc_account_mappings` (item category, item, place) with the 
 
 ### 7.2 The Jordan pack
 
-To be confirmed against the Income and Sales Tax Department's rules by a Jordanian accountant before A6 ships (Q11):
+To be confirmed against the Income and Sales Tax Department's rules by the Jordanian accountant the owner named, Bader Ahmad Tamimi, before A6 ships (Q11):
 - **General sales tax 16%** on most goods and services: `JO-GST-16` (output) and `JO-GST-IN-16` (input).
 - **Reduced rates** that Jordan applies to listed goods (the pack includes the rates in force; a workspace adds a code with `valid_from` when one changes).
 - **Zero-rated** (`JO-GST-0`, exports and listed goods: tax deductible on inputs) and **exempt** (`JO-EXEMPT`: no tax and input tax not reclaimable on related purchases).
@@ -455,7 +455,7 @@ Screens without a card (Money › Bills, a bill, new invoice, an invoice record,
 
 ## 12. Questions for the owner (answered 21 November 2026)
 
-Answers: Q1 "Paid plugin", then, with the owner's new approach the same day, a paid JoFotara integration plugin rather than an accounting plugin; Q2 dropped, as there is no accounting plugin (the JoFotara plugin is priced with the other integrations); Q6 became a volume meter (invoices a month), counted and charged by the business-model decision; Q14's "only with the paid plugin" became core's multi-currency phase A7; Q11 "I'll name someone" (A1 and A6 wait at a draft PR for the review); all others "Accept all", as recommended.
+Answers: Q1 "Paid plugin", then, with the owner's new approach the same day, a paid JoFotara integration plugin rather than an accounting plugin; Q2 dropped, as there is no accounting plugin (the JoFotara plugin is priced with the other integrations); Q6 became a volume meter (invoices a month), counted and charged by the business-model decision; Q14's "only with the paid plugin" became core's multi-currency phase A7; Q11 "I'll name someone" (A1 and A6 wait at a draft PR for the review), and on 22 November 2026 "the accountant will be "Bader Ahmad Tamimi"" and, for A1, "yes merge tuning can come later" (the chart review becomes tuning after A1 merges; A6 still waits); all others "Accept all", as recommended.
 
 | # | Question | Options | Recommendation |
 | --- | --- | --- | --- |
@@ -469,7 +469,7 @@ Answers: Q1 "Paid plugin", then, with the owner's new approach the same day, a p
 | Q8 | A seeded Accountant role for an outside accountant | (a) yes; (b) no, use custom roles | **(a).** |
 | Q9 | Merchant-of-record providers (Polar, Paddle) through Whity Pay | (a) record the sale to the customer, the provider as a payment method, a setting for the accountant to switch; (b) record sales to the provider | **(a)**, with the accountant confirming the Jordanian treatment. |
 | Q10 | Tax period | (a) two months by default, monthly as a setting; (b) two months only | **(a).** |
-| Q11 | Who reviews the Jordan chart, the tax codes and the return layout? | an accountant you name; a paid review | A Jordanian accountant reviews the chart before A1 merges and the pack and return before A6 merges (register rule 6.7 already asks for this). |
+| Q11 | Who reviews the Jordan chart, the tax codes and the return layout? | an accountant you name; a paid review | A Jordanian accountant reviews the chart and the pack and return before A6 merges (register rule 6.7 already asks for this). The owner named Bader Ahmad Tamimi (22 Nov 2026); A1 merges first and the chart review becomes tuning ("yes merge tuning can come later", 22 Nov 2026). |
 | Q12 | Tamper-evident hash chain on entries | (a) yes; (b) no | **(a).** One hash per posting, and an auditor can trust an export. |
 | Q13 | Sidebar | (a) Operations › Money with tabs Overview, Invoices, Bills, Payments, Accounts, Sales tax, Reports; Purchases and Sales stay inside Inventory; (b) split Purchases and Sales out now | **(a)** until A3 lands, then revisit IV.23. |
 | Q14 | Base currency | (a) fixed at the first posting, foreign currencies only with the paid plugin; (b) core allows other currencies without exchange differences | **(a).** |
