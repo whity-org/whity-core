@@ -113,7 +113,9 @@ final class ExpensesRealEngineTest extends TestCase
         self::assertSame(7000, $this->balance('6600'));
         self::assertSame(800, $this->balance('1400'));
         self::assertSame(-7800, $this->balance('2100'), 'owed to Emad');
-        $contact = $this->pdo->query("SELECT profile_id, is_supplier, is_customer FROM contacts WHERE id = " . (int) $claim['contact_id'])->fetch(PDO::FETCH_ASSOC);
+        $found = $this->pdo->query("SELECT profile_id, is_supplier, is_customer FROM contacts WHERE id = " . (int) $claim['contact_id']);
+        self::assertNotFalse($found);
+        $contact = $found->fetch(PDO::FETCH_ASSOC);
         self::assertIsArray($contact);
         self::assertSame(self::EMAD, (int) $contact['profile_id']);
 
