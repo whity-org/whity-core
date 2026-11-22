@@ -259,6 +259,8 @@ function main(argv) {
   const problems = idProblems(ids);
 
   if (argv.includes('--check')) {
+    // Compared as JSON, not bytes: a Windows checkout turns the file's line
+    // endings into CRLF, which says nothing about whether it is current.
     const stale = previous === null || serialize(previous) !== serialize(manifest);
     if (stale) problems.unshift('web/routes.json is out of date. Run `npm run routes:generate --workspace web` and commit it.');
     for (const p of problems) process.stderr.write(`::error::${p}\n`);
