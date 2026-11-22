@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api/client';
+import { isPathHidden, NOTHING_HIDDEN, parseHiddenIds, type HiddenIds } from '@/lib/routes/hidden';
 
 export interface NavigationItem {
   id: string;
@@ -30,9 +31,28 @@ interface NavigationContextType {
    * subsequent {@link refresh} then reconciles with the server.
    */
   removeItemsByHref: (hrefs: readonly string[]) => void;
+  /**
+   * The ids the operator hid on this instance (#2386). The server already
+   * leaves hidden items out of {@link items}; this is for the links that do not
+   * come from it (the palette's "New …" commands, the Settings area's own
+   * pages). Use {@link isHidden} for a path.
+   */
+  hidden: HiddenIds;
+  /** Whether the page at this path is hidden on this instance. */
+  isHidden: (href: string) => boolean;
 }
 
 const NavigationContext = createContext<NavigationContextType | undefined>(undefined);
+
+/** Asked once per page load: the list changes only when the operator edits it. */
+async function fetchHiddenIds(): Promise<HiddenIds> {
+  try {
+    const { data } = await api.GET('/api/v1/navigation/hidden');
+    return parseHiddenIds(data);
+  } catch {
+    return NOTHING_HIDDEN;
+  }
+}
 
 /**
  * Auth-aware source of the sidebar navigation.
@@ -53,6 +73,19 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
   const { user, isLoading: isAuthLoading } = useAuth();
   const [items, setItems] = useState<NavigationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [hidden, setHidden] = useState<HiddenIds>(NOTHING_HIDDEN);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchHiddenIds().then((ids) => {
+      if (!cancelled) setHidden(ids);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isHidden = useCallback((href: string) => isPathHidden(href, hidden), [hidden]);
 
   // The stable identity driving refetches: a login, logout, or user switch
   // changes it; token refreshes for the same user do not.
@@ -148,7 +181,7 @@ export function NavigationProvider({ children }: { children: React.ReactNode }) 
 
   return (
     <NavigationContext.Provider
-      value={{ items, isLoading, refresh, removeItemsByHref }}
+      value={{ items, isLoading, refresh, removeItemsByHref, hidden, isHidden }}
     >
       {children}
     </NavigationContext.Provider>

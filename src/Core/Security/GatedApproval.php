@@ -71,7 +71,7 @@ final class GatedApproval
      * code, sends one. Null when too many codes were sent lately or there is no
      * address to send to.
      *
-     * @return array{method: string, email_hint: ?string}|null
+     * @return array{method: string, email_hint: ?string, provider_key?: ?string, purpose?: string}|null
      */
     public function start(int $tenantId, int $approverId, string $kind, string $subject): ?array
     {

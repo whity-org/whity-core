@@ -101,6 +101,8 @@ export interface CommandContext {
   connectAgentHref: string | null;
   /** The person may create another workspace (WHIT-1169); absent means no. */
   canCreateWorkspace?: boolean;
+  /** Whether the operator hid the page at this path (#2386); absent means none are. */
+  isHidden?: (href: string) => boolean;
 }
 
 interface Kind {
@@ -129,7 +131,8 @@ function kinds(t: TranslateFn, ctx: CommandContext): Kind[] {
     { kind: 'message', names: ['message', 'chat', 'رسالة', 'محادثة'], label: t('palette.new.message', 'New chat'), icon: 'comment', href: '/chat', allowed: ctx.pages.some((p) => p.href === '/chat') },
     { kind: 'person', names: ['person', 'people', 'user', 'شخص', 'مستخدم'], label: t('palette.new.person', 'Invite someone'), icon: 'user', href: '/admin/users', allowed: can('users:write') },
   ];
-  return all.filter((k) => k.allowed);
+  // #2386: a page the operator hid takes its "New …" with it.
+  return all.filter((k) => k.allowed && !(ctx.isHidden?.(k.href) ?? false));
 }
 
 export function buildCoreCommands(t: TranslateFn, ctx: CommandContext): PaletteCommand[] {

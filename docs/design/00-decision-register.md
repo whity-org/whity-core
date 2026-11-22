@@ -13,7 +13,7 @@ The brand is being rebuilt one stage at a time. A stage is locked before the nex
 8. Files and templates: locked 28 Oct 2026
 9. Final guideline: locked 28 Oct 2026
 
-Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026)
+Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026)
 
 ## Stage 1 · Logo (locked 28 Oct 2026)
 
@@ -1087,6 +1087,29 @@ The Salons plugin's features in core (BM.15, Q3; BM.19), specified in section 35
 | SL.10 | Retiring Salons | After the core work deploys: on app.whity.dev the `plugin.salons.*` add-on plans 2–4 are retired and their six per-chair prices deactivated (rows kept), and the plugin is turned off and removed, through whity-local-deploy's procedure; in whity-plugins Salons leaves the store and the salon template stops offering it. `PluginSeats` stays for third-party plugins |
 | SL.11 | Salon setup | The six-step setup and the ready menus go to the salon workspace template, not core (owner, Q1, "Accept all") |
 | SL.12 | Screens | Core block screens in the Calendar group (Walk-ins, Commission, Price list), with Salons' English and Arabic, until the brand team's cards arrive |
+
+## My workspaces and @handles (decided 22 November 2026)
+
+The owner, 22 November 2026: "as a normal user they need a manage workspaces/organizations space so that he can hand them over to someone, delete them, etc... Organisation slugs should become like the @handles in social media per whity instance... and we might later enable cross tenant communication". Specified in section 36 (`36-my-workspaces-and-handles.md`, WHIT-1354) and answered the same day: **"Accept all"**, so every question in section 36 §9 stands as recommended. Owners now delete their own workspaces (this replaces the 17 November rule that deleting stays operator-only); the backups wording "at most 30 days" is still to be checked against app.whity.dev's real remote retention before M4 ships.
+
+| # | Decision | Proposed |
+| --- | --- | --- |
+| HD.1 | Handle rules | A workspace's `slug` is its public @handle: `a–z`, `0–9`, `-`, 3–30, starts with a letter, no `--`, stored in lower case, unique on the installation on `LOWER(slug)`; `ws-` is kept for handles Whity makes |
+| HD.2 | Reserved | Every first path segment of the web app (generated from `routes.json`, checked in CI), infrastructure and role words, chat words, anything containing `whity`, and the operator's `handles.reserved` list |
+| HD.3 | Arabic names | Handles stay Latin; an Arabic name gets a suggested Latin handle the person edits; no machine translation; all-Arabic names are never refused |
+| HD.4 | Changing | Owners only, at most once every 30 days; the old handle redirects for 90 days and only the same workspace can take it back meanwhile; audit entry and `tenant.handle_changed` |
+| HD.5 | Where it shows | `/@handle` workspace page (the address to share), book, join, chat and form pages, share cards, email footers, subdomain, switcher, My workspaces, Settings; never a security boundary |
+| HD.6 | New workspaces | A Handle field on create and sign-up, suggested from the name, optional; a `ws-` workspace's owners are asked to choose one, and the first choice is free of the 30-day rule |
+| HD.7 | Moving slugs | One idempotent migration and `whity-cli handles:check`: valid slugs kept (almolakhas, curapass, mcp-check, aau-irb), others fixed or given `ws-`, every change held and redirected for 90 days |
+| HD.8 | Later addressing | `@handle` on one installation, `@handle@installation` between installations; conversations store the tenant id, never the handle |
+| HD.9 | Operators | Operators see, search, change and free any handle; reserved handles can be granted by an operator |
+| MW.1 | Place | My workspaces at `/workspaces`, outside any one workspace; from the switcher, the account menu, Ctrl+K and More |
+| MW.2 | The list | Groups Yours, Where you work, Where you're a customer; each with logo, name, @handle, role, plan state; offers waiting for you on top; Create workspace is the main button |
+| MW.3 | Owners | Rename, change the handle, co-owners, hand over (also to an email), step down, download everything, delete; through `/api/me/workspaces`, the same services as Settings › Owners |
+| MW.4 | Leaving | Anyone but the last owner leaves; what they hold is listed first and handed back to the admins; what they made stays under their name; confirmed by a plain dialog |
+| MW.5 | Export | Download everything: a ZIP of JSON, CSV, files and issued PDFs with a bilingual README, for owners, link valid 7 days, plugins add parts; no secrets |
+| MW.6 | Deleting | Any owner, after an export or a ticked "I don't need a copy", the typed handle and an identity check; 14 days Closing (owners only, read-only, Keep the workspace); then purged with a tombstone row; renewal off at once, cancelled at the end, no refund; backups age out within 30 days; Whity's invoices and the audit log stay |
+| MW.7 | Switcher | Manage workspaces as the last item; @handle under each name; Closing shown and only owners may enter |
 
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.

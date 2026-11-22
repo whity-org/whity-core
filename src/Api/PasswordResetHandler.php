@@ -177,6 +177,12 @@ final class PasswordResetHandler
         }
         $token    = $checked->value('token');
         $password = $checked->value('password');
+        try {
+            PasswordPolicy::refuseBreached($password);
+        } catch (\InvalidArgumentException) {
+            // READINESS CE-7: a breached or common new password.
+            return Response::error(PasswordPolicy::BREACHED_MESSAGE, 422, ['password' => 'breached']);
+        }
 
         $requireApproval = $this->approvalRequired();
 

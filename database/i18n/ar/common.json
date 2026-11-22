@@ -275,6 +275,7 @@
         "sidebar.group.settings": "الإعدادات",
         "sidebar.group.work": "العمل",
         "sidebar.group.workspace": "مساحة العمل",
+        "sidebar.homeLink": "{name}: الصفحة الرئيسية",
         "sidebar.item.agents": "المساعدون",
         "sidebar.item.aiPrincipals": "تطبيقات ذكاء اصطناعي متصلة",
         "sidebar.item.approvalGating": "الموافقة على التسجيل",
@@ -334,7 +335,6 @@
         "sidebar.notifications": "الإشعارات",
         "sidebar.openNav": "فتح التنقّل",
         "sidebar.tenantSwitcher.create": "أنشئ مساحة عمل",
-        "sidebar.tenantSwitcher.error": "تعذّر تبديل مساحة العمل",
         "sidebar.tenantSwitcher.find": "ابحث عن مساحة عمل",
         "sidebar.tenantSwitcher.noResults": "لا توجد مساحة عمل مطابقة",
         "sidebar.tenantSwitcher.owner": "المالك",
@@ -350,7 +350,9 @@
         "system.error.retry": "حاول مرة أخرى",
         "system.error.title": "حدث خطأ من جانبنا",
         "system.notFound.body": "ربما نُقلت، أو الرابط غير صحيح. تحقّق من العنوان أو ارجع إلى لوحتك.",
+        "system.notFound.bodyHome": "ربما نُقلت، أو أن الرابط غير صحيح. تحقّق من العنوان أو عُد إلى الصفحة الرئيسية.",
         "system.notFound.home": "الانتقال إلى اللوحة",
+        "system.notFound.homePage": "الذهاب إلى الصفحة الرئيسية",
         "system.notFound.title": "لا نجد هذه الصفحة",
         "tagPicker.error": "تعذّر تحميل الوسوم.",
         "tagPicker.loading": "جارٍ تحميل الوسوم…",
@@ -445,6 +447,13 @@
         "workspacePay.opening": "جارٍ فتح صفحة البطاقة…",
         "workspacePay.skip": "ليس الآن",
         "workspacePay.thisWorkspace": "مساحة العمل هذه",
-        "workspacePay.title": "أضف بطاقة لـ {workspace}"
+        "workspacePay.title": "أضف بطاقة لـ {workspace}",
+        "workspaceSwitch.refused.confined": "تسجيل الدخول هذا يعمل فقط في مساحة العمل التي سجّلت الدخول إليها. سجّل الدخول عبر Whity ID لفتح مساحات عملك الأخرى.",
+        "workspaceSwitch.refused.notMember": "لم تعد عضواً في مساحة العمل هذه. اطلب من أحد مالكيها إضافتك من جديد.",
+        "workspaceSwitch.refused.other": "تعذّر فتح مساحة العمل هذه. حاول مرة أخرى.",
+        "workspaceSwitch.refused.paused": "مساحة العمل هذه متوقفة مؤقتاً حتى يدفع أحد المالكين.",
+        "workspaceSwitch.refused.signedOut": "انتهت جلسة تسجيل الدخول. سجّل الدخول من جديد، ثم افتح مساحة العمل.",
+        "workspaceSwitch.refused.tooMany": "محاولات كثيرة متتالية. انتظر دقيقة، ثم حاول مرة أخرى.",
+        "workspaceSwitch.refused.unreachable": "تعذّر الوصول إلى Whity. تحقّق من اتصالك، ثم حاول مرة أخرى."
     }
 }

@@ -27,6 +27,7 @@ import {
   ConfirmItsYouDialog,
   isIdentityCheckFailure,
   startIdentityCheck,
+  useFreshSignInReturn,
   type IdentityCheck,
 } from '@/components/security/confirm-its-you-dialog';
 import { Alert, AlertDescription } from '@whity/ui/alert';
@@ -83,7 +84,7 @@ export default function OwnersSettingsPage() {
   const t = useTranslation('admin');
   const refusalText = useRefusalText();
   const { addToast } = useToast();
-  const { user, refreshAuth } = useAuth();
+  const { user, sessionChanged } = useAuth();
   const dates = useDateDisplay();
   const formatDate = (value: string): string => dates.date(value) ?? '';
   const [version, setVersion] = useState(0);
@@ -91,6 +92,8 @@ export default function OwnersSettingsPage() {
   const [chosen, setChosen] = useState('');
   const [leaveAfter, setLeaveAfter] = useState(false);
   const [pending, setPending] = useState<Pending | null>(null);
+  // Back from signing in again at Whity ID: the same approval, ready to approve.
+  const signInOutcome = useFreshSignInReturn<Pending>(setPending);
   const [busy, setBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
@@ -182,7 +185,7 @@ export default function OwnersSettingsPage() {
           'success',
         );
         // My own owner flag changed: the switcher and owner-only actions follow.
-        if (done.profileId === user?.id) await refreshAuth();
+        if (done.profileId === user?.id) await sessionChanged();
       }
       reload();
     } catch {
@@ -414,6 +417,8 @@ export default function OwnersSettingsPage() {
         check={pending?.check ?? null}
         busy={busy}
         error={codeError}
+        resume={pending}
+        signInOutcome={signInOutcome}
         onCancel={() => setPending(null)}
         onClearError={() => setCodeError(null)}
         onConfirm={(code) => void confirm(code)}

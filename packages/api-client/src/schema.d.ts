@@ -2144,6 +2144,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/billing/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether this workspace is paused because its plan lapsed, and who its owners are
+         * @description For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.
+         */
+        get: operations["get_api_v1_billing_pause"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/billing/plans": {
         parameters: {
             query?: never;
@@ -9942,6 +9962,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/navigation/hidden": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The menu items and Settings pages hidden on this instance (public)
+         * @description The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.
+         */
+        get: operations["get_api_v1_navigation_hidden"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notification-metrics": {
         parameters: {
             query?: never;
@@ -16403,6 +16443,13 @@ export interface components {
             builtOnWhity?: boolean;
             /** @description The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one. */
             currency?: string;
+            /** @description Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard). */
+            homePath?: string;
+            /** @description A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none. */
+            backToProduct?: {
+                url: string;
+                label: string;
+            } | null;
         };
         BrandingHostReadResponse: {
             data: {
@@ -20826,6 +20873,14 @@ export interface components {
         };
         HelloGreetingResponse: {
             data: components["schemas"]["HelloGreeting"];
+        };
+        HiddenNavIdsResponse: {
+            data: {
+                /** @description Menu item ids, as on GET /api/navigation. */
+                nav: string[];
+                /** @description Settings page ids, without the settings. prefix. */
+                settings: string[];
+            };
         };
         HomeCard: {
             key: string;
@@ -27059,6 +27114,19 @@ export interface components {
                 }[];
                 is_owner: boolean;
             };
+        };
+        WorkspacePauseResponse: {
+            data: components["schemas"]["WorkspacePauseState"] | null;
+        };
+        WorkspacePauseState: {
+            /** @description expired or canceled */
+            status: string;
+            /** @description The wall refuses reads too, not only changes */
+            reads_refused: boolean;
+            /** @description The owners who can pay, by name */
+            owners: {
+                name: string;
+            }[];
         };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
@@ -38066,6 +38134,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentMethodListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether this workspace is paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePauseResponse"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -79689,6 +79822,53 @@ export interface operations {
                 };
             };
             /** @description Internal error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_navigation_hidden: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The hidden ids */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HiddenNavIdsResponse"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
             500: {
                 headers: {
                     [name: string]: unknown;

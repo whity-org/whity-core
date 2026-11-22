@@ -271,6 +271,18 @@ final class RateLimits
         return RateLimitRule::keyed('public_forms.upload_form', 400, self::HOUR);
     }
 
+    /** Self-registration (`POST /register`), per address (READINESS CE-8). */
+    public static function registerPerAddress(): RateLimitRule
+    {
+        return RateLimitRule::keyed('register.address', 10, self::HOUR);
+    }
+
+    /** Self-registration, per email address (CE-8). */
+    public static function registerPerEmail(): RateLimitRule
+    {
+        return RateLimitRule::keyed('register.email', 3, self::HOUR);
+    }
+
     /** Opening a workspace's sign-up page, per address. */
     public static function publicSignupInfoPerAddress(): RateLimitRule
     {

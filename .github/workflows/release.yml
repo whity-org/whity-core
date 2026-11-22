@@ -464,6 +464,19 @@ jobs:
           git tag -a "${RELEASE_TAG}" -m "${RELEASE_TAG}"
           git push origin "${RELEASE_TAG}"
 
+      # READINESS CO-22: what this release is made of, as a CycloneDX SBOM
+      # of its composer and npm dependencies (from composer.lock and the npm
+      # lockfiles), attached to the GitHub Release. The images carry their own
+      # SBOM and provenance as attestations (images.yml).
+      - name: SBOM of the release's dependencies (CycloneDX)
+        uses: anchore/sbom-action@66cbf4bc1f1c0d2edc94016e65bc221b6bb0ad6c # v0.24.3
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: ${{ runner.temp }}/whity-core-sbom.cdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
       - name: Create the release, with the CHANGELOG section as its notes
         env:
           GH_TOKEN: ${{ github.token }}
@@ -553,7 +566,7 @@ jobs:
           COMPOSE_ASSET="${RUNNER_TEMP}/whity-compose.yml"
           cp docker/production/docker-compose.yml "$COMPOSE_ASSET"
 
-          gh release create "${RELEASE_TAG}" "$COMPOSE_ASSET" \
+          gh release create "${RELEASE_TAG}" "$COMPOSE_ASSET" "${RUNNER_TEMP}/whity-core-sbom.cdx.json" \
             --title "${RELEASE_TAG}" \
             --notes-file "$NOTES" \
             --verify-tag

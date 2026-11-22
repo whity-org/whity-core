@@ -3592,6 +3592,23 @@ final class CoreApiSchemas
                     ],
                 ],
             ],
+            // #2386: public, so the web server's route guard can ask before sign-in.
+            [
+                'method' => 'GET',
+                'path' => '/api/navigation/hidden',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'The menu items and Settings pages hidden on this instance (public)',
+                    'description' => 'The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS '
+                        . 'environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, '
+                        . 'and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.',
+                    'tags' => ['platform-ops'],
+                    'responses' => [
+                        200 => self::jsonResponse('The hidden ids', 'HiddenNavIdsResponse'),
+                    ],
+                ],
+            ],
             self::permissionRoute('GET', '/api/migrations', 'migrations:read', [
                 'summary' => 'List database migrations and their execution state',
                 'tags' => ['platform-ops'],
@@ -6318,6 +6335,19 @@ final class CoreApiSchemas
                 'pay_online' => self::bool() + ['description' => 'This deployment takes payments online'],
                 'card_step' => self::bool() + ['description' => 'A card can be added now and first charged when the trial ends'],
             ], ['plan_key', 'plan_name', 'status', 'trial_ends_at', 'days_left', 'read_only', 'card_added', 'price', 'pay_online', 'card_step']),
+            // 2026-11-22: a workspace paused because its plan expired or was canceled.
+            'WorkspacePauseState' => self::object([
+                'status' => self::str() + ['description' => 'expired or canceled'],
+                'reads_refused' => self::bool() + ['description' => 'The wall refuses reads too, not only changes'],
+                'owners' => [
+                    'type' => 'array',
+                    'description' => 'The owners who can pay, by name',
+                    'items' => self::object(['name' => self::str()], ['name']),
+                ],
+            ], ['status', 'reads_refused', 'owners']),
+            'WorkspacePauseResponse' => self::object([
+                'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspacePauseState']], 'nullable' => true],
+            ], ['data']),
             'WorkspaceTrialResponse' => self::object([
                 'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspaceTrialState']], 'nullable' => true],
             ], ['data']),
@@ -12067,6 +12097,11 @@ final class CoreApiSchemas
                 'requiredPermission' => self::str(true),
             ], ['id', 'label', 'href', 'icon', 'group', 'order']),
             'NavigationListResponse' => self::listEnvelope('NavigationItem'),
+            // GET /api/navigation/hidden (#2386)
+            'HiddenNavIdsResponse' => self::dataEnvelope(self::object([
+                'nav' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Menu item ids, as on GET /api/navigation.'],
+                'settings' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Settings page ids, without the settings. prefix.'],
+            ], ['nav', 'settings'])),
 
             // GET /api/settings/tabs (WC-tabs-nav-be)
             'SettingsTab' => self::object([
@@ -12446,6 +12481,15 @@ final class CoreApiSchemas
                 'builtOnWhity' => ['type' => 'boolean', 'description' => 'Whether this workspace\'s public pages show "Built on Whity". False when its plan removes the credit.'],
                 // CU.4: the workspace currency, so the app writes money in it.
                 'currency' => ['type' => 'string', 'description' => 'The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one.'],
+                // #2386: an instance's home and its way back to the product beside it.
+                'homePath' => ['type' => 'string', 'description' => 'Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard).'],
+                'backToProduct' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'description' => 'A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none.',
+                    'properties' => ['url' => self::str(), 'label' => self::str()],
+                    'required' => ['url', 'label'],
+                ],
             ], ['siteName', 'logoWideUrl', 'logoSquareUrl', 'faviconUrl', 'mainColor', 'theme', 'installable']),
             // GET /api/branding — the standard data envelope around Branding.
             'BrandingResponse' => self::dataEnvelope(SchemaBuilder::ref('Branding')),
@@ -15606,6 +15650,18 @@ final class CoreApiSchemas
                 'tags' => ['billing'],
                 'responses' => [
                     200 => self::jsonResponse('The trial of this workspace','WorkspaceTrialResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/billing/pause', [
+                'summary' => 'Whether this workspace is paused because its plan lapsed, and who its owners are',
+                'description' =>
+                    'For every member: when the subscription of this workspace expired or was canceled '
+                    . 'and changes are refused, its status, whether reads are refused too, and the names of its '
+                    . 'owners, so people who cannot pay are told who can. `data` is null when the workspace '
+                    . 'is not paused. Not behind the payment wall.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('Whether this workspace is paused', 'WorkspacePauseResponse'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [

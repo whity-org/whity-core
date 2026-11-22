@@ -1632,6 +1632,18 @@ $pluginLoader = new PluginLoader(
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
 // SAME encryption key as the setup/confirm path (WC-95).
 // WC-0abcc29f: brute-force throttle uses the shared DatabaseSharedStore.
+// READINESS CE-7: a new password that has been in a data breach or is too
+// common is refused. WHITY_BREACHED_PASSWORDS: `online` (default) asks the
+// Have I Been Pwned range API by k-anonymity and falls back to the built-in
+// list when it can't be reached; `offline` uses the built-in list only; `off`
+// turns the check off.
+$breachedPasswordsMode = strtolower((string) ($_ENV['WHITY_BREACHED_PASSWORDS'] ?? getenv('WHITY_BREACHED_PASSWORDS') ?: 'online'));
+\Whity\Core\PasswordPolicy::setBreachedPasswords(match ($breachedPasswordsMode) {
+    'off' => null,
+    'offline' => new \Whity\Core\Identity\BreachedPasswords(),
+    default => \Whity\Core\Identity\BreachedPasswords::online(),
+});
+
 // Brute-force login throttle thresholds are operator-configurable (like the HTTP
 // RATE_LIMIT_* rules); unset falls back to the service defaults (10/20/900s).
 $loginThrottle = new LoginThrottleService(
@@ -1837,7 +1849,7 @@ $accountSecurityMailer = new \Whity\Core\Mail\AccountSecurityMailer(
 );
 $authHandler->setSecurityMailer($accountSecurityMailer);
 
-$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager);
+$registerHandler = new RegisterApiHandler($db->getPdo(), $settingsService, $emailVerificationProvider, $hookManager, store: new DatabaseSharedStore($db->getPdo()));
 $router->register('POST', '/api/register', $passwordRoute([$registerHandler, 'register']), null);
 
 // WC-235: public email verification — (re)send a link + confirm a token. Both are
@@ -1911,7 +1923,7 @@ $router->register('POST',   '/api/devices/token', [$authHandler, 'handleDeviceTo
 // 10a-ter. Interactive session management (WC-f-sessions-table). Session-gated
 // in-handler (cookie OR Bearer access token), scoped to the caller's own
 // profile. Interactive logins only — native devices are managed via /api/devices.
-$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()));
+$sessionsHandler = new \Whity\Api\SessionsApiHandler($tokenValidator, new \Whity\Auth\SessionService($db->getPdo()), $auditLogger);
 $router->register('GET',    '/api/me/sessions',      [$sessionsHandler, 'list'], null);
 $router->register('DELETE', '/api/me/sessions/{id}', [$sessionsHandler, 'revoke'], null);
 $router->register('DELETE', '/api/me/sessions',      [$sessionsHandler, 'revokeOthers'], null);
@@ -1926,6 +1938,8 @@ $twoFactorProofThrottle = new LoginThrottleService(
     'two_factor_proof',
 );
 $twoFactorHandler = new TwoFactorHandler($db->getPdo(), $totpService, $backupCodesService, $tokenValidator, $auditLogger, $twoFactorProofThrottle);
+// READINESS CE-6: the current password on PATCH /me counts against the same budget.
+$authHandler->setProofThrottle($twoFactorProofThrottle);
 $twoFactorHandler->setSecurityMailer($accountSecurityMailer);
 $router->register('POST', '/api/auth/2fa/setup', $passwordRoute([$twoFactorHandler, 'setup']), null);
 $router->register('POST', '/api/auth/2fa/confirm', $passwordRoute([$twoFactorHandler, 'confirm']), null);
@@ -2211,8 +2225,12 @@ $navigationHandler = new NavigationApiHandler($hookManager, $roleChecker, [
     'messages-for-customer' => [new \Whity\Core\Messaging\MessagesNavConditions($db->getPdo()), 'isCustomerWithMessages'],
     // Team chat (CH.1): the people who work here.
     'chat-for-staff' => [new \Whity\Core\Chat\ChatNavConditions(new \Whity\Core\Chat\ChatRepository($db->getPdo())), 'isStaff'],
-]);
+], $settingsService);
 $router->register('GET', '/api/navigation', [$navigationHandler, 'list']);
+// #2386: which menu items and Settings pages the operator hid. Public (see
+// EnforceTenantIsolation): the web server's route guard asks before anyone
+// signs in.
+$router->register('GET', '/api/navigation/hidden', [$navigationHandler, 'hidden'], null);
 
 // Caller capabilities (WC-176, #205). Registered with NO required
 // role/permission — any authenticated caller may ask which permissions they
@@ -2975,6 +2993,8 @@ $pluginLimitPacks = new \Whity\Core\Plugin\Workspace\PluginLimitPacks(
 $entitlementService->usePluginPacks(static fn (int $tenantId): array => $pluginLimitPacks->packsFor($tenantId));
 // WHIT-1156: invitations ask the plan's staff limit first, as `seats.enforcement` says.
 $invitationsHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
+// READINESS TM-14: adding a person directly holds to the same staff limit.
+$usersHandler->useSeats(new \Whity\Core\Seat\SeatService($db->getPdo(), $entitlementService, $settingsService));
 // WHIT-1129 (SDK 1.108): packs set a workspace up through core's own routes,
 // as the person acting there, limited to WorkspaceSetup::ROUTES.
 $hostWorkspaceSetup = new \Whity\Core\Plugin\Workspace\HostWorkspaceSetup($router, $roleChecker);
@@ -3348,6 +3368,15 @@ $externalBillingHandler->useWorkspaceTrial(new \Whity\Core\Billing\WorkspaceTria
     ),
     $settingsService,
 ));
+// 2026-11-22: an expired or canceled workspace is paused; members who can't pay
+// are told so and who its owners are, instead of meeting a 402.
+$externalBillingHandler->useWorkspacePause(new \Whity\Core\Billing\WorkspacePause(
+    new \Whity\Core\Subscription\SubscriptionService(
+        new \Whity\Core\Subscription\SubscriptionRepository($db->getPdo()),
+        $settingsService
+    ),
+    new \Whity\Core\Tenant\WorkspaceOwners($db->getPdo()),
+));
 $cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
 $router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
@@ -3372,6 +3401,9 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // WHIT-1207: the plan's trial and how to pay, for every member (the banner tells
 // those who can't pay to ask an owner).
 $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'trial']);
+// 2026-11-22: whether the workspace is paused (expired or canceled) and who its
+// owners are, for every member: those who can't pay see a plain paused page.
+$router->register('GET',  '/api/billing/pause',    [$externalBillingHandler, 'pause']);
 
 // WHIT-1040: the plan limits the business model sells, and where a workspace
 // stands against them. Every one of them warns and none refuses: customers are
@@ -4991,7 +5023,9 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     // a reason for a second storage path.
     $formUploadStore,
     // WHIT-1040: whether the workspace's plan removes "Built on Whity".
-    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService)
+    new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService),
+    // READINESS TM-20: the same bot check booking and chat use.
+    $publicFormBotCheck,
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,
@@ -6822,7 +6856,8 @@ $router->register('DELETE', '/api/email-domains/{id:\d+}',     [$emailDomainHand
 // never returned in a response.
 $identityProvidersHandler = new IdentityProvidersApiHandler(
     $db->getPdo(),
-    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV)
+    \Whity\Core\Security\EncryptedSecretStore::fromEnv($_ENV),
+    $auditLogger,
 );
 $router->register('GET',    '/api/identity-providers',          [$identityProvidersHandler, 'list'],   null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
 $router->register('POST',   '/api/identity-providers',          [$identityProvidersHandler, 'create'], null, null, CorePermissions::AUTH_PROVIDERS_MANAGE);
@@ -6921,7 +6956,7 @@ $workspaceOwnersHandler = new \Whity\Api\WorkspaceOwnersApiHandler(
         $db->getPdo(),
         $auditLogger,
         $hookManager,
-        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls->base()),
+        new \Whity\Core\Tenant\OwnershipNotifier($notificationDispatcher, $brandedEmailSender, $profileEmailRepository, $frontendUrls, $settingsService),
     ),
     $tokenValidator,
     $gatedApproval,
@@ -7222,7 +7257,7 @@ $mcpToolsCallHandler->setWorkspaceGate($pluginLoader);
 // an agent must not be able to approve its own proposal.
 // WHIT-816: a workspace agent's proposal runs under the person's assignment as it is now.
 $agentAssignments = new \Whity\Core\Agent\AgentAssignmentRepository($db->getPdo(), $mcpConnectionEvents);
-$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval);
+$agentProposalsHandler = new \Whity\Api\AgentProposalsApiHandler($agentProposals, $mcpToolsCallHandler, $auditLogger, $agentAssignments, $agentActions, $mcpToolCatalogue, $gatedApproval, $mcpTokenService);
 $router->register('GET',  '/api/me/agent-proposals',                    [$agentProposalsHandler, 'list'],    null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/identity-check', [$agentProposalsHandler, 'identityCheck'], null);
 $router->register('POST', '/api/me/agent-proposals/{id:\d+}/approve',  [$agentProposalsHandler, 'approve'], null);
@@ -7726,6 +7761,8 @@ if ($isWorker) {
 
                 // Create request from PHP superglobals
                 $request = Request::fromGlobals();
+                // #2386 (CE-4): believe X-Whity-Client-Ip only from a trusted proxy.
+                \Whity\Core\RateLimit\ClientIp::authenticate($request, $_SERVER);
 
                 // Resolve CORS headers once per request from the allowlist (WC-53).
                 // A plugin's public form sets its own (WHIT-906): they never allow credentials.
@@ -7890,6 +7927,8 @@ if ($isWorker) {
     try {
         // Create request from PHP superglobals
         $request = Request::fromGlobals();
+        // #2386 (CE-4): believe X-Whity-Client-Ip only from a trusted proxy.
+        \Whity\Core\RateLimit\ClientIp::authenticate($request, $_SERVER);
 
         // Resolve CORS headers once per request from the allowlist (WC-53).
         // A plugin's public form sets its own (WHIT-906): they never allow credentials.

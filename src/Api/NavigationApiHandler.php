@@ -6,8 +6,10 @@ namespace Whity\Api;
 
 use Whity\Auth\RoleChecker;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Navigation\HiddenNavIds;
 use Whity\Core\Request;
 use Whity\Core\Response;
+use Whity\Core\Settings\SettingsService;
 use Whity\Core\Tenant\TenantContext;
 
 /**
@@ -50,16 +52,34 @@ final class NavigationApiHandler
      */
     private array $conditions;
 
+    /** Where the operator's hidden ids are stored (#2386); null reads the environment only. */
+    private ?SettingsService $settings;
+
     /**
      * @param HookManager $hookManager Collects items via the navigation.register hook.
      * @param RoleChecker $roleChecker Authoritative RBAC resolver for per-caller filtering.
      * @param array<string, callable(int, int): bool> $conditions Named checks, given the profile and tenant.
+     * @param SettingsService|null $settings Holds `navigation.hidden_ids` (#2386).
      */
-    public function __construct(HookManager $hookManager, RoleChecker $roleChecker, array $conditions = [])
+    public function __construct(HookManager $hookManager, RoleChecker $roleChecker, array $conditions = [], ?SettingsService $settings = null)
     {
         $this->hookManager = $hookManager;
         $this->roleChecker = $roleChecker;
         $this->conditions = $conditions;
+        $this->settings = $settings;
+    }
+
+    /**
+     * GET /api/navigation/hidden — the ids the operator hid on this instance
+     * (#2386), split into menu ids and Settings page ids.
+     *
+     * Public, like /api/health: the web server's route guard asks before
+     * anyone is signed in, so a hidden page answers 404 to everyone. The list
+     * says no more than which pages this installation does not offer.
+     */
+    public function hidden(Request $request): Response
+    {
+        return Response::json(['data' => HiddenNavIds::split(HiddenNavIds::all($this->settings))], 200);
     }
 
     /**
@@ -91,6 +111,16 @@ final class NavigationApiHandler
                 'items' => [],
             ]);
             $items = $result['items'] ?? [];
+
+            // #2386: an id the operator hid leaves every menu at once, here,
+            // before any client sees the list.
+            $hidden = HiddenNavIds::split(HiddenNavIds::all($this->settings))['nav'];
+            if ($hidden !== []) {
+                $items = array_values(array_filter(
+                    $items,
+                    static fn (array $item): bool => !in_array((string) ($item['id'] ?? ''), $hidden, true)
+                ));
+            }
 
             // Server-side filtering against the authoritative store: keep an item
             // unless a declared RBAC gate excludes the caller.

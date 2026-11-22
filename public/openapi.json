@@ -14548,6 +14548,78 @@
                 ]
             }
         },
+        "/api/v1/billing/pause": {
+            "get": {
+                "operationId": "get_api_v1_billing_pause",
+                "summary": "Whether this workspace is paused because its plan lapsed, and who its owners are",
+                "tags": [
+                    "billing"
+                ],
+                "description": "For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.",
+                "responses": {
+                    "200": {
+                        "description": "Whether this workspace is paused",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspacePauseResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/billing/plans": {
             "get": {
                 "operationId": "get_api_v1_billing_plans",
@@ -68668,6 +68740,58 @@
                 }
             }
         },
+        "/api/v1/navigation/hidden": {
+            "get": {
+                "operationId": "get_api_v1_navigation_hidden",
+                "summary": "The menu items and Settings pages hidden on this instance (public)",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "The union of the navigation.hidden_ids setting and the WHITY_HIDDEN_NAV_IDS environment variable. Hidden items leave GET /api/navigation and GET /api/settings/tabs, and the web app answers their pages with 404. See docs/wiki/Hiding-Pages.md.",
+                "responses": {
+                    "200": {
+                        "description": "The hidden ids",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/HiddenNavIdsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/notification-metrics": {
             "get": {
                 "operationId": "get_api_v1_notification_metrics",
@@ -107472,6 +107596,27 @@
                     "currency": {
                         "type": "string",
                         "description": "The workspace currency as an ISO 4217 code (billing.default_currency; USD by default). Amounts with a currency of their own show in that one."
+                    },
+                    "homePath": {
+                        "type": "string",
+                        "description": "Where people land after signing in and where home links go: a path on this site (navigation.home_path, else WHITY_HOME_PATH, else /dashboard)."
+                    },
+                    "backToProduct": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "A link at the top of the sidebar back to the product Whity runs beside (navigation.back_to_product_url and _label, else WHITY_BACK_TO_PRODUCT_URL and _LABEL), or null for none.",
+                        "properties": {
+                            "url": {
+                                "type": "string"
+                            },
+                            "label": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "url",
+                            "label"
+                        ]
                     }
                 },
                 "required": [
@@ -122176,6 +122321,37 @@
                         "$ref": "#/components/schemas/HelloGreeting"
                     }
                 }
+            },
+            "HiddenNavIdsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "nav": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Menu item ids, as on GET /api/navigation."
+                            },
+                            "settings": {
+                                "type": "array",
+                                "items": {
+                                    "type": "string"
+                                },
+                                "description": "Settings page ids, without the settings. prefix."
+                            }
+                        },
+                        "required": [
+                            "nav",
+                            "settings"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
             },
             "HomeCard": {
                 "type": "object",
@@ -143262,7 +143438,7 @@
                     "password": {
                         "type": "string",
                         "format": "password",
-                        "minLength": 8,
+                        "minLength": 12,
                         "maxLength": 72,
                         "description": "Initial password; must satisfy the site password policy."
                     },
@@ -143660,7 +143836,7 @@
                     "password": {
                         "type": "string",
                         "format": "password",
-                        "minLength": 8,
+                        "minLength": 12,
                         "maxLength": 72,
                         "description": "New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
@@ -144412,6 +144588,55 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "WorkspacePauseResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkspacePauseState"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspacePauseState": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "expired or canceled"
+                    },
+                    "reads_refused": {
+                        "type": "boolean",
+                        "description": "The wall refuses reads too, not only changes"
+                    },
+                    "owners": {
+                        "type": "array",
+                        "description": "The owners who can pay, by name",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "status",
+                    "reads_refused",
+                    "owners"
                 ]
             },
             "WorkspacePlugin": {

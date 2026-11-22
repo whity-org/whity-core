@@ -111,3 +111,20 @@ test('the checked-in manifest is well formed', () => {
   }
   assert.ok(m.routes.some((r) => r.path === '/web-build/routes.json'));
 });
+
+test('the Caddy matcher lists page and file prefixes, never the forwarders or the root', async () => {
+  const { caddyMatcher } = await import('./route-manifest.mjs');
+  const out = caddyMatcher({
+    routes: [
+      { path: '/', kind: 'page' },
+      { path: '/login', kind: 'page' },
+      { path: '/admin/users/:id', kind: 'page' },
+      { path: '/sw.js', kind: 'file' },
+      { path: '/api/:path*', kind: 'forwarder' },
+      { path: '/mcp', kind: 'forwarder' },
+      { path: '/:slug', kind: 'page' },
+    ],
+  }, ['_next']);
+  assert.match(out, /^@whity path \/_next \/_next\/\* \/admin \/admin\/\* \/login \/login\/\* \/sw\.js \/sw\.js\/\*$/m);
+  assert.doesNotMatch(out, /\/api|\/mcp| \/ /);
+});

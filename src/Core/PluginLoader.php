@@ -3174,6 +3174,13 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 
         $lifecycle->reEnable();
 
+        // Enabling a plugin that was discovered disabled is the first time its
+        // permissions reach the catalogue.
+        $enabled = $this->registeredPlugins[$pluginKey]['plugin'] ?? null;
+        if ($enabled instanceof PluginInterface) {
+            $this->roleSeeder?->catalogue($enabled);
+        }
+
         if ($reRegister) {
             $registered = $this->registerCapabilities(
                 $info['plugin'],
@@ -4157,6 +4164,14 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // What it declared it uses (SDK 1.151, #1693): in discovery order, so the
         // first plugin to declare a table owns it in every process.
         \Whity\Core\Plugin\PluginCapabilities::register($plugin, $this->logger);
+
+        // Catalogue the permissions this plugin declares, so roles can be
+        // granted them (WHIT-1352: a plugin that seeds no roles, like Whity Pay,
+        // otherwise had no catalogue rows and no role could hold its
+        // permissions). Runs on every boot, which is also the backfill for
+        // installs already running. Before seeding, so the seeder's grants
+        // find their rows.
+        $this->roleSeeder?->catalogue($plugin);
 
         // Seed plugin-declared roles and permission grants into the database.
         // The seeder is optional (not wired in tests that lack a DB); errors

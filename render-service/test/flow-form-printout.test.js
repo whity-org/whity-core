@@ -111,7 +111,7 @@ describe('questions (FP.8, FP.9)', () => {
     const html = body(doc([block]));
     expect((html.match(/class="ff-box"/g) || []).length).toBe(2);
     expect((html.match(/M3 3L9 9M9 3L3 9/g) || []).length).toBe(1);
-    expect(html).toContain('<span class="ff-off">');
+    expect(html).toContain('<span class="ff-off" data-flow-item="1">');
   });
 
   test('Yes / No / N/A as a word with a mark, and in three columns', () => {
@@ -153,6 +153,89 @@ describe('questions (FP.8, FP.9)', () => {
     expect(valid(question({ kind: 'slider' }))).toMatch(/kind/);
     expect(valid(question({ kind: 'choices', options: [{ text: 'A' }] }))).toMatch(/options/);
     expect(valid(question({ kind: 'yesNo', value: 'maybe', word: 'Maybe' }))).toMatch(/yes\|no\|na/);
+  });
+});
+
+describe('blocks taller than a page (WHIT-1370)', () => {
+  /*
+   * AAU IRB's application was refused whole because question 9.1, twenty
+   * Yes / No rows kept together, was taller than an A4 page. Only a browser
+   * can prove the paginator now splits such a block (render-tier CI runs
+   * scripts/check-flow-tall-blocks.js); this proves the markup gives it the
+   * places to split, and that nothing else about the markup moved.
+   */
+  const items = (html) => (html.match(/data-flow-item="1"/g) || []).length;
+  const { build, TEXTS } = require('../scripts/generate-flow-tall-blocks-fixture');
+
+  test('a question is still kept together while it fits, and carries the line its continuation starts with', () => {
+    const html = body(doc([question({ kind: 'yesNoRows', rows: [{ text: 'Consent form', value: 'yes', word: 'Yes · Attachment 1' }] }, { continued: '(continued)' })]));
+    expect(html).toContain('data-keep-together="1"');
+    expect(html).toContain('data-flow-tail-continued="');
+    expect(html).toContain('ff-qn-continued');
+    expect(html).toContain('(continued)');
+    // Not on the question itself: only a continuation starts with it.
+    expect(html).not.toContain(' data-flow-continued="');
+  });
+
+  test('without the caller’s word the continuation uses the document’s own "continued"', () => {
+    const html = body(doc([question({ kind: 'facts', items: [{ label: 'Name', value: 'Dr Ahmad Khalil' }] })]));
+    expect(html).toContain('data-flow-label=&quot;continued&quot;');
+    const script = require('node:fs').readFileSync(require.resolve('../src/flow/assets/paginate.js'), 'utf8');
+    expect(script).toContain("doc.labels[el.getAttribute('data-flow-label')]");
+  });
+
+  test('every row, option, fact, table row and approval is a place to split', () => {
+    const rows = Array.from({ length: 20 }, (_, i) => ({ text: `Attachment ${i + 1}`, value: 'yes', word: `Yes · Attachment ${i + 1}` }));
+    expect(items(body(doc([question({ kind: 'yesNoRows', rows })])))).toBe(20);
+    const three = body(doc([question({ kind: 'yesNoRows', style: 'threeColumns', headers: { item: 'Item', yes: 'Yes', no: 'No', na: 'N/A' }, rows })]));
+    expect(items(three)).toBe(20);
+    // The column heads print again above the rows continued on the next page.
+    expect((three.match(/class="ff-h" data-flow-repeat="1"/g) || []).length).toBe(4);
+    expect(items(body(doc([question({ kind: 'choices', options: [{ text: 'A', chosen: true }, { text: 'B', chosen: false }] })])))).toBe(2);
+    expect(items(body(doc([question({ kind: 'facts', items: [{ label: 'A', value: '1' }, { label: 'B', value: '2' }, { label: 'C', value: '3' }] })])))).toBe(3);
+    const table = body(doc([question({ kind: 'table', columns: ['Drug', 'Dose'], rows: [['A', '5 mg'], ['B', '10 mg']] })]));
+    expect(items(table)).toBe(2);
+    expect(table).toContain('<thead data-flow-repeat="1">');
+    const approvals = body(doc([{ type: 'approvals', title: 'Approvals', rows: [{ status: 'approved', word: 'Approved', name: 'Awss Haddad' }, { status: 'approved', word: 'Approved', name: 'Ahmad Khalil' }], notCounted: 'Not counted: Emad Nasser' }]));
+    expect(items(approvals)).toBe(3);
+    expect(items(body(doc([{ type: 'notice', text: 'Read before you start.' }])))).toBe(1);
+  });
+
+  test('lists, fields, facts and exam choices split between their items too', () => {
+    expect(items(body(doc([{ type: 'list', items: ['One', 'Two', 'Three'] }])))).toBe(3);
+    expect(items(body(doc([{ type: 'fields', fields: [{ label: 'Name' }, { label: 'Date' }] }])))).toBe(2);
+    expect(items(body(doc([{ type: 'facts', items: [{ label: 'A', value: '1' }, { label: 'B', value: '2' }] }])))).toBe(2);
+    expect(items(body(doc([{ type: 'question', text: 'Pick one', choices: { items: [{ label: 'a', text: 'Yes' }, { label: 'b', text: 'No' }] } }])))).toBe(2);
+  });
+
+  test('a long single answer in two columns flows like any long answer instead of being one unit', () => {
+    const long = 'word '.repeat(200).trim();
+    const html = body(doc([question({ kind: 'text', paragraphs: [long] }, { layout: 'row', continued: '(continued)' })]));
+    expect(html).not.toContain('ff-q-row');
+    expect(html).toContain('ff-q-head');
+    expect(html).toContain('data-flow-unit="paragraph"');
+    // A short one keeps its two columns; the question column is kept empty on a continuation.
+    const short = body(doc([question({ kind: 'yesNo', value: 'no', word: 'No' }, { layout: 'row' })]));
+    expect(short).toContain('<div class="ff-row-q" data-flow-slot="1">');
+  });
+
+  test('the paginator splits a unit that fits no page instead of refusing it', () => {
+    const script = require('node:fs').readFileSync(require.resolve('../src/flow/assets/paginate.js'), 'utf8');
+    expect(script).toContain('var mustSplit = tallerThanPage || isFirstOnPage;');
+    expect(script).toContain('function splitItems(node, container, limit, firstOnPage)');
+    expect(script).toContain('function splitTextCells(item, limit)');
+    expect(script).toContain('function scaleImagesToFit(node, limit)');
+  });
+
+  test('the regression fixture is a valid payload in both directions, with every long text numbered', () => {
+    for (const direction of ['ltr', 'rtl']) {
+      const payload = build({ direction });
+      expect(validateFlowPayload(payload)).toBeNull();
+      const text = JSON.stringify(payload);
+      for (const [prefix, count] of Object.entries(TEXTS)) {
+        expect(text).toContain(`${prefix}${String(count).padStart(4, '0')}`);
+      }
+    }
   });
 });
 

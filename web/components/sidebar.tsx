@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth-context';
 import { useNavigation } from '@/lib/navigation-context';
 import type { Membership } from '@/lib/auth-context';
-import { useBranding } from '@/lib/branding-context';
+import { useBranding, useHomePath } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { useToast } from '@/lib/toast-context';
 import { Avatar } from '@whity/ui/avatar';
@@ -26,6 +26,7 @@ import {
 } from '@whity/ui/dropdown-menu';
 import { TenantSwitcher as WorkspaceSwitcher } from '@whity/ui/tenant-switcher';
 import { AppSidebar, useForcedRail } from '@whity/ui/app-sidebar';
+import { useSwitchRefusalMessage } from '@/lib/workspace-switch';
 import { useCurrentLanguage, useLanguageCode, useI18nEnabled, useTranslation } from '@whity/features/i18n';
 import { roleLabel } from '@whity/features/roles/role-label';
 import { RoleSummary } from '@whity/ui/role-summary';
@@ -34,6 +35,7 @@ import { useRoleSummaryLabels } from '@/hooks/useRoleSummaryLabels';
 import { useCanOfferWorkspaceCreate } from '@/lib/use-workspace-create';
 import { NOTIFICATIONS_HREF } from '@/lib/pwa/push';
 import {
+  IconArrowLeft,
   IconLogout,
   IconUserCog,
   IconBell,
@@ -46,6 +48,8 @@ import { useState, useCallback, useMemo } from 'react';
 import { useShellNav } from '@/components/shell/use-shell-nav';
 import { localizedText } from '@whity/ui/localized-text';
 import { useCalendarSidebarOpen } from '@/lib/calendar/choices';
+
+const NEVER_HIDDEN = (): boolean => false;
 
 /** Settings stays at the foot with the account row on short windows (PW.10). */
 const PINNED_GROUP_IDS = ['settings'];
@@ -76,6 +80,7 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
   const { refresh: refreshNav } = useNavigation();
   const { addToast } = useToast();
   const t = useTranslation('common');
+  const refusalMessage = useSwitchRefusalMessage();
   const currentLanguage = useLanguageCode();
   const [isSwitching, setIsSwitching] = useState(false);
   const roleSummaryLabels = useRoleSummaryLabels();
@@ -102,19 +107,23 @@ export function TenantSwitcher({ memberships, activeTenantId, collapsed }: Tenan
       void (async () => {
         try {
           await switchTenant(tenantId);
-          await refreshNav();
         } catch (err) {
-          const message =
-            err instanceof Error
-              ? err.message
-              : t('sidebar.tenantSwitcher.error', 'Couldn’t switch workspace');
-          addToast(message, 'error');
+          // Never silent (2026-11-22): the reason, in plain words.
+          addToast(refusalMessage(err), 'error');
+          setIsSwitching(false);
+          return;
+        }
+        try {
+          // The switch happened; a menu that fails to reload is not a refusal.
+          await refreshNav();
+        } catch {
+          // The menu catches up on the next navigation.
         } finally {
           setIsSwitching(false);
         }
       })();
     },
-    [activeTenantId, isSwitching, switchTenant, refreshNav, addToast, t],
+    [activeTenantId, isSwitching, switchTenant, refreshNav, addToast, refusalMessage],
   );
 
   if (workspaces.length === 0) return null;
@@ -151,11 +160,14 @@ export function Sidebar() {
   const router = useRouter();
   const { logout, user, memberships } = useAuth();
   const branding = useBranding();
+  const homePath = useHomePath();
   const { resolved: resolvedTheme, setPreference } = useThemeMode();
   const t = useTranslation('common');
   // Whether this instance offers a language choice at all (`i18n.enabled`).
   const isI18nEnabled = useI18nEnabled();
   const { groups } = useShellNav();
+  // #2386: links the operator hid leave the account menu too.
+  const { isHidden = NEVER_HIDDEN } = useNavigation();
   const { currentLanguage, availableLanguages, setLanguage } = useCurrentLanguage();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -185,7 +197,7 @@ export function Sidebar() {
     router.push('/login');
   };
 
-  const header = collapsed ? (
+  const brand = collapsed ? (
     branding.logoSquareUrl ? (
       <img
         src={branding.logoSquareUrl}
@@ -224,6 +236,36 @@ export function Sidebar() {
         </p>
       )}
     </>
+  );
+
+  // #2386: the logo goes home (the instance's home page), and a product that
+  // runs Whity beside its own app can add a way back to it.
+  const back = branding.backToProduct ?? null;
+  const backLabel = back ? back.label : '';
+  const header = (
+    <div className={`flex flex-col gap-2 ${collapsed ? 'items-center' : ''}`}>
+      <Link
+        href={homePath}
+        className="rounded-md focus-visible:outline-2 focus-visible:outline-ring"
+        aria-label={t('sidebar.homeLink', '{name}: home').replace('{name}', branding.siteName)}
+        data-testid="sidebar-home-link"
+        onClick={() => setIsMobileOpen(false)}
+      >
+        {brand}
+      </Link>
+      {back && (
+        <a
+          href={back.url}
+          className={`inline-flex min-h-8 items-center gap-1 rounded-md text-sm text-muted-foreground hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring ${collapsed ? 'justify-center' : ''}`}
+          aria-label={collapsed ? backLabel : undefined}
+          title={collapsed ? backLabel : undefined}
+          data-testid="sidebar-back-to-product"
+        >
+          <IconArrowLeft size={16} className="shrink-0 rtl:rotate-180" aria-hidden="true" />
+          {!collapsed && <span className="truncate">{backLabel}</span>}
+        </a>
+      )}
+    </div>
   );
 
   // The foot is the person, as on every 3.3 card: avatar, name and role in one
@@ -278,19 +320,24 @@ export function Sidebar() {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
-            <IconUserCog />
-            {t('sidebar.accountSettings', 'My settings')}
-          </Link>
-        </DropdownMenuItem>
+        {/* #2386: the operator may hide your own settings pages. */}
+        {!isHidden('/settings') && (
+          <DropdownMenuItem asChild>
+            <Link href="/settings" onClick={() => setIsMobileOpen(false)}>
+              <IconUserCog />
+              {t('sidebar.accountSettings', 'My settings')}
+            </Link>
+          </DropdownMenuItem>
+        )}
         {/* WHIT-1078: notifications on this device, straight to the card. */}
-        <DropdownMenuItem asChild>
-          <Link href={NOTIFICATIONS_HREF} onClick={() => setIsMobileOpen(false)} data-testid="account-menu-notifications">
-            <IconBell />
-            {t('sidebar.notifications', 'Notifications')}
-          </Link>
-        </DropdownMenuItem>
+        {!isHidden(NOTIFICATIONS_HREF) && (
+          <DropdownMenuItem asChild>
+            <Link href={NOTIFICATIONS_HREF} onClick={() => setIsMobileOpen(false)} data-testid="account-menu-notifications">
+              <IconBell />
+              {t('sidebar.notifications', 'Notifications')}
+            </Link>
+          </DropdownMenuItem>
+        )}
         {isI18nEnabled && availableLanguages.length > 1 && (
           // The language is also the direction (lib/direction-context.tsx):
           // choosing Arabic mirrors the interface. Stored on the profile, so it

@@ -320,8 +320,10 @@ function renderMath(block) {
 /* ---------------------------------------------------------------- forms
  *
  * The blocks a printed form needs. Each is one paginator unit (its
- * data-flow-unit is its own type, and the paginator splits only paragraphs
- * and tables), so a question never parts from its choices at a page break.
+ * data-flow-unit is its own type), so a question never parts from its
+ * choices at a page break - unless it is taller than a page, when it splits
+ * between its items (data-flow-item: facts, fields, list items, choices)
+ * rather than failing the whole document (WHIT-1370).
  * Every caller string goes through isolateForeignRuns, which escapes it and
  * isolates runs in the other direction: an Arabic stem with "12 V" in it
  * prints the 12 before the V.
@@ -357,7 +359,7 @@ function renderFacts(block, direction) {
   const items = block.items
     .map(
       (item) =>
-        `<div class="flow-fact"><span class="flow-fact-label">${isolateForeignRuns(item.label, direction)}</span>` +
+        `<div class="flow-fact" data-flow-item="1"><span class="flow-fact-label">${isolateForeignRuns(item.label, direction)}</span>` +
         `<span class="flow-fact-value">${isolateForeignRuns(item.value, direction)}</span></div>`
     )
     .join('');
@@ -373,7 +375,7 @@ function renderFields(block, direction) {
         field.kind === 'boxes'
           ? `<span class="flow-field-boxes">${repeatBounded('<span class="flow-field-box"></span>', field.boxes, MAX_FIELD_BOXES)}</span>`
           : '<span class="flow-field-line"></span>';
-      return `<div class="flow-field${full}"><span class="flow-field-label">${isolateForeignRuns(field.label, direction)}</span>${input}</div>`;
+      return `<div class="flow-field${full}" data-flow-item="1"><span class="flow-field-label">${isolateForeignRuns(field.label, direction)}</span>${input}</div>`;
     })
     .join('');
   return `${unitOpen(block, 'fields', 'flow-panel flow-panel-outline')}${title}<div class="flow-field-grid">${fields}</div></div>`;
@@ -383,7 +385,7 @@ function renderList(block, direction) {
   const tone = block.tone || 'outline';
   const title = block.title ? `<div class="flow-panel-title">${isolateForeignRuns(block.title, direction)}</div>` : '';
   const tag = block.ordered ? 'ol' : 'ul';
-  const items = block.items.map((item) => `<li>${isolateForeignRuns(item, direction)}</li>`).join('');
+  const items = block.items.map((item) => `<li data-flow-item="1">${isolateForeignRuns(item, direction)}</li>`).join('');
   return `${unitOpen(block, 'list', `flow-panel flow-panel-${tone}`)}${title}<${tag} class="flow-list-items">${items}</${tag}></div>`;
 }
 
@@ -416,7 +418,7 @@ function renderQuestion(block, direction) {
       block.choices.items
         .map(
           (item) =>
-            `<span class="flow-choice"><span class="flow-choice-mark">${item.label ? isolateForeignRuns(item.label, direction) : ''}</span>` +
+            `<span class="flow-choice" data-flow-item="1"><span class="flow-choice-mark">${item.label ? isolateForeignRuns(item.label, direction) : ''}</span>` +
             `<span class="flow-choice-text" dir="auto">${isolateForeignRuns(item.text, direction)}</span></span>`
         )
         .join('') +

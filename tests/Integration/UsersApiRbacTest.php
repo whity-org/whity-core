@@ -121,7 +121,7 @@ final class UsersApiRbacTest extends TestCase
             'POST',
             '/api/users',
             $this->auth($userId, 1),
-            (string) json_encode(['email' => 'new@example.com', 'password' => 'secret123'])
+            (string) json_encode(['email' => 'new@example.com', 'password' => 'secret123-long'])
         ));
 
         $this->assertSame(403, $response->getStatusCode());
@@ -137,7 +137,7 @@ final class UsersApiRbacTest extends TestCase
             'POST',
             '/api/users',
             $this->auth($userId, 1),
-            (string) json_encode(['email' => 'new@example.com', 'password' => 'secret123'])
+            (string) json_encode(['email' => 'new@example.com', 'password' => 'secret123-long'])
         ));
 
         // 201 = created successfully; the RBAC check passed.
@@ -281,7 +281,7 @@ final class UsersApiRbacTest extends TestCase
             'POST',
             '/api/users',
             $this->auth($userId, 1),
-            (string) json_encode(['email' => 'check@example.com', 'password' => 'secret123'])
+            (string) json_encode(['email' => 'check@example.com', 'password' => 'secret123-long'])
         ));
         $this->assertSame(403, $post->getStatusCode(), 'users:read must not grant write access.');
 

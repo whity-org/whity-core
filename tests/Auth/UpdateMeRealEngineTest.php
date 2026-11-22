@@ -101,6 +101,31 @@ final class UpdateMeRealEngineTest extends TestCase
         $this->assertSame(2, (int) $count->fetchColumn());
     }
 
+    public function testOwnPasswordAndEmailChangesAreOnTheAuditTrail(): void
+    {
+        // READINESS CO-9: not only in the process log. Never the password,
+        // and the unconfirmed new address by its domain only.
+        $profileId = $this->seedProfile('trail@example.com', 'old-password');
+        $this->authenticateAs($profileId, self::TENANT, 'trail@example.com');
+        $handler = new AuthHandler($this->pdo, $this->jwtParser, new TokenValidator($this->jwtParser, $this->pdo), null, null, null, new \Whity\Core\Audit\AuditLogger($this->pdo));
+
+        $response = $handler->handleUpdateMe($this->jsonRequest([
+            'password' => 'brand-new-pass', 'email' => 'new-trail@bakery.test', 'current_password' => 'old-password',
+        ]));
+        $this->assertSame(200, $response->getStatusCode(), $response->getBody());
+
+        $stmt = $this->pdo->query("SELECT action, actor_user_id, metadata FROM audit_log WHERE action IN ('auth.password.changed', 'auth.email.change_requested') ORDER BY action");
+        self::assertNotFalse($stmt);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        $this->assertSame(['auth.email.change_requested', 'auth.password.changed'], array_column($rows, 'action'));
+        foreach ($rows as $row) {
+            $this->assertSame($profileId, (int) $row['actor_user_id']);
+            $this->assertStringNotContainsString('brand-new-pass', (string) $row['metadata']);
+            $this->assertStringNotContainsString('new-trail@', (string) $row['metadata']);
+        }
+        $this->assertStringContainsString('bakery.test', (string) $rows[0]['metadata']);
+    }
+
     public function testSelfPasswordUpdatePersistsVerifiableBcryptHash(): void
     {
         $profileId = $this->seedProfile('pw@example.com', 'old-password');
@@ -280,6 +305,24 @@ final class UpdateMeRealEngineTest extends TestCase
             $stmt->fetchColumn(),
             'A wrong current password must not persist any change.'
         );
+    }
+
+    public function testGuessingTheCurrentPasswordIsThrottled(): void
+    {
+        // READINESS CE-6: someone holding a stolen session can't try the
+        // current password at the request rate, and the right one is refused
+        // too once the limit is reached.
+        $profileId = $this->seedProfile('guess@example.com', 'correct-pass');
+        $this->authenticateAs($profileId, self::TENANT, 'guess@example.com');
+        $handler = $this->handler();
+        $handler->setProofThrottle(new \Whity\Auth\LoginThrottleService(new \Whity\Core\Store\ArraySharedStore(), 3, 100, 900, 'two_factor_proof'));
+
+        for ($i = 0; $i < 3; $i++) {
+            $this->assertSame(401, $handler->handleUpdateMe($this->jsonRequest(['email' => 'x@example.com', 'current_password' => 'guess-' . $i]))->getStatusCode());
+        }
+
+        $response = $handler->handleUpdateMe($this->jsonRequest(['email' => 'x@example.com', 'current_password' => 'correct-pass']));
+        $this->assertSame(429, $response->getStatusCode(), $response->getBody());
     }
 
     public function testMissingCurrentPasswordIsRejected(): void

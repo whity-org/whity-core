@@ -14,6 +14,9 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\MembershipRepository;
 use Whity\Core\Identity\NullEmailVerificationProvider;
 use Whity\Core\PasswordPolicy;
+use Whity\Core\RateLimit\ClientIp;
+use Whity\Core\RateLimit\RateLimits;
+use Whity\Core\Store\SharedStoreInterface;
 use Whity\Http\Validation\Field;
 use Whity\Http\Validation\FieldValidator;
 use Whity\Http\Validation\Messages;
@@ -70,6 +73,9 @@ final class RegisterApiHandler
          * with commissions. Null simply means no code is ever attributed.
          */
         private readonly ?AffiliateAttribution $affiliates = null,
+        // READINESS CE-8: per-address and per-email limits on creating a
+        // workspace and an account. Null (tests): only the global limit.
+        private readonly ?SharedStoreInterface $store = null,
     ) {
         $this->db = $db;
         // Instance-governance flags (self-registration open? approval required?)
@@ -107,6 +113,15 @@ final class RegisterApiHandler
             $paymentRequired =
                 ($global[SettingsRegistry::REGISTRATION_PAYMENT_REQUIRED] ?? 'false') === 'true';
 
+            // Every attempt counts against the address, valid or not: each one
+            // that succeeds makes a workspace, an account and an email (CE-8).
+            $ip = ClientIp::fromRequest($request);
+            if ($this->store !== null && $ip !== null
+                && ($limited = RateLimits::registerPerAddress()->take($this->store, 'register:ip:' . $ip)) !== null
+            ) {
+                return $limited;
+            }
+
             $body = JsonBody::parsed($request);
 
             // ── Validate inputs (#2174: the shared field validator) ─────────────
@@ -135,7 +150,18 @@ final class RegisterApiHandler
                 });
             }
             $email       = $checked->value('email');
+            if ($this->store !== null
+                && ($limited = RateLimits::registerPerEmail()->take($this->store, 'register:email:' . hash('sha256', strtolower((string) $email)))) !== null
+            ) {
+                return $limited;
+            }
             $password    = $checked->value('password');
+            try {
+                PasswordPolicy::refuseBreached($password);
+            } catch (\InvalidArgumentException) {
+                // READINESS CE-7: a breached or common new password.
+                return Response::error(PasswordPolicy::BREACHED_MESSAGE, 422, ['password' => 'breached']);
+            }
             $tenantName  = $checked->value('tenant_name');
             $displayName = $checked->value('display_name');
 

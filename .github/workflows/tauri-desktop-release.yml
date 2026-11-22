@@ -85,8 +85,13 @@ jobs:
         with:
           node-version: '22'
 
+      # READINESS CO-27: pinned to a commit. This job holds the Tauri signing
+      # key, so a moved ref must not change what runs here. The toolchain is
+      # still the current stable one, named below.
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
 
       - name: Cache Cargo
         uses: actions/cache@v6

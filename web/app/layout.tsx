@@ -8,6 +8,7 @@ import { NavigationProvider } from "@/lib/navigation-context";
 import { DirectionProvider } from "@/lib/direction-context";
 import { PluginFeaturesProvider } from "@/lib/plugin-features-context";
 import { CapabilitiesProvider } from "@/lib/capabilities-context";
+import { SessionScope } from "@/lib/session-scope";
 import { ToastContainerMount } from "@/components/ui/toast-container-mount";
 import { PluginScreenRegistrations } from "@/lib/plugin-screens";
 import { ReferralCapture } from "@/components/referral-capture";
@@ -23,6 +24,7 @@ import { UiPreferencesProvider } from "@/lib/ui-preferences-context";
 import { getAppInstall } from "@/lib/pwa/app-install";
 import { appIconUrl } from "@/lib/pwa/shared";
 import { AppInstall } from "@/components/pwa/app-install";
+import { pwaScope } from "@/lib/pwa/scope";
 
 // Design-token font families (see src/design/tokens/base.json): Noto Sans
 // (latin) + Noto Sans Arabic together drive --font-sans / --font-heading (see
@@ -284,21 +286,31 @@ export default async function RootLayout({
                 */}
                 <AppLanguageProvider>
                   <DirectionProvider>
-                    <CapabilitiesProvider>
-                      <ToastProvider>
-                        <NavigationProvider>
-                          <PluginFeaturesProvider>
-                            {children}
-                            <ToastContainerMount />
-                            <AppInstall
-                              state={appInstall.state}
-                              name={appInstall.siteName}
-                              iconUrl={appIconUrl("192", appInstall.version)}
-                            />
-                          </PluginFeaturesProvider>
-                        </NavigationProvider>
-                      </ToastProvider>
-                    </CapabilitiesProvider>
+                    <ToastProvider>
+                      {/*
+                        2026-11-22: everything that depends on the workspace
+                        is remounted together when the session changes (a
+                        switch, another account, a plan change), here or in
+                        another tab. Toasts stay outside it, so "You're now
+                        in …" survives. See lib/session-scope.tsx.
+                      */}
+                      <SessionScope>
+                        <CapabilitiesProvider>
+                          <NavigationProvider>
+                            <PluginFeaturesProvider>
+                              {children}
+                            </PluginFeaturesProvider>
+                          </NavigationProvider>
+                        </CapabilitiesProvider>
+                      </SessionScope>
+                      <ToastContainerMount />
+                      <AppInstall
+                        state={appInstall.state}
+                        name={appInstall.siteName}
+                        iconUrl={appIconUrl("192", appInstall.version)}
+                        scope={pwaScope()}
+                      />
+                    </ToastProvider>
                   </DirectionProvider>
                 </AppLanguageProvider>
               </UiPreferencesProvider>

@@ -38,6 +38,18 @@ final readonly class Branding
         // WHIT-1225 (TH.12): the tokens Higher contrast changes, per mode.
         /** @var array{light: array<string, string>, dark: array<string, string>} */
         public array $themeHigh = ['light' => [], 'dark' => []],
+        /**
+         * #2386: where people land after signing in and where home links go,
+         * a path on this site. An instance setting ({@see \Whity\Core\Navigation\HomeLinks}).
+         */
+        public string $homePath = '/dashboard',
+        /**
+         * #2386: the sidebar's link back to the product Whity runs beside,
+         * or null for none.
+         *
+         * @var array{url: string, label: string}|null
+         */
+        public ?array $backToProduct = null,
     ) {
     }
 
@@ -45,7 +57,7 @@ final readonly class Branding
      * The main colour (2.8) and the light and dark token sets derived from it
      * are null until the workspace sets one; clients then keep Whity Blue.
      *
-     * @return array{siteName: string, logoWideUrl: ?string, logoSquareUrl: ?string, faviconUrl: ?string, mainColor: ?string, theme: array<string, mixed>|null, installable: bool, builtOnWhity: bool, currency: string, themeHigh: array{light: array<string, string>, dark: array<string, string>}}
+     * @return array{siteName: string, logoWideUrl: ?string, logoSquareUrl: ?string, faviconUrl: ?string, mainColor: ?string, theme: array<string, mixed>|null, installable: bool, builtOnWhity: bool, currency: string, themeHigh: array{light: array<string, string>, dark: array<string, string>}, homePath: string, backToProduct: array{url: string, label: string}|null}
      */
     public function toArray(): array
     {
@@ -60,6 +72,8 @@ final readonly class Branding
             'builtOnWhity' => $this->builtOnWhity,
             'currency' => $this->currency,
             'themeHigh' => $this->themeHigh,
+            'homePath' => $this->homePath,
+            'backToProduct' => $this->backToProduct,
         ];
     }
 }

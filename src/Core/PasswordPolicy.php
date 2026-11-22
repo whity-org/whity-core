@@ -13,7 +13,11 @@ namespace Whity\Core;
  */
 final class PasswordPolicy
 {
-    public const MIN_LENGTH = 8;
+    /**
+     * 12, as ASVS 2.1.1 asks (READINESS CE-5). Checked when a password is set
+     * or changed; a stored hash is never re-checked, so nobody is locked out.
+     */
+    public const MIN_LENGTH = 12;
 
     /**
      * Maximum length, in bytes. bcrypt (PASSWORD_BCRYPT, used by every hashing
@@ -32,7 +36,30 @@ final class PasswordPolicy
      * @param string $password The plaintext password to check (never logged).
      * @throws \InvalidArgumentException when the password is too short or too long.
      */
-    public static function validate(string $password): void
+    /** Set at boot (READINESS CE-7); null in tests and tools that set none. */
+    private static ?Identity\BreachedPasswords $breached = null;
+
+    public const BREACHED_MESSAGE = 'This password has been seen in a data breach or is too common. Choose another.';
+
+    public static function setBreachedPasswords(?Identity\BreachedPasswords $breached): void
+    {
+        self::$breached = $breached;
+    }
+
+    /**
+     * Refuse a NEW password that is known to be breached or common. Call it
+     * where a password is set or changed, never at sign-in.
+     *
+     * @throws \InvalidArgumentException with {@see self::BREACHED_MESSAGE}
+     */
+    public static function refuseBreached(#[\SensitiveParameter] string $password): void
+    {
+        if (self::$breached?->isBreached($password) === true) {
+            throw new \InvalidArgumentException(self::BREACHED_MESSAGE);
+        }
+    }
+
+    public static function validate(#[\SensitiveParameter] string $password): void
     {
         if (strlen($password) < self::MIN_LENGTH) {
             throw new \InvalidArgumentException(
@@ -44,5 +71,6 @@ final class PasswordPolicy
                 'Password must be at most ' . self::MAX_LENGTH . ' characters'
             );
         }
+        self::refuseBreached($password);
     }
 }
