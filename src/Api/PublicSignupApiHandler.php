@@ -295,6 +295,12 @@ final class PublicSignupApiHandler
 
         $passwordHash = null;
         if ($password !== '') {
+            try {
+                PasswordPolicy::refuseBreached($password);
+            } catch (\InvalidArgumentException) {
+                // READINESS CE-7: a breached or common new password.
+                return Response::error(PasswordPolicy::BREACHED_MESSAGE, 422, ['password' => 'breached']);
+            }
             $passwordHash = password_hash($password, PASSWORD_BCRYPT);
         }
 

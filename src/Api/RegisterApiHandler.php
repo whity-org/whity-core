@@ -156,6 +156,12 @@ final class RegisterApiHandler
                 return $limited;
             }
             $password    = $checked->value('password');
+            try {
+                PasswordPolicy::refuseBreached($password);
+            } catch (\InvalidArgumentException) {
+                // READINESS CE-7: a breached or common new password.
+                return Response::error(PasswordPolicy::BREACHED_MESSAGE, 422, ['password' => 'breached']);
+            }
             $tenantName  = $checked->value('tenant_name');
             $displayName = $checked->value('display_name');
 

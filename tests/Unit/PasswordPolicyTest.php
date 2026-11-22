@@ -13,18 +13,19 @@ use Whity\Core\PasswordPolicy;
  */
 class PasswordPolicyTest extends TestCase
 {
-    public function testSevenCharacterPasswordThrows(): void
+    public function testElevenCharacterPasswordThrows(): void
     {
+        // READINESS CE-5: 12 is the minimum (ASVS 2.1.1).
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessageMatches('/8 characters/i');
+        $this->expectExceptionMessageMatches('/12 characters/i');
 
-        PasswordPolicy::validate('1234567');
+        PasswordPolicy::validate('bakery-oven');
     }
 
-    public function testEightCharacterPasswordPasses(): void
+    public function testTwelveCharacterPasswordPasses(): void
     {
         // Must not throw — no assertion needed beyond the absence of an exception.
-        PasswordPolicy::validate('12345678');
+        PasswordPolicy::validate('bakery-ovens');
         $this->addToAssertionCount(1);
     }
 
@@ -41,9 +42,9 @@ class PasswordPolicyTest extends TestCase
         PasswordPolicy::validate('');
     }
 
-    public function testMinLengthConstantIsEight(): void
+    public function testMinLengthConstantIsTwelve(): void
     {
-        $this->assertSame(8, PasswordPolicy::MIN_LENGTH);
+        $this->assertSame(12, PasswordPolicy::MIN_LENGTH);
     }
 
     public function testPasswordAtTheMaximumLengthPasses(): void

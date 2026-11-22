@@ -242,7 +242,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
     {
         TenantContext::setTenantId(self::TENANT_A);
         $response = $this->usersHandler()->create(
-            $this->req('POST', '/api/users', ['email' => 'newbie@t1.example', 'password' => 'secret-123', 'role' => 'user'])
+            $this->req('POST', '/api/users', ['email' => 'newbie@t1.example', 'password' => 'secret-123-long', 'role' => 'user'])
         );
 
         $this->assertSame(201, $response->getStatusCode());
@@ -270,7 +270,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         TenantContext::setTenantId(self::TENANT_A);
         // Profile 101 (a1@t1.example) already has an active membership in Tenant A.
         $response = $this->usersHandler()->create(
-            $this->req('POST', '/api/users', ['email' => 'a1@t1.example', 'password' => 'secret-123', 'role' => 'user'])
+            $this->req('POST', '/api/users', ['email' => 'a1@t1.example', 'password' => 'secret-123-long', 'role' => 'user'])
         );
 
         $this->assertSame(409, $response->getStatusCode(), 'A duplicate active membership must be rejected');

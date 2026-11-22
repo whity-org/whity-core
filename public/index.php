@@ -1632,6 +1632,18 @@ $pluginLoader = new PluginLoader(
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
 // SAME encryption key as the setup/confirm path (WC-95).
 // WC-0abcc29f: brute-force throttle uses the shared DatabaseSharedStore.
+// READINESS CE-7: a new password that has been in a data breach or is too
+// common is refused. WHITY_BREACHED_PASSWORDS: `online` (default) asks the
+// Have I Been Pwned range API by k-anonymity and falls back to the built-in
+// list when it can't be reached; `offline` uses the built-in list only; `off`
+// turns the check off.
+$breachedPasswordsMode = strtolower((string) ($_ENV['WHITY_BREACHED_PASSWORDS'] ?? getenv('WHITY_BREACHED_PASSWORDS') ?: 'online'));
+\Whity\Core\PasswordPolicy::setBreachedPasswords(match ($breachedPasswordsMode) {
+    'off' => null,
+    'offline' => new \Whity\Core\Identity\BreachedPasswords(),
+    default => \Whity\Core\Identity\BreachedPasswords::online(),
+});
+
 // Brute-force login throttle thresholds are operator-configurable (like the HTTP
 // RATE_LIMIT_* rules); unset falls back to the service defaults (10/20/900s).
 $loginThrottle = new LoginThrottleService(

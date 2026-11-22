@@ -21,6 +21,7 @@ import { PublicShell } from '@/components/auth/public-shell';
 import { PublicOutcome } from '@/components/auth/public-outcome';
 import type { WorkspaceBrand } from '@/lib/branding-context';
 import { api } from '@/lib/api/client';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 type Phase = 'loading' | 'form' | 'joined' | 'pending' | 'already' | 'refused' | 'closed' | 'invalid';
 
@@ -79,8 +80,8 @@ function ConfirmInner() {
     if (!token || preview === null) return;
 
     if (preview.requiresPassword) {
-      if (password.length < 8) {
-        setError(t('joinConfirm.error.tooShort', 'Password must be at least 8 characters'));
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        setError(t('joinConfirm.error.tooShort', 'Password must be at least 12 characters'));
         return;
       }
       if (password !== confirmPassword) {
@@ -108,7 +109,7 @@ function ConfirmInner() {
         return;
       }
       if (res.status === 422) {
-        setError(t('joinConfirm.error.weak', 'Choose a password of at least 8 characters.'));
+        setError(t('joinConfirm.error.weak', 'Choose a password of at least 12 characters.'));
         return;
       }
       if (res.status === 429) {
@@ -253,7 +254,7 @@ function ConfirmInner() {
                   disabled={submitting}
                 />
                 <p id="join-password-hint" className="text-sm text-muted-foreground">
-                  {t('joinConfirm.password.hint', 'At least 8 characters.')}
+                  {t('joinConfirm.password.hint', 'At least 12 characters.')}
                 </p>
               </div>
               <div className="space-y-1.5">

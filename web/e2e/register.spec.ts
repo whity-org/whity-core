@@ -46,7 +46,7 @@ test.describe('Self-service registration (WC-235)', () => {
     await page.getByLabel('Password', { exact: true }).fill('short');
     await page.getByRole('button', { name: 'Create workspace' }).click();
 
-    await expect(page.getByText('Password must be at least 8 characters')).toBeVisible();
+    await expect(page.getByText('Password must be at least 12 characters')).toBeVisible();
     await expect(page).toHaveURL(/\/register$/);
   });
 

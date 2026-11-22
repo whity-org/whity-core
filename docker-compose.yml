@@ -57,6 +57,10 @@ services:
       # one browser is one IP there, and the suite against the production
       # build outruns 2000 a minute (WHIT-1222). Unset keeps the app default.
       RATE_LIMIT_IP_LIMIT: ${RATE_LIMIT_IP_LIMIT:-2000}
+      # READINESS CE-7: the development stack judges new passwords by the
+      # built-in list only, so it needs no internet; set `online` to try the
+      # breach service.
+      WHITY_BREACHED_PASSWORDS: ${WHITY_BREACHED_PASSWORDS:-offline}
       # Whether the web app can be installed as a phone app (#1733): manifest,
       # service worker, offline page. Empty leaves it on. The app.installable
       # system setting, once an operator saves it, wins over this.
