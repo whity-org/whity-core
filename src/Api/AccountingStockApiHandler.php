@@ -100,7 +100,7 @@ final class AccountingStockApiHandler
         } catch (AccountingRejectedException $e) {
             return Response::error($e->clientMessage, $e->status, $e->extra);
         } catch (\Throwable $e) {
-            error_log('[AccountingStockApiHandler] ' . $area . ' failed: ' . $e->getMessage());
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[AccountingStockApiHandler] ' . $area . ' failed', $e);
 
             return Response::error('Something went wrong with stock in the books. Try again.', 500);
         }

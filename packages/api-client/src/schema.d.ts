@@ -1155,6 +1155,26 @@ export interface paths {
         patch: operations["patch_api_v1_accounting_stock"];
         trace?: never;
     };
+    "/api/v1/accounting/stock/costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give stock with no cost its cost
+         * @description For an item on hand whose cost is unknown (no purchase price and no priced receipt): sets the cost of one base unit, in the workspace's currency, and posts the stock's value against Opening balances so the Stock account takes it in.
+         */
+        post: operations["post_api_v1_accounting_stock_costs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/stock/opening": {
         parameters: {
             query?: never;
@@ -1183,8 +1203,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Stock changes waiting for a cost
-         * @description Moves since stock went into the books whose cost is unknown, so they posted nothing.
+         * Stock waiting for a cost
+         * @description Items on hand whose cost is unknown, so they are not in the Stock account, and moves since stock went into the books that posted nothing for want of a cost.
          */
         get: operations["get_api_v1_accounting_stock_waiting"];
         put?: never;
@@ -15536,6 +15556,13 @@ export interface components {
                 after_date?: string;
                 after_line?: number;
             } | null;
+        };
+        AccountingStockCost: {
+            variant_id: number;
+            /** @description The cost of one base unit (a kilogram, a piece), in minor units of the workspace's currency. */
+            unit_cost_minor: number;
+            /** @description YYYY-MM-DD, in an open month. Default: today. */
+            date?: string;
         };
         AccountingStockOpening: {
             /** @description YYYY-MM-DD, in an open month. Default: today. */
@@ -33502,6 +33529,109 @@ export interface operations {
             };
         };
     };
+    post_api_v1_accounting_stock_costs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockCost"];
+            };
+        };
+        responses: {
+            /** @description The cost given */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            variant_id: number;
+                            /** @description What the stock on hand is now worth. */
+                            value_minor: number;
+                            entry_id?: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_accounting_stock_opening: {
         parameters: {
             query?: never;
@@ -33624,14 +33754,23 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: {
-                            move_id: number;
-                            variant_id: number;
-                            item_name: string;
-                            quantity: number;
-                            source_type?: string;
-                            source_id?: number | null;
-                            occurred_at?: string;
-                        }[];
+                            items: {
+                                variant_id: number;
+                                item_id: number;
+                                item_name: string;
+                                /** @description In the unit's smallest steps. */
+                                quantity: number;
+                            }[];
+                            moves: {
+                                move_id: number;
+                                variant_id: number;
+                                item_name: string;
+                                quantity: number;
+                                source_type?: string;
+                                source_id?: number | null;
+                                occurred_at?: string;
+                            }[];
+                        };
                     };
                 };
             };
