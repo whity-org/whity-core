@@ -55,6 +55,10 @@ final class HostPluginServices
                 new \Whity\Core\Theme\ThemeLibrary($themes, $pluginThemes),
             ));
         }
+        // SDK 1.152 (#1686): where a plugin's $ctx->log() writes, scrubbed.
+        if ($logger !== null) {
+            \Whity\register_service(LoggerInterface::class, $logger);
+        }
         // SDK 1.124 (D3): the one entry point; it reaches the factories below
         // and the ones each entry point binds itself, at call time.
         \Whity\register_service(\Whity\Sdk\PluginContext::class, new HostPluginContext());
