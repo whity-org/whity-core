@@ -435,6 +435,80 @@ that honour it.
 
 ---
 
+### Declare what you use, and reach your tables through the context (SDK 1.151)
+
+Implement `Whity\Sdk\Contribute\PluginCapabilitiesInterface` to say which
+context services your plugin uses and which of your own tables it reaches
+(#1693). Your `PluginContext` scope then gives you only those; anything else
+throws `ServiceNotDeclared`. The operator sees the list under your plugin
+(`capabilities` in `GET /api/plugins`).
+
+```php
+use Whity\Sdk\Context\Service;
+use Whity\Sdk\Contribute\PluginCapabilitiesInterface;
+
+final class KeyHubPlugin implements PluginInterface, PluginCapabilitiesInterface
+{
+    public function getServices(): array
+    {
+        return [Service::SETTINGS, Service::JOBS, Service::DATABASE];
+    }
+
+    public function getTables(): array
+    {
+        return ['keyhub_orders'];   // created by your migrations, with a tenant_id column
+    }
+}
+
+$db = \Whitypp(PluginContext::class)->for($this)->database();
+$db->insert('keyhub_orders', ['ref' => 'A-1', 'status' => 'open']);
+$open = $db->select('keyhub_orders', ['status' => ['open', 'held']], ['ref' => 'asc'], 50);
+$db->update('keyhub_orders', ['status' => 'paid'], ['ref' => 'A-1']);
+```
+
+The host adds `tenant_id = <this workspace>` to every condition and sets it on
+every insert; you never write `tenant_id`, and a call that names it, names a
+table you didn't declare, uses a column name that isn't plain, or runs with no
+workspace in scope is refused with `TableRefused`. A core table, or one another
+plugin declared first, is dropped from your declaration with a logged warning.
+Conditions are equals, `null` (IS NULL) or a list (IN). For joins, ranges and
+aggregates write your own SQL as before, with its own `tenant_id` predicate.
+
+A plugin that doesn't implement the interface keeps every service until 2.0,
+which makes the declaration required. It is least privilege inside the host,
+not a sandbox: plugin PHP runs in the host's process, and store review is what
+checks a plugin keeps to its declaration.
+
+### Logs, errors, route limits and install callbacks (SDK 1.152)
+
+From the plugin context (#1686):
+
+```php
+$ctx = \Whitypp(PluginContext::class)->for($this);
+$ctx->log()->warning('Provider answered late', ['provider' => 'polar', 'ms' => 4200]);
+
+try {
+    $this->sync();
+} catch (ProviderDown $e) {
+    $ctx->errors()->report($e, ['provider' => 'polar']);   // a caught error someone should see
+}
+```
+
+Both pass everything through core's error scrubber (secrets, tokens, emails
+and keys whose names suggest a secret are replaced) and the host tags each
+record with your plugin and the workspace; you can't set those. Neither throws.
+An exception your route or job lets escape is captured by the host already.
+
+Limit a route with `'rateLimit' => 30` in its `getRoutes()` entry: 30 calls a
+minute per person (per address when signed out), then 429 with `Retry-After`,
+before your handler runs. It adds to the deployment's own limits.
+
+Implement `Whity\Sdk\PluginInstallLifecycleInterface` to hear once per version
+that the plugin was installed (`onInstalled($version)`) or upgraded
+(`onUpgraded($from, $to)`), after your migrations ran, with no workspace. A
+throw is logged and the call is made again next time, so make both idempotent.
+Per-workspace set-up belongs in `PluginWorkspaceLifecycleInterface`.
+
 ## Step 3 — Discovery and auto-loading
 
 You do not register the plugin anywhere. When the application boots,
@@ -969,6 +1043,48 @@ dropped with a logged warning and the plugin still loads):
 
 The full working reference is the HelloWorld plugin: greetings CRUD routes with
 typed schemas, the descriptor above, and both migrations.
+
+### An embedded screen that calls its own API (SDK 1.150)
+
+A `screen: 'embed'` page runs in a sandboxed frame with no origin of its own,
+so a `fetch()` from it reaches the API with no session. Since SDK 1.150 (#1688)
+it calls the plugin's own routes through the app instead. Put the bridge in the
+page and use the `whity` global it defines:
+
+```php
+use Whity\Sdk\Frontend\FrameBridge;
+
+public function designer(Request $request): Response
+{
+    $nonce = bin2hex(random_bytes(16));
+    $html = '<!doctype html><html><body><ul id="parts"></ul>'
+        . '<script nonce="' . $nonce . '">' . FrameBridge::script() . '</script>'
+        . '<script nonce="' . $nonce . '">'
+        . 'whity.ready().then(() => whity.request("GET", "/api/bom/parts"))'
+        . '.then(r => { if (r.ok) { /* draw r.body */ whity.resize(); } });'
+        . '</script></body></html>';
+
+    return new Response(200, $html, [
+        'Content-Type' => 'text/html; charset=utf-8',
+        'Content-Security-Policy' => "default-src 'none'; script-src 'nonce-{$nonce}'; frame-ancestors 'self'",
+    ]);
+}
+```
+
+- `whity.request(method, path, body?)` answers `{ ok, status, body }`. The app
+  makes the call with a five-minute token bound to **your plugin's routes**,
+  never with the person's cookies; the route's `requiredPermission` is checked
+  against the person as usual. A core route or another plugin's route answers
+  401, so ask core for data on the server side, before you render.
+- `whity.ready()` gives `{ locale, dir, theme, apiBase }` so the page can match
+  the app's language, direction and light or dark theme.
+- `whity.resize()`, `whity.navigate('/admin/x/…')` (app pages only) and
+  `whity.toast(message, 'success' | 'error' | 'warning' | 'info')`.
+- Keep the frame on your own pages. The app answers whatever page the frame
+  shows, so sending it to another site hands that site the same bridge.
+
+Prefer `screen: 'blocks'` when the block vocabulary can say it: it needs no
+bridge and inherits the app's theme, direction and every renderer improvement.
 
 ---
 
@@ -1786,9 +1902,21 @@ $notice = new Notice(
 - Only active members of that workspace are reached. Anyone else counts as nobody, so check the returned number rather than expecting an error.
 - Your type is stored as `your_plugin:order.shipped`, so it can't be mistaken for another plugin's or for a core notice, and it always respects a person's opt-outs, even if you name it `security.alert`.
 - Pass the plugin itself to `for()`. An object the host didn't load is refused.
-- A single send reaches at most 1000 people, and notifications are in-app only for now.
+- A single send reaches at most 1000 people.
+- Each person gets the subject and body in their own language, or the workspace's when they have none.
 
-Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`.
+**By email (SDK 1.141, #2209).** Every notice lands in the inbox. Add `'emailDefault' => true` to a type to also email it to people who never chose for that type:
+
+```php
+'task.assigned' => [
+    'label' => ['en' => 'A task was given to you', 'ar' => 'أُسندت إليك مهمة'],
+    'emailDefault' => true,
+],
+```
+
+Left out, it is false: nobody gets that type by email until they turn it on in Preferences › Notifications, so existing plugins send no email on upgrade. A person's own choice for the type always wins, and turning every email off, or the workspace turning its email off, stops it like any core email. The email has the workspace's brand and carries only the Notice's subject and body, never `data`. You still name people by profile id: the host finds the address, and `toPerson()` returns the same count whether or not an email went. A failed email is retried by the delivery job and never thrown to you.
+
+Declared types and their labels are listed in `GET /api/me/notification-preferences` as `plugin_types`, with `email_default`.
 
 To react to routes and forms (SDK 1.94), listen to `Events::DOCUMENT_ROUTED`, `DOCUMENT_ROUTE_ACTED`, `ROUTE_SENT_BACK`, `ROUTE_RESUBMITTED`, `ROUTE_SIGNED`, `ROUTE_COMPLETED` (with `outcome`: `approved`, `rejected` or null) and `DOCUMENT_FINALISED`, and to `Events::FORM_SUBMITTED`, `SUBMISSION_REVIEWED` and `SUBMISSION_WITHDRAWN`. They fire after the change is saved and carry ids only, because a submission holds personal data and may be anonymous. A route payload names its `subject_type` and `subject_id`; `document_id` is null for a form submission with no document yet. A form submission's final document also fires `document.issuing` and `document.issued` with `origin: route`, so a listener can refuse it or read its id.
 
@@ -2044,11 +2172,12 @@ What to know:
 - **Refusals** throw `InventoryRejected` with a stable `reason` (`no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`); branch on it, not on the message.
 - **Adjust, count and transfer** (SDK 1.128). `$inventory->operations()` does what people do on the Inventory page: `adjust($placeId, 'damaged', [['variant_id' => $v, 'change' => '-2']], $profileId)`, `startCount()`, `recordCount()` and `finishCount()`, `transfer($fromId, $toId, $lines, $profileId)` and `receive()`. Each returns an `Operation` with a `number` (`ADJ-0001`) and a `status`. An adjustment or a count's differences worth more than the workspace's value comes back `waiting_approval` and posts once approved; don't treat that as a failure. They need `stock:adjust`, `stock:count` and `stock:transfer`.
 - **Order from suppliers** (SDK 1.129). `$inventory->orders()->createPurchase($supplierContactId, $placeId, [['variant_id' => $v, 'quantity' => '24', 'unit' => 'bag']], $profileId)` drafts a purchase order (the supplier's price fills a line without one); `submit()` sends it and `receive()` takes in what arrived, at the order's cost. They need `purchases:write`. `inventory.order.submitting` lets you refuse an order (a budget, a blocked supplier).
+- **Batches and expiry** (SDK 1.137). For an item whose `tracking` is `lot`, stock you bring in names its batch: `new MoveLine($variantId, '24', $supplier, $shop, lotCode: 'B-0412', expiresOn: '2027-03-31')`. Stock you take out may name one (`lotCode`), or core takes the batches that expire first. `$inventory->lots()->expiring()` lists what is expiring; listen for `stock.lot.expiring` and `stock.lot.expired` to act on it.
 - **Listen or refuse.** `stock.moved` (and `stock.moved.async` after commit) tells you what posted. `stock.moving` runs before, inside the transaction; throw `HookVetoException` to refuse the whole post (the caller gets 409 with your reason). `inventory.item.created`, `updated` and `archived` follow the items; `inventory.operation.done`, `inventory.count.differences`, `stock.level.below_reorder` and `stock.level.restored` follow operations and reorder levels (SDK 1.128).
 
-## Step 12k — Post to core's books (SDK 1.132)
+## Step 12k — Post to core's books (SDK 1.154)
 
-Accounting is core (WHIT-1318, design section 32). A payroll, point-of-sale or rental plugin posts its money to the workspace's own books instead of keeping a ledger of its own, through `$ctx->accounting()` (SDK 1.132). On an older host it throws `Context\ServiceUnavailable`.
+Accounting is core (WHIT-1318, design section 32). A payroll, point-of-sale or rental plugin posts its money to the workspace's own books instead of keeping a ledger of its own, through `$ctx->accounting()` (SDK 1.154). On an older host it throws `Context\ServiceUnavailable`. A plugin that declares its services (`PluginCapabilitiesInterface`) lists `Service::ACCOUNTING`; without it the call throws `ServiceNotDeclared`.
 
 ```php
 use Whity\Sdk\Accounting\{EntryRequest, EntryRequestLine};

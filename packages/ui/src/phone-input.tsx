@@ -179,6 +179,7 @@ function PhoneInput({
       </label>
       <div
         dir="ltr"
+        data-slot="phone-input"
         className={cn(
           "flex h-10 overflow-hidden rounded-control border bg-card focus-within:ring-2 focus-within:ring-ring",
           error ? "border-destructive" : "border-input",

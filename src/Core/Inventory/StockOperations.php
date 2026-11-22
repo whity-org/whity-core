@@ -109,12 +109,13 @@ final class StockOperations
                 'unit' => $line['unit'] ?? null,
                 'from_location_id' => $negative ? $place : $other,
                 'to_location_id' => $negative ? $other : $place,
-            ], $field);
+            ] + self::lotFields($line), $field);
             $lines[] = [
                 'variant_id' => $prepared['variant_id'],
                 'quantity' => $negative ? -$prepared['steps'] : $prepared['steps'],
                 'entered_unit_id' => $prepared['entered_unit_id'],
                 'entered_quantity' => $prepared['entered_quantity'],
+                'lot_input' => $prepared['lot_input'],
                 'reason_code' => $lineReason,
                 'note' => is_string($line['note'] ?? null) ? mb_substr(trim($line['note']), 0, 500) : '',
             ];
@@ -244,6 +245,11 @@ final class StockOperations
                 $steps = $this->units->toBaseSteps($tenantId, (int) $found['item']['id'], $found['unit'], $counted, $unit, $field . '.counted');
                 $expected = $this->ledger->onHandSteps($tenantId, $variantId, $place);
                 $note = is_string($raw['note'] ?? null) ? mb_substr(trim($raw['note']), 0, 500) : null;
+                // The batch any extra stock came from (WHIT-1235); a shortfall comes out of the batches first expiring.
+                $lot = StockLedger::lotInput($raw);
+                if (($lot['lot_id'] ?? null) !== null || ($lot['lot_code'] ?? null) !== null) {
+                    $this->ledger->lots()->check($tenantId, $found, $lot, true, $field);
+                }
 
                 $line = $this->db->one(
                     'SELECT id FROM inv_operation_lines WHERE tenant_id = :tenant_id AND operation_id = :op AND variant_id = :variant_id ORDER BY id LIMIT 1',
@@ -263,9 +269,10 @@ final class StockOperations
                     'UPDATE inv_operation_lines
                         SET quantity = :quantity, entered_unit_id = :unit_id, entered_quantity = :entered, expected_quantity = :expected,
                             counted_at = CURRENT_TIMESTAMP, counted_by_profile_id = :actor,
-                            note = COALESCE(:note, note), updated_at = CURRENT_TIMESTAMP
+                            note = COALESCE(:note, note), lot_id = :lot_id, lot_code = :lot_code, expires_on = :expires_on, made_on = :made_on,
+                            updated_at = CURRENT_TIMESTAMP
                       WHERE tenant_id = :tenant_id AND operation_id = :op AND variant_id = :variant_id',
-                    [
+                    self::lotColumns($lot) + [
                         ':quantity' => $steps['steps'], ':unit_id' => $steps['unit_id'], ':entered' => $steps['entered_steps'],
                         ':expected' => $expected, ':actor' => $actor, ':note' => $note,
                         ':tenant_id' => $tenantId, ':op' => $id, ':variant_id' => $variantId,
@@ -303,6 +310,7 @@ final class StockOperations
         }
         $this->priceLines($tenantId, $id, true);
         $differences = $this->countDifferences($tenantId, $id);
+        $this->checkFoundLots($tenantId, $id);
         $waiting = $differences !== [] && $this->needsApproval($tenantId, $id, SettingsRegistry::INVENTORY_APPROVE_COUNTS_ABOVE);
 
         if ($differences !== []) {
@@ -355,10 +363,11 @@ final class StockOperations
             $prepared = $this->ledger->prepareLine($tenantId, [
                 'variant_id' => $line['variant_id'] ?? null, 'quantity' => $line['quantity'] ?? null, 'unit' => $line['unit'] ?? null,
                 'from_location_id' => $from, 'to_location_id' => $to,
-            ], 'lines[' . $i . ']');
+            ] + self::lotFields($line), 'lines[' . $i . ']');
             $lines[] = [
                 'variant_id' => $prepared['variant_id'], 'quantity' => $prepared['steps'],
                 'entered_unit_id' => $prepared['entered_unit_id'], 'entered_quantity' => $prepared['entered_quantity'],
+                'lot_input' => $prepared['lot_input'],
                 'note' => is_string($line['note'] ?? null) ? mb_substr(trim($line['note']), 0, 500) : '',
             ];
         }
@@ -394,7 +403,7 @@ final class StockOperations
         $lines = array_map(static fn (array $l): array => [
             'variant_id' => $l['variant_id'], 'from_location_id' => (int) $op['from_location_id'], 'to_location_id' => $transit,
             'steps' => $l['quantity'], 'entered_unit_id' => $l['entered_unit_id'], 'entered_quantity' => $l['entered_quantity'],
-            'note' => $l['note'], 'source_line_id' => $l['id'],
+            'note' => $l['note'], 'source_line_id' => $l['id'], 'lot_input' => $l['lot_input'],
         ], $this->lineRows($tenantId, $id));
 
         $this->db->transaction(function () use ($tenantId, $id, $actor, $op, $lines): void {
@@ -446,16 +455,29 @@ final class StockOperations
 
         $transit = $this->workspace->virtualId($tenantId, 'transit');
         $loss = $this->workspace->virtualId($tenantId, 'loss');
+        // What went on its way, by line and lot (WHIT-1235): what arrives comes out of the same lots, first sent first.
+        $sent = [];
+        foreach ($this->db->all(
+            'SELECT source_line_id, lot_id, quantity FROM inv_moves WHERE tenant_id = :tenant_id AND batch_key = :batch ORDER BY id',
+            [':tenant_id' => $tenantId, ':batch' => (string) $op['sent_batch_key']]
+        ) as $m) {
+            $sent[(int) $m['source_line_id']][] = ['lot_id' => InventoryDb::int($m['lot_id']), 'steps' => (int) $m['quantity']];
+        }
         $post = [];
         foreach ($lines as $l) {
             $got = $received[$l['id']] ?? $l['quantity'];
-            if ($got > 0) {
-                $post[] = ['variant_id' => $l['variant_id'], 'from_location_id' => $transit, 'to_location_id' => (int) $op['to_location_id'],
-                    'steps' => $got, 'note' => $l['note'], 'source_line_id' => $l['id'], 'reason_code' => ''];
-            }
-            if ($got < $l['quantity']) {
-                $post[] = ['variant_id' => $l['variant_id'], 'from_location_id' => $transit, 'to_location_id' => $loss,
-                    'steps' => $l['quantity'] - $got, 'note' => $l['note'], 'source_line_id' => $l['id'], 'reason_code' => 'lost_in_transit'];
+            foreach ($sent[$l['id']] ?? [['lot_id' => null, 'steps' => $l['quantity']]] as $part) {
+                $arrived = min($got, $part['steps']);
+                $got -= $arrived;
+                if ($arrived > 0) {
+                    $post[] = ['variant_id' => $l['variant_id'], 'from_location_id' => $transit, 'to_location_id' => (int) $op['to_location_id'],
+                        'steps' => $arrived, 'note' => $l['note'], 'source_line_id' => $l['id'], 'reason_code' => '', 'lot_id' => $part['lot_id']];
+                }
+                if ($arrived < $part['steps']) {
+                    $post[] = ['variant_id' => $l['variant_id'], 'from_location_id' => $transit, 'to_location_id' => $loss,
+                        'steps' => $part['steps'] - $arrived, 'note' => $l['note'], 'source_line_id' => $l['id'], 'reason_code' => 'lost_in_transit',
+                        'lot_id' => $part['lot_id']];
+                }
             }
         }
 
@@ -481,7 +503,7 @@ final class StockOperations
      * costing can use it. The order keeps its own count of what arrived;
      * {@see PurchaseOrders::receive()} calls this inside its transaction.
      *
-     * @param list<array{variant_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, order_line_id: int, unit_cost_minor: ?int, currency: ?string, note: string}> $lines
+     * @param list<array{variant_id: int, steps: int, entered_unit_id: ?int, entered_quantity: ?int, order_line_id: int, unit_cost_minor: ?int, currency: ?string, note: string, lot_input?: array<string, mixed>}> $lines
      * @param array{agent_id?: ?int, on_behalf_of?: ?int, idempotency_key?: ?string, source_plugin?: ?string} $meta
      * @return array<string, mixed> the receipt
      */
@@ -492,6 +514,12 @@ final class StockOperations
             throw InventoryRejectedException::field('lines', 'Receive at least one line');
         }
         $supplier = $this->workspace->virtualId($tenantId, 'supplier');
+        foreach ($lines as $i => $l) {
+            $found = $this->items->variantForStock($tenantId, $l['variant_id']);
+            if ($found !== null) {
+                $this->ledger->lots()->check($tenantId, $found, $l['lot_input'] ?? [], true, 'lines[' . $i . ']');
+            }
+        }
 
         return $this->db->transaction(function () use ($tenantId, $actor, $orderId, $placeId, $lines, $note, $occurredAt, $meta, $supplier): array {
             $id = $this->insert($tenantId, $actor, 'receipt', [
@@ -499,6 +527,7 @@ final class StockOperations
             ], array_map(static fn (array $l): array => [
                 'variant_id' => $l['variant_id'], 'quantity' => $l['steps'], 'entered_unit_id' => $l['entered_unit_id'],
                 'entered_quantity' => $l['entered_quantity'], 'note' => $l['note'], 'order_line_id' => $l['order_line_id'],
+                'lot_input' => $l['lot_input'] ?? null,
             ], $lines), $meta);
             $op = $this->row($tenantId, $id) ?? throw InventoryRejectedException::notFound('Receipt');
             $lineIds = array_column($this->lineRows($tenantId, $id), 'id');
@@ -509,6 +538,7 @@ final class StockOperations
                     'steps' => $l['steps'], 'entered_unit_id' => $l['entered_unit_id'], 'entered_quantity' => $l['entered_quantity'],
                     'unit_cost_minor' => $l['unit_cost_minor'], 'currency' => $l['currency'], 'note' => $l['note'],
                     'source_line_id' => $lineIds[$i] ?? null, 'reason_code' => '',
+                    'lot_input' => $l['lot_input'] ?? ['lot_id' => null],
                 ];
             }
             $posted = $this->ledger->postSteps($tenantId, $actor, $post, $this->postMeta($op, 'receipt'));
@@ -575,7 +605,7 @@ final class StockOperations
         $lines = [];
         foreach ($this->lineRows($tenantId, $id) as $l) {
             $base = ['variant_id' => $l['variant_id'], 'note' => $l['note'], 'source_line_id' => $l['id'],
-                'entered_unit_id' => $l['entered_unit_id'], 'entered_quantity' => $l['entered_quantity']];
+                'entered_unit_id' => $l['entered_unit_id'], 'entered_quantity' => $l['entered_quantity'], 'lot_input' => $l['lot_input']];
             if ($op['kind'] === 'adjustment') {
                 $out = $l['quantity'] < 0;
                 $other = $this->workspace->virtualId($tenantId, $out ? 'loss' : 'found');
@@ -589,7 +619,7 @@ final class StockOperations
                 $other = $this->workspace->virtualId($tenantId, $diff < 0 ? 'loss' : 'found');
                 $lines[] = ['variant_id' => $l['variant_id'], 'note' => $l['note'], 'source_line_id' => $l['id'],
                     'from_location_id' => $diff < 0 ? $place : $other, 'to_location_id' => $diff < 0 ? $other : $place,
-                    'steps' => (int) abs($diff), 'reason_code' => 'count_correction'];
+                    'steps' => (int) abs($diff), 'reason_code' => 'count_correction', 'lot_input' => $l['lot_input']];
             } else {
                 $lines[] = $base + ['from_location_id' => $place, 'to_location_id' => (int) $op['to_location_id'], 'steps' => $l['quantity'], 'reason_code' => ''];
             }
@@ -757,6 +787,8 @@ final class StockOperations
                     ? (new Quantity($l['entered_quantity'], $l['entered_decimals']))->toDecimal() : null,
                 'reason_code' => $l['reason_code'], 'note' => $l['note'],
                 'value_minor' => $l['value_minor'], 'currency' => $l['currency'],
+                // The batch the line named (WHIT-1235); a line that named none took the batches that expire first, as its moves show.
+                'lot_code' => $l['lot_code'], 'lot_expires_on' => $l['lot_expires_on'],
             ];
             if ($op['kind'] === 'count') {
                 $counted = $l['counted_at'] !== null;
@@ -829,9 +861,11 @@ final class StockOperations
                     );
                     foreach ($lines as $i => $l) {
                         $this->db->run(
-                            'INSERT INTO inv_operation_lines (tenant_id, operation_id, variant_id, quantity, entered_unit_id, entered_quantity, reason_code, note, sort_order, order_line_id)
-                             VALUES (:tenant_id, :op, :variant_id, :quantity, :unit_id, :entered, :reason, :note, :sort_order, :order_line_id)',
-                            [
+                            'INSERT INTO inv_operation_lines (tenant_id, operation_id, variant_id, quantity, entered_unit_id, entered_quantity, reason_code, note, sort_order, order_line_id,
+                                    lot_id, lot_code, expires_on, made_on)
+                             VALUES (:tenant_id, :op, :variant_id, :quantity, :unit_id, :entered, :reason, :note, :sort_order, :order_line_id,
+                                    :lot_id, :lot_code, :expires_on, :made_on)',
+                            self::lotColumns($l['lot_input'] ?? null) + [
                                 ':tenant_id' => $tenantId, ':op' => $id, ':variant_id' => $l['variant_id'], ':quantity' => $l['quantity'],
                                 ':unit_id' => $l['entered_unit_id'] ?? null, ':entered' => $l['entered_quantity'] ?? null,
                                 ':reason' => (string) ($l['reason_code'] ?? ''), ':note' => (string) ($l['note'] ?? ''), ':sort_order' => $i + 1,
@@ -1037,12 +1071,30 @@ final class StockOperations
         return $out;
     }
 
+    /**
+     * A count that found more of an item that keeps batches says which batch
+     * the extra is (WHIT-1235), before it routes.
+     */
+    private function checkFoundLots(int $tenantId, int $id): void
+    {
+        foreach ($this->lineRows($tenantId, $id) as $i => $l) {
+            if ($l['counted_at'] === null || $l['quantity'] === null || $l['expected'] === null || $l['quantity'] <= $l['expected']) {
+                continue;
+            }
+            $found = $this->items->variantForStock($tenantId, $l['variant_id']);
+            if ($found !== null) {
+                $this->ledger->lots()->check($tenantId, $found, $l['lot_input'], true, 'lines[' . $i . ']');
+            }
+        }
+    }
+
     /** @return list<array<string, mixed>> */
     private function lineRows(int $tenantId, int $id): array
     {
         $rows = $this->db->all(
             'SELECT l.id, l.variant_id, l.order_line_id, l.quantity, l.entered_unit_id, l.entered_quantity, l.expected_quantity, l.counted_at,
-                    l.counted_by_profile_id, l.received_quantity, l.reason_code, l.note, l.value_minor,
+                    l.counted_by_profile_id, l.received_quantity, l.reason_code, l.note, l.value_minor, l.lot_id, l.lot_code, l.expires_on, l.made_on,
+                    t.code AS lot_name, t.expires_on AS lot_expires_on,
                     v.item_id, v.sku, v.purchase_price_minor AS variant_price, i.name AS item_name, i.names AS item_names, i.purchase_price_minor AS item_price,
                     i.currency, u.code AS unit, u.decimals, eu.code AS entered_unit, eu.decimals AS entered_decimals
                FROM inv_operation_lines l
@@ -1050,6 +1102,7 @@ final class StockOperations
                JOIN inv_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id
                JOIN inv_units u ON u.tenant_id = i.tenant_id AND u.id = i.base_unit_id
                LEFT JOIN inv_units eu ON eu.tenant_id = l.tenant_id AND eu.id = l.entered_unit_id
+               LEFT JOIN inv_lots t ON t.tenant_id = l.tenant_id AND t.id = l.lot_id
               WHERE l.tenant_id = :tenant_id AND l.operation_id = :op
               ORDER BY l.sort_order, l.id',
             [':tenant_id' => $tenantId, ':op' => $id]
@@ -1069,7 +1122,42 @@ final class StockOperations
             'variant_price' => InventoryDb::int($r['variant_price']), 'item_price' => InventoryDb::int($r['item_price']),
             'currency' => is_string($r['currency']) && $r['currency'] !== '' ? $r['currency'] : null,
             'unit' => (string) $r['unit'], 'decimals' => (int) $r['decimals'],
+            'lot_input' => [
+                'lot_id' => InventoryDb::int($r['lot_id']), 'lot_code' => is_string($r['lot_code']) ? $r['lot_code'] : null,
+                'expires_on' => $r['expires_on'] === null ? null : substr((string) $r['expires_on'], 0, 10),
+                'made_on' => $r['made_on'] === null ? null : substr((string) $r['made_on'], 0, 10),
+            ],
+            'lot_code' => is_string($r['lot_name']) ? $r['lot_name'] : (is_string($r['lot_code']) ? $r['lot_code'] : null),
+            'lot_expires_on' => $r['lot_expires_on'] !== null ? substr((string) $r['lot_expires_on'], 0, 10)
+                : ($r['expires_on'] === null ? null : substr((string) $r['expires_on'], 0, 10)),
         ], $rows);
+    }
+
+    /**
+     * The lot fields a raw line may carry (WHIT-1235).
+     *
+     * @param array<mixed> $line
+     * @return array<string, mixed>
+     */
+    private static function lotFields(array $line): array
+    {
+        return array_intersect_key($line, ['lot_id' => true, 'lot_code' => true, 'expires_on' => true, 'made_on' => true]);
+    }
+
+    /**
+     * @param array<string, mixed>|null $lot
+     * @return array<string, mixed> bound parameters
+     */
+    private static function lotColumns(?array $lot): array
+    {
+        $date = static fn (mixed $d): ?string => is_string($d) && $d !== '' ? $d : null;
+
+        return [
+            ':lot_id' => InventoryDb::int($lot['lot_id'] ?? null),
+            ':lot_code' => is_string($lot['lot_code'] ?? null) ? mb_substr($lot['lot_code'], 0, LotService::MAX_CODE) : null,
+            ':expires_on' => $date($lot['expires_on'] ?? null),
+            ':made_on' => $date($lot['made_on'] ?? null),
+        ];
     }
 
     /**

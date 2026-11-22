@@ -63,7 +63,7 @@ final class WorkspaceTemplateValidator
     public const SETTINGS = ['billing.default_currency', 'timezone', 'locale', 'calendar.week_start', 'calendar.weekend_days'];
 
     /** Booking rules a template may set (PUT /api/calendar/settings). */
-    public const CALENDAR_SETTINGS = ['booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'instant_booking', 'multi_service_booking', 'week_start', 'weekend_days'];
+    public const CALENDAR_SETTINGS = ['booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'instant_booking', 'multi_service_booking', 'walkins_enabled', 'week_start', 'weekend_days'];
 
     /**
      * The kinds of guided-setup step core draws for a template. Each has its

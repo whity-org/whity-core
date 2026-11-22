@@ -18,8 +18,8 @@ use Whity\Core\Messaging\MessagingService;
  * - **Hand-over**: a new conversation goes to the next person on a list, in
  *   turn, when nobody has it.
  *
- * Order status and stock alerts need Front Office's data; that plugin can add
- * its own bots.
+ * Order status and stock alerts need inventory's and accounting's data; they
+ * come as bots of their own.
  */
 final class ChatBots
 {

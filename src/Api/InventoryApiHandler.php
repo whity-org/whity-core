@@ -67,6 +67,8 @@ final class InventoryApiHandler
         'transfers_one_step' => SettingsRegistry::INVENTORY_TRANSFERS_ONE_STEP,
         'purchase_route_template_id' => SettingsRegistry::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
         'over_receipt_percent' => SettingsRegistry::INVENTORY_OVER_RECEIPT_PERCENT,
+        'fefo' => SettingsRegistry::INVENTORY_FEFO,
+        'expiry_warning_days' => SettingsRegistry::INVENTORY_EXPIRY_WARNING_DAYS,
     ];
 
     // ── units and categories ────────────────────────────────────────────
@@ -507,9 +509,9 @@ final class InventoryApiHandler
         foreach (self::SETTING_KEYS as $field => $key) {
             $value = (string) ($effective[$key] ?? $defaults[$key]);
             $out[$field] = match ($field) {
-                'transfers_one_step' => $value === 'true',
+                'transfers_one_step', 'fefo' => $value === 'true',
                 'adjustment_route_template_id', 'count_route_template_id', 'purchase_route_template_id' => (int) $value === 0 ? null : (int) $value,
-                'over_receipt_percent' => (int) $value,
+                'over_receipt_percent', 'expiry_warning_days' => (int) $value,
                 default => $value === '' ? null : $value,
             };
         }

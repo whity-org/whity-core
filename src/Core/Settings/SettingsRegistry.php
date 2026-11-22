@@ -285,9 +285,10 @@ final class SettingsRegistry
     public const SEATS_ENFORCEMENT = 'seats.enforcement';
     public const SEATS_COUNT_INVITED = 'seats.count_invited';
 
-    // METERED LIMITS (documents rendered per day or month). 'block' refuses past
-    // the limit, as metering always has; 'warn' counts and lets the action go
-    // ahead. Global-only for the same reason as seats.enforcement.
+    // METERED LIMITS (documents rendered per day or month). 'warn', the
+    // default since the business model (BM.17), counts and lets the action go
+    // ahead; 'block' refuses past the limit, for an operator who opts in.
+    // Global-only for the same reason as seats.enforcement.
     public const METERS_ENFORCEMENT = 'meters.enforcement';
 
     // INVOICING (#billing). Every one of these differs per deployment, which
@@ -704,6 +705,9 @@ final class SettingsRegistry
     //             name, never its title), its revision letter and page count,
     //             and which revision replaced a revised one (#1627). Never a
     //             price, a name, a subject or the document's number.
+    //   signed  — adds the signatures and company stamps on it, as capacities
+    //             with dates (never names unless the next key says so), and
+    //             whether its trail's chain is intact (#1730).
     //
     // Tenant-overridable because #1036 is explicit that this is a tenant's
     // decision: some institutions want a holder to see where a document sits,
@@ -718,6 +722,12 @@ final class SettingsRegistry
     // turns it on. Tenant-overridable, because it is a decision about how an
     // organisation speaks to the people it serves.
     public const FORMS_SHOW_REVIEWER_NAMES = 'forms.show_reviewer_names';
+
+    // #1730. At the `signed` level of `documents.qr_public_detail`, whether the
+    // public check also names who signed. Off: a holder reads "Director, signed
+    // 21 Nov 2026", not the director's name. Tenant-overridable: the workspace
+    // decides what its paper says about its people.
+    public const DOCUMENTS_QR_PUBLIC_SIGNER_NAMES = 'documents.qr_public_signer_names';
 
     // How many people a USER GROUP preview SHOWS (#999). Not a ceiling on
     // resolution — the count a preview reports is always exact — but the size of
@@ -877,6 +887,11 @@ final class SettingsRegistry
      * desk. Off by default; the Salons plugin turns it on.
      */
     public const CALENDAR_MULTI_SERVICE_BOOKING = 'calendar.multi_service_booking';
+    /**
+     * WHIT-1334 (design section 35, SL.3): the walk-in queue at the front
+     * desk. Off by default; the salon workspace template turns it on.
+     */
+    public const CALENDAR_WALKINS_ENABLED = 'calendar.walkins_enabled';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -948,6 +963,25 @@ final class SettingsRegistry
     //     it asks (IV.12: 0 by default, so anything over asks).
     public const INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID = 'inventory.purchase_route_template_id';
     public const INVENTORY_OVER_RECEIPT_PERCENT = 'inventory.over_receipt_percent';
+    //   - fefo: stock leaving a place takes the batch that expires first
+    //     (IN.1, design 31 §3.5); off takes the oldest batch (WHIT-1235).
+    //   - expiry_warning_days: how many days before its expiry a batch is
+    //     "expiring soon" (IN.1: 7).
+    public const INVENTORY_FEFO = 'inventory.fefo';
+    public const INVENTORY_EXPIRY_WARNING_DAYS = 'inventory.expiry_warning_days';
+
+    // ---- Quotes to customers (WHIT-1321, design section 34 §3, QT.4) ----
+    //   - quote_valid_days: how long a new quote is valid, 1 to 365 days (30).
+    //   - quote_route_template_id: the route a quote travels before it can be
+    //     sent; 0 means none, and a person with quotes:write marks it ready.
+    public const SALES_QUOTE_VALID_DAYS = 'sales.quote_valid_days';
+    public const SALES_QUOTE_ROUTE_TEMPLATE_ID = 'sales.quote_route_template_id';
+    //   - email_*: whether the workspace emails its customers a quote, an
+    //     invoice, a receipt or a payment reminder (WHIT-1323, TR.3); all on.
+    public const SALES_EMAIL_QUOTE = 'sales.email_quote';
+    public const SALES_EMAIL_INVOICE = 'sales.email_invoice';
+    public const SALES_EMAIL_RECEIPT = 'sales.email_receipt';
+    public const SALES_EMAIL_REMINDER = 'sales.email_reminder';
 
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
@@ -974,6 +1008,14 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP,
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID,
         self::INVENTORY_OVER_RECEIPT_PERCENT,
+        self::INVENTORY_FEFO,
+        self::INVENTORY_EXPIRY_WARNING_DAYS,
+        self::SALES_QUOTE_VALID_DAYS,
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID,
+        self::SALES_EMAIL_QUOTE,
+        self::SALES_EMAIL_INVOICE,
+        self::SALES_EMAIL_RECEIPT,
+        self::SALES_EMAIL_REMINDER,
     ];
 
     /**
@@ -1094,6 +1136,7 @@ final class SettingsRegistry
         self::SIGNUP_CUSTOMER_INVITES,
         self::MESSAGING_WEBCHAT_ENABLED,
         self::INVENTORY_TRANSFERS_ONE_STEP,
+        self::INVENTORY_FEFO,
         self::MAINTENANCE_ACTIVE,
         self::ERROR_TRACKING_ENABLED,
         self::ERROR_TRACKING_NOTIFY_ADMINS,
@@ -1122,11 +1165,13 @@ final class SettingsRegistry
         self::DOCUMENTS_PERSIST_ENABLED,
         self::DOCUMENTS_QR_ENABLED,
         self::FORMS_SHOW_REVIEWER_NAMES,
+        self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES,
         self::I18N_ENABLED,
         self::UI_HIDE_DATES,
         self::CALENDAR_BOOKING_PAGE_ENABLED,
         self::CALENDAR_INSTANT_BOOKING,
         self::CALENDAR_MULTI_SERVICE_BOOKING,
+        self::CALENDAR_WALKINS_ENABLED,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::BILLING_LOCAL_RUNS_ENABLED,
@@ -1226,7 +1271,7 @@ final class SettingsRegistry
         // DEFAULT sits: `minimal` is the middle value and stays the default,
         // because it is what shipped and adding a quieter level must not change
         // what any existing tenant discloses.
-        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described'],
+        self::DOCUMENTS_QR_PUBLIC_DETAIL => ['undated', 'minimal', 'stage', 'described', 'signed'],
         // 'internal' stores errors in this deployment's own database (no extra
         // infrastructure); 'sentry' ships them to any Sentry-PROTOCOL backend —
         // hosted Sentry, or a self-hosted GlitchTip/Bugsink — via the encrypted
@@ -1327,7 +1372,10 @@ final class SettingsRegistry
         self::LICENSING_BILLING_BASIS => 'activated',
         self::SEATS_ENFORCEMENT => 'warn',
         self::SEATS_COUNT_INVITED => 'true',
-        self::METERS_ENFORCEMENT => 'block',
+        // Warn by default (BM.4, BM.17): a limit counts and tells the people
+        // who can change the plan, and nobody is ever locked out. 'block' is
+        // still there for an operator who chooses it.
+        self::METERS_ENFORCEMENT => 'warn',
         // Zero tax until an operator says otherwise — see the constant.
         self::BILLING_DEFAULT_CURRENCY => 'USD',
         self::BILLING_DEFAULT_PLAN => '',
@@ -1437,6 +1485,7 @@ final class SettingsRegistry
         self::DOCUMENTS_QR_PUBLIC_DETAIL => 'minimal',
         // Off: applicants see stages and outcomes, not reviewers. See the constant.
         self::FORMS_SHOW_REVIEWER_NAMES => 'false',
+        self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES => 'false',
         // Ten faces. Enough to recognise a group at a glance — "yes, those are
         // the instructors" — and small enough that nobody mistakes the sample
         // for the list. The COUNT beside it is exact and unbounded, which is
@@ -1475,6 +1524,7 @@ final class SettingsRegistry
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
         self::CALENDAR_INSTANT_BOOKING => 'true',
         self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
+        self::CALENDAR_WALKINS_ENABLED => 'false',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: the plans page shows the active plans as they are, and the
@@ -1500,6 +1550,14 @@ final class SettingsRegistry
         self::INVENTORY_TRANSFERS_ONE_STEP => 'false',
         self::INVENTORY_PURCHASE_ROUTE_TEMPLATE_ID => '0',
         self::INVENTORY_OVER_RECEIPT_PERCENT => '0',
+        self::INVENTORY_FEFO => 'true',
+        self::INVENTORY_EXPIRY_WARNING_DAYS => '7',
+        self::SALES_QUOTE_VALID_DAYS => '30',
+        self::SALES_QUOTE_ROUTE_TEMPLATE_ID => '0',
+        self::SALES_EMAIL_QUOTE => 'true',
+        self::SALES_EMAIL_INVOICE => 'true',
+        self::SALES_EMAIL_RECEIPT => 'true',
+        self::SALES_EMAIL_REMINDER => 'true',
     ];
 
     /**
@@ -1936,6 +1994,7 @@ final class SettingsRegistry
             self::DOCUMENTS_QR_ENABLED => self::validateBoolean($value, self::DOCUMENTS_QR_ENABLED),
             self::DOCUMENTS_QR_PUBLIC_DETAIL => self::validateEnum($key, $value),
             self::FORMS_SHOW_REVIEWER_NAMES => self::validateBoolean($value, self::FORMS_SHOW_REVIEWER_NAMES),
+            self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES => self::validateBoolean($value, self::DOCUMENTS_QR_PUBLIC_SIGNER_NAMES),
             self::GROUPS_PREVIEW_SAMPLE_SIZE => self::validateGroupsPreviewSampleSize($value),
             self::DATA_TYPES_BULK_MAX_IDS => self::validateBulkMaxIds($value),
             // Error tracking. These five were declared with defaults, types,
@@ -1965,6 +2024,7 @@ final class SettingsRegistry
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
             self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
+            self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             // #billing free-text. Declared with defaults and no validate() arm,
             // these fell straight through to `default` below — so six keys the
@@ -2016,6 +2076,13 @@ final class SettingsRegistry
                 : $key . ' must be a route template id, or 0 for the default.',
             self::INVENTORY_TRANSFERS_ONE_STEP => self::validateBoolean($value, self::INVENTORY_TRANSFERS_ONE_STEP),
             self::INVENTORY_OVER_RECEIPT_PERCENT => self::validateWholeNumberBetween($value, self::INVENTORY_OVER_RECEIPT_PERCENT, 0, 100),
+            self::INVENTORY_FEFO => self::validateBoolean($value, self::INVENTORY_FEFO),
+            self::INVENTORY_EXPIRY_WARNING_DAYS => self::validateWholeNumberBetween($value, self::INVENTORY_EXPIRY_WARNING_DAYS, 1, 365),
+            self::SALES_QUOTE_VALID_DAYS => self::validateWholeNumberBetween($value, self::SALES_QUOTE_VALID_DAYS, 1, 365),
+            self::SALES_QUOTE_ROUTE_TEMPLATE_ID => preg_match('/^(0|[1-9][0-9]{0,18})$/', $value) === 1
+                ? null
+                : $key . ' must be a route template id, or 0 for none.',
+            self::SALES_EMAIL_QUOTE, self::SALES_EMAIL_INVOICE, self::SALES_EMAIL_RECEIPT, self::SALES_EMAIL_REMINDER => self::validateBoolean($value, $key),
             default => "Unknown setting key: {$key}",
         };
     }

@@ -242,9 +242,19 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsOneEightForInteractiveBlocks(): void
     {
         $this->assertSame(
-            '1.132.0',
+            '1.154.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.132 ADDS Accounting\\Accounts, Ledger, Periods and Reports: the chart of accounts, an append-only double-entry ledger and the trial balance for plugins (WHIT-1318). '
+            'SDK 1.154 ADDS Accounting\\Accounts, Ledger, Periods and Reports: the chart of accounts, an append-only double-entry ledger and the trial balance for plugins (WHIT-1318). '
+            . 'SDK 1.153 ADDS the route.stamped event: a holder applied a company stamp on a stamp step (#1729). '
+            . 'SDK 1.152 ADDS Log\PluginLog and Log\ErrorReporter (PluginScope::log(), errors()), route rateLimit and PluginInstallLifecycleInterface (#1686). '
+            . 'SDK 1.151 ADDS Contribute\PluginCapabilitiesInterface and Database\WorkspaceTables (PluginScope::database()): plugins get only the services they declare, and their own tables held to the workspace (#1693). '
+            . 'SDK 1.150 ADDS Frontend\FrameBridge: an embedded screen calls its own plugin routes through the app, with a short-lived token bound to them (#1688). '
+            . 'SDK 1.148 ADDS Contribute\\WorkspaceCommissionExpenses, Calendar\\CommissionClose and the calendar.commission.closed event: a closed commission period goes to the books (WHIT-1334). '
+            . 'SDK 1.147 ADDS the workspace template calendar setting `walkins_enabled`: a template turns on the walk-in queue (WHIT-1334). '
+            . 'SDK 1.141 ADDS the optional notification type `emailDefault` key: a plugin notice can also go by email, per each person\'s preferences (WHIT-1250, #2209). '
+            . 'SDK 1.137 ADDS Inventory\\Lots and Inventory\\Lot, lot fields on MoveLine and Move, and the stock.lot.expiring|expired events: batches, serial numbers and expiry (WHIT-1235). '
+            . 'SDK 1.133 ADDS Usage\\Usage: a workspace\'s usage meters for a month, read-only, with each base and warning state (section 33 §5). '
+            . 'SDK 1.132 ADDS Contribute\\WorkspaceQuoteConversion and the sales.quote.* events: what an accepted quote turns into (WHIT-1321). '
             . 'SDK 1.131 ADDS the optional workspace template `theme` key: a template names the theme that suits it, offered when it is chosen (WHIT-1225). '
             . 'SDK 1.130 ADDS Contribute\\CorePermissionRequestsInterface and the CorePermissionGrants host service: plugins ask for core permissions for their roles, granted only with an operator\'s approval (#2256). '
             . 'SDK 1.129 ADDS Inventory\\Orders: purchase orders for plugins, sent on the workspace\'s route and received in parts (WHIT-1234). '

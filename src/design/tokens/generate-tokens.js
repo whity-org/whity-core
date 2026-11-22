@@ -488,6 +488,62 @@ function generateDart(base) {
 }
 
 /**
+ * The component families a theme may give their own shape preset (TH.21,
+ * 30-themes 14.2), each by the `data-slot` of the element that draws its
+ * corner. Anything inside one without a family of its own follows it, so a
+ * container and its children match. Keep in step with
+ * ThemeValidator::COMPONENT_FAMILIES.
+ */
+const SHAPE_FAMILIES = {
+  buttons: ['button', 'icon-button'],
+  fields: [
+    'input', 'textarea', 'select-trigger', 'search-field', 'tag-input', 'bilingual-input',
+    'phone-input', 'otp-input', 'date-picker-trigger', 'time-picker-trigger',
+  ],
+  chips: ['badge', 'actor-chip', 'data-table-phone-chips'],
+  cards: ['card'],
+  dialogs: [
+    'dialog-content', 'alert-dialog-content', 'sheet-content', 'popover-content', 'select-content',
+    'dropdown-menu-content', 'dropdown-menu-sub-content', 'menu-bar-content', 'menu-bar-sub-content', 'command-palette',
+  ],
+  tables: ['table-container', 'data-table'],
+  navigation: ['app-sidebar-nav', 'tabs-list', 'toggle-group', 'view-toggle', 'menu-bar'],
+};
+
+/**
+ * The --shape-* properties every radius utility reads: from the theme's
+ * --wy-radius-* (or the default), and for a family from its own
+ * --wy-<family>-radius-* first. Declared on the element, so the inset, inner,
+ * pressed and selected radii follow that element's control radius.
+ */
+function shapeDeclarations(base, family) {
+  const pick = (name, fallback) =>
+    family ? `var(--wy-${family}-${name}, var(--wy-${name}, ${fallback}))` : `var(--wy-${name}, ${fallback})`;
+  const out = [];
+  for (const [name, value] of Object.entries(base.borderRadius)) {
+    if (name === 'base' || name === 'full') continue;
+    out.push(`--shape-radius-${name}: ${pick(`radius-${name}`, value)};`);
+  }
+  out.push('--shape-inset-control: max(0.25rem, calc(var(--shape-radius-control) * 0.3));');
+  out.push('--shape-radius-control-inner: max(0.125rem, calc(var(--shape-radius-control) - var(--shape-inset-control)));');
+  out.push(`--shape-radius-control-pressed: ${pick('radius-control-pressed', 'var(--shape-radius-control)')};`);
+  out.push(`--shape-radius-control-selected: ${pick('radius-control-selected', 'var(--shape-radius-control-sm)')};`);
+  out.push(`--shape-corner: ${pick('corner-shape', 'round')};`);
+  return out.join(' ');
+}
+
+function generateShapeScopes(base) {
+  // The theme editor's preview (TH.25) sets a draft's --wy-* on its own
+  // element, so it recomputes the --shape-* values there as :root does.
+  const lines = [`@layer base { :root, [data-theme-preview] { ${shapeDeclarations(base, null)} } }`];
+  for (const [family, slots] of Object.entries(SHAPE_FAMILIES)) {
+    const selector = slots.map((slot) => `[data-slot="${slot}"]`).join(', ');
+    lines.push(`@layer base { ${selector} { ${shapeDeclarations(base, family)} } }`);
+  }
+  return lines;
+}
+
+/**
  * The `@theme inline` block mapping Tailwind v4's theme keys to the plain CSS
  * custom properties this generator defines — built from base.json so a new
  * color/typography token automatically gets a matching Tailwind utility
@@ -523,19 +579,24 @@ function generateThemeInlineBlock(base) {
   // A workspace theme's shape preset (TH.8, WHIT-1225) sets --wy-radius-*;
   // only the theme engine writes those, and `full` stays a pill. Round's
   // control radius is half the control height, never 999px.
-  for (const [name, value] of Object.entries(base.borderRadius)) {
+  //
+  // Each utility reads a --shape-* property (shapeDeclarations), not the
+  // --wy-* value itself: `@theme inline` writes the value into the utility,
+  // so the indirection is what lets a component family carry its own preset
+  // (TH.21, 30-themes 14.2) by setting --shape-* on its own element.
+  for (const name of Object.keys(base.borderRadius)) {
     if (name === 'base') continue;
-    lines.push(name === 'full' ? `  --radius-${name}: ${value};` : `  --radius-${name}: var(--wy-radius-${name}, ${value});`);
+    lines.push(name === 'full' ? `  --radius-${name}: ${base.borderRadius.full};` : `  --radius-${name}: var(--shape-radius-${name});`);
   }
   // Inner padding that grows with the corner (WHIT-1225): a field that
   // wraps chips keeps them clear of its curve under any shape preset, and
   // a child's radius inside it is the outer radius less this padding.
-  lines.push('  --spacing-inset-control: max(0.25rem, calc(var(--radius-control) * 0.3));');
-  lines.push('  --radius-control-inner: max(0.125rem, calc(var(--radius-control) - var(--spacing-inset-control)));');
+  lines.push('  --spacing-inset-control: var(--shape-inset-control);');
+  lines.push('  --radius-control-inner: var(--shape-radius-control-inner);');
   // Shape morph (TH.18): the main button while pressed and a selected chip.
   // Without a theme that morphs, both stay the control's own radius.
-  lines.push('  --radius-control-pressed: var(--wy-radius-control-pressed, var(--radius-control));');
-  lines.push('  --radius-control-selected: var(--wy-radius-control-selected, var(--radius-control-sm));');
+  lines.push('  --radius-control-pressed: var(--shape-radius-control-pressed);');
+  lines.push('  --radius-control-selected: var(--shape-radius-control-selected);');
   // The plane (decision 4.3) and the float shadow (4.4).
   lines.push('  --shadow-plane: var(--plane-rest);');
   lines.push('  --shadow-plane-hover: var(--plane-hover);');
@@ -554,8 +615,9 @@ function generateThemeInlineBlock(base) {
   // stay round. Browsers without corner-shape draw the rounded corner.
   lines.push(
     '@layer base { [class*="rounded-control"], [class*="rounded-card"], [class*="rounded-dialog"], [class*="rounded-sm"], ' +
-      '[class*="rounded-md"], [class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"] { corner-shape: var(--wy-corner-shape, round); } }'
+      '[class*="rounded-md"], [class*="rounded-lg"], [class*="rounded-xl"], [class*="rounded-2xl"] { corner-shape: var(--shape-corner, round); } }'
   );
+  lines.push(...generateShapeScopes(base));
   // Morph moves only for people on Full animations (06-motion, LT.4).
   lines.push(':root { --dur-morph: var(--dur-fast); }');
   lines.push(':root[data-motion="calm"], :root[data-motion="off"] { --dur-morph: 0ms; }');

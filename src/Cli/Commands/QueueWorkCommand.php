@@ -224,6 +224,7 @@ final class QueueWorkCommand implements CliCommand
                 null,
                 (string) ($_ENV['APP_URL'] ?? getenv('APP_URL') ?: ''),
                 $workerSender,
+                \Whity\Core\Usage\UsageLedger::forDatabase($pdo),
             );
             \Whity\register_service(\Whity\Core\Messaging\MessagingService::class, $messaging);
             \Whity\register_service(\Whity\Sdk\Messaging\CustomerMessages::class, new \Whity\Core\Messaging\HostCustomerMessages(static fn (): \Whity\Core\Messaging\MessagingService => $messaging));
@@ -260,6 +261,18 @@ final class QueueWorkCommand implements CliCommand
             $registry->register(
                 \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob::NAME,
                 new \Whity\Core\Queue\Jobs\PurgeRemovedPluginsJob($pdo, static fn (): ?\Whity\Core\PluginLoader => $loaded->loader, $auditLogger, $this->logger),
+                false
+            );
+            // WHIT-1235: batches expiring and expired, told once each. Internal.
+            $registry->register(
+                \Whity\Core\Inventory\LotExpiryJob::NAME,
+                new \Whity\Core\Inventory\LotExpiryJob(
+                    new \Whity\Core\Inventory\LotService(
+                        new \Whity\Core\Inventory\InventoryDb($pdo),
+                        static fn (int $tenantId): array => $workerSettings->effective($tenantId),
+                    ),
+                    $hookManager,
+                ),
                 false
             );
             // WHIT-1153: reminders before a cash payment's cover ends. Internal.

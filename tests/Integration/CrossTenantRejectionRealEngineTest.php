@@ -2887,7 +2887,7 @@ final class CrossTenantRejectionRealEngineTest extends TestCase
         self::assertCount(1, $ledger->history(self::TENANT_A));
     }
 
-    // ==================== accounting (WHIT-1318, migrations 327-328) ====================
+    // ==================== accounting (WHIT-1318, migrations 344-345) ====================
 
     public function testAccountingIsTenantScopedAndForeignAccountsEntriesAndMonthsCannotBeTouched(): void
     {

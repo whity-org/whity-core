@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * The trial balance for a date range (SDK 1.132, WHIT-1318, register AC.23):
+ * The trial balance for a date range (SDK 1.154, WHIT-1318, register AC.23):
  * every account with an opening balance or lines, in the base currency's
  * minor units. `balanced` is true when debits equal credits, as they always
  * should.

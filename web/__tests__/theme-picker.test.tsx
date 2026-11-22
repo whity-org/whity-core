@@ -4,7 +4,8 @@
  * guard rails changed.
  */
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ThemePicker, adjustmentText, changeText, overridesValue } from '@/components/theme-picker';
+import userEvent from '@testing-library/user-event';
+import { ThemePicker, adjustmentText, changeText, fontStack, overridesValue } from '@/components/theme-picker';
 
 const GET = jest.fn();
 const PATCH = jest.fn();
@@ -116,9 +117,35 @@ it('exports the theme in use as a file', async () => {
   const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
   render(<ThemePicker scope="tenant" canWrite={false} />);
   await screen.findByText('Harbour');
-  fireEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  await userEvent.click(await screen.findByRole('menuitem', { name: 'Theme file, for Whity' }));
   await waitFor(() => expect(click).toHaveBeenCalled());
   expect(GET).toHaveBeenCalledWith('/api/v1/themes/export');
+  click.mockRestore();
+});
+
+// TH.25: the theme in use for another tool.
+it('exports the theme in use as CSS, JSON, Tailwind or Flutter', async () => {
+  GET.mockImplementation((path: string) =>
+    Promise.resolve(
+      path === '/api/v1/themes/export/tokens'
+        ? { data: { data: { format: 'flutter', filename: 'workspace_whity_theme.dart', media_type: 'text/x-dart', content: 'class WorkspaceWhityTheme {}' } } }
+        : { data: { data: list } },
+    ),
+  );
+  const createObjectURL = jest.fn((_blob: Blob) => 'blob:theme');
+  Object.assign(URL, { createObjectURL, revokeObjectURL: jest.fn() });
+  const click = jest.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+  render(<ThemePicker scope="tenant" canWrite={false} />);
+  await screen.findByText('Harbour');
+  await userEvent.click(screen.getByRole('button', { name: 'Export theme' }));
+  for (const name of ['CSS variables', 'Design tokens (JSON)', 'Tailwind CSS']) {
+    expect(await screen.findByRole('menuitem', { name })).toBeInTheDocument();
+  }
+  await userEvent.click(screen.getByRole('menuitem', { name: 'Flutter' }));
+  await waitFor(() => expect(click).toHaveBeenCalled());
+  expect(GET).toHaveBeenCalledWith('/api/v1/themes/export/tokens', { params: { query: { format: 'flutter' } } });
+  expect(createObjectURL.mock.calls[0][0].type).toBe('text/x-dart');
   click.mockRestore();
 });
 
@@ -145,4 +172,107 @@ it('says what a newer version changes before replacing it', async () => {
 
 it('words a change field by field', () => {
   expect(changeText({ field: 'density', from: null, to: 'compact' }, t)).toBe('Spacing: none → compact');
+});
+
+it('previews the chosen font pair in English and Arabic, with only a well-formed stack (TH.20)', async () => {
+  const stack = 'var(--font-rubik), ui-sans-serif, system-ui, sans-serif';
+  GET.mockResolvedValue({
+    data: {
+      data: {
+        ...list,
+        tweaks: { shape: null, density: null, font: 'rubik' },
+        options: { shape: ['whity'], density: ['standard'], font: [{ id: 'rubik', name: 'Rubik', stack, heading_stack: stack }] },
+      },
+    },
+  });
+  render(<ThemePicker scope="tenant" canWrite />);
+  const preview = await screen.findByTestId('theme-font-preview');
+  expect(preview.querySelector('[lang="ar"]')).toHaveStyle({ fontFamily: stack });
+  expect(fontStack('Comic Sans; } body {')).toBeUndefined();
+  expect(fontStack(stack)).toBe(stack);
+});
+
+// TH.25: a theme from shadcn, Tailwind or Material Theme Builder, seen before it is added.
+it('turns pasted shadcn CSS into a theme, shows what was kept, then adds it through the checked import', async () => {
+  const converted = { schemaVersion: 1, id: 'imported.acme', version: '1.0.0', name: { en: 'Acme' } };
+  POST.mockImplementation((path: string, init: { params?: { query?: { check?: string } }; body?: unknown }) => {
+    if (path === '/api/v1/themes/convert') {
+      return Promise.resolve({ data: { data: { theme: converted, notes: ['Kept 4 colours, with #2563eb as the main colour.'], preview: { light: swatch, dark: swatch }, adjustments: [] } } });
+    }
+    return Promise.resolve(
+      init.params?.query?.check === '1'
+        ? { data: { data: { id: 'imported.acme', version: '1.0.0', installed_version: null, changes: [] } } }
+        : { data: { data: { id: 'imported.acme', version: '1.0.0' } }, error: undefined },
+    );
+  });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  fireEvent.click(screen.getByRole('button', { name: 'Import from another tool' }));
+  const dialog = await screen.findByTestId('theme-convert');
+  fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Acme' } });
+  fireEvent.change(screen.getByLabelText('CSS'), { target: { value: ':root { --primary: #2563eb; }' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Make the theme' }));
+  expect(await screen.findByTestId('theme-convert-result')).toHaveTextContent('Kept 4 colours');
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes/convert', { body: { format: 'shadcn', source: ':root { --primary: #2563eb; }', name: 'Acme' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Add this theme' }));
+  await waitFor(() => expect(POST).toHaveBeenCalledWith('/api/v1/themes', { body: converted }));
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes', { params: { query: { check: '1' } }, body: converted });
+  await waitFor(() => expect(dialog).not.toBeInTheDocument());
+});
+
+it('says in words why something could not be turned into a theme', async () => {
+  POST.mockResolvedValue({ error: { error: 'This could not be turned into a theme.', details: { source: 'No CSS variables were found. Paste the :root and .dark blocks, or the @theme block.' } } });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  fireEvent.click(screen.getByRole('button', { name: 'Import from another tool' }));
+  await screen.findByTestId('theme-convert');
+  fireEvent.change(screen.getByLabelText('CSS'), { target: { value: 'body {}' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Make the theme' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('No CSS variables were found');
+  expect(screen.queryByTestId('theme-convert-result')).not.toBeInTheDocument();
+});
+
+// TH.25: a newer version shows side by side with the installed one.
+it('shows a newer version side by side with the one installed, and the reason when a file is refused', async () => {
+  const installed = { schemaVersion: 1, id: 'acme.sea', version: '1.0.0', name: { en: 'Sea' }, shape: { preset: 'soft' } };
+  const newer = { ...installed, version: '1.1.0', shape: { preset: 'round' } };
+  GET.mockImplementation((path: string) =>
+    Promise.resolve(path === '/api/v1/themes/{themeId}' ? { data: { data: { theme: installed, source: 'import', editable: true } } } : { data: { data: list } }),
+  );
+  POST.mockImplementation((path: string, init: { params?: { query?: { check?: string } } }) => {
+    if (path === '/api/v1/themes/compare') {
+      return Promise.resolve({
+        data: { data: { changes: [{ field: 'shape.preset', from: 'soft', to: 'round' }], before: { light: swatch, dark: swatch, vars: { 'wy-radius-control': '13px' } }, after: { light: swatch, dark: swatch, vars: { 'wy-radius-control': '20px' } } } },
+      });
+    }
+    return Promise.resolve(
+      init.params?.query?.check === '1'
+        ? { data: { data: { id: 'acme.sea', version: '1.1.0', installed_version: '1.0.0', changes: [{ field: 'shape.preset', from: 'soft', to: 'round' }] } } }
+        : { data: { data: { id: 'acme.sea', version: '1.1.0' } }, error: undefined },
+    );
+  });
+  const { container } = render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  const file = new File([JSON.stringify(newer)], 'sea.json', { type: 'application/json' });
+  Object.defineProperty(file, 'text', { value: () => Promise.resolve(JSON.stringify(newer)) });
+  fireEvent.change(screen.getByLabelText('Add a theme file', { selector: 'input' }), { target: { files: [file] } });
+  const diff = await screen.findByTestId('theme-diff');
+  expect(POST).toHaveBeenCalledWith('/api/v1/themes/compare', { body: { before: installed, after: newer } });
+  expect(diff).toHaveTextContent('Corners: soft → round');
+  expect(diff).toHaveTextContent('Now (1.0.0)');
+  expect(diff).toHaveTextContent('New (1.1.0)');
+  expect(screen.getByTestId('theme-editor-preview-before-light')).toBeInTheDocument();
+  expect(screen.getByTestId('theme-editor-preview-after-light')).toBeInTheDocument();
+  expect(document.body.innerHTML).toContain('[data-theme-preview="after-light"]{');
+  expect(container).toBeTruthy();
+});
+
+it('says the server’s reason when a theme file is refused', async () => {
+  POST.mockResolvedValue({ error: { error: 'This theme file can’t be used.', details: { theme: 'density must be one of: compact, standard, comfortable.' } } });
+  render(<ThemePicker scope="tenant" canWrite />);
+  await screen.findByText('Sea');
+  const file = new File(['{"id":"acme.sea"}'], 'sea.json', { type: 'application/json' });
+  Object.defineProperty(file, 'text', { value: () => Promise.resolve('{"id":"acme.sea"}') });
+  fireEvent.change(screen.getByLabelText('Add a theme file', { selector: 'input' }), { target: { files: [file] } });
+  await waitFor(() => expect(addToast).toHaveBeenCalledWith('density must be one of: compact, standard, comfortable.', 'error'));
 });

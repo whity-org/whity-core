@@ -30,8 +30,13 @@ $ctx->jobs()->enqueue('catalog.sync');
 $ctx->audit()->record('order.refunded', 'order', $orderId);
 $ctx->http(AddressPolicy::publicOnly())->send('GET', $urlSomeoneTyped, []);
 $ctx->themes()->current()['light']['primary'] ?? null;   // 1.125: Theme\WorkspaceTheme, read-only
+$ctx->database()->select('keyhub_orders', ['status' => 'open']);   // 1.151: Database\WorkspaceTables, held to the workspace
+$ctx->log()->warning('Provider answered late', ['ms' => 4200]);    // 1.152: Log\PluginLog, scrubbed
+$ctx->errors()->report($caught);                                    // 1.152: Log\ErrorReporter, scrubbed
 $ctx->workspaceId();                          // null outside a workspace
 ```
+
+- **Declare what you use (1.151).** With `Contribute\PluginCapabilitiesInterface` the context gives only the services you list (`Context\Service`) and `database()` reaches only your listed tables; anything else throws `Context\ServiceNotDeclared` or `Database\TableRefused`. `log()` and `errors()` need no declaration.
 
 - **The workspace comes from the context (D2).** Every store acts in the workspace the request or job runs in, and none takes a workspace, so none can name another.
 - **A missing service fails when you use it.** A service this host doesn't provide throws `Context\ServiceUnavailable` (an `SdkException`) when you ask for it, not when you load.
@@ -47,7 +52,7 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 | `Secrets\PluginSecrets` → `Secrets\SecretStore` | API keys and signing secrets: encrypted, never read back on screens or in the API. | argument | 1.60 |
 | `Storage\PluginFiles` → `Storage\PluginFileStore` | Uploads and exports under plain relative paths (`put`, `get`, `exists`, `list`, `delete`). `Storage\PluginFileController` serves them. | current | 1.63 |
 | `Documents\PluginDocuments` → `Documents\PluginDocumentStore` | Issue documents recorded as yours, then QR verification URLs and tracking for those documents only. | current | 1.63 |
-| `Notification\PluginNotifier` → `Notification\Notifier` | Notify a person, a role or a unit with a notice type you declared. Preferences apply. | current | WHIT-1030 |
+| `Notification\PluginNotifier` → `Notification\Notifier` | Notify a person, a role or a unit with a notice type you declared. Preferences apply; a type with `emailDefault` also goes by email (SDK 1.141). | current | WHIT-1030, WHIT-1250 |
 | `Jobs\PluginJobQueue` → `Jobs\JobQueue` | Enqueue your own jobs (idempotency key, delay) and read their `JobStatus`. | current | WHIT-1031 |
 | `Audit\PluginAudit` → `Audit\AuditTrail` | Record and read your audit entries. The host attributes actor, IP and workspace. | current | WHIT-1032 |
 
@@ -98,9 +103,11 @@ $inventory->stock()->move(new MoveRequest(
 | `Inventory\Operations` | Adjustments with a reason, counts and transfers, each an `Inventory\Operation` with its lines. Through `$ctx->inventory()->operations()`, bound to your plugin; the container copy reads. Above the workspace's value an adjustment or a count's differences wait for approval. | current | 1.128 |
 | `Inventory\Orders` | Purchase orders: draft for a supplier contact, send (the workspace's route or approved at once), receive in parts at the order's cost, cancel. Through `$ctx->inventory()->orders()`, bound to your plugin; the container copy reads. | current | 1.129 |
 
-`Context\InventoryScope` (`$ctx->inventory()`) holds the six (`operations()` since 1.128, `orders()` since 1.129). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+| `Inventory\Lots` | Batches and serial numbers (`Inventory\Lot`): an item's, one by code, and what is expiring. Reads only. Stock coming in names its batch on the `MoveLine` (`lotCode`, `expiresOn`); stock leaving may name one, or takes the batches that expire first. | current | 1.137 |
 
-### Accounting (1.132)
+`Context\InventoryScope` (`$ctx->inventory()`) holds the seven (`operations()` since 1.128, `orders()` since 1.129, `lots()` since 1.137). Refusals throw `Inventory\InventoryRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `conflict`, `vetoed`, `use_plugin_context`.
+
+### Accounting (1.154)
 
 Core's books (WHIT-1318, design section 32). Through the context, in the workspace the call runs in:
 
@@ -122,10 +129,10 @@ $entry = $books->ledger()->post(new EntryRequest(
 
 | Service | What for | Workspace | Since |
 |---|---|---|---|
-| `Accounting\Accounts` | The chart in tree order, by code and by role (`receivable`, `sales_tax_output`...); `create()` adds an account your plugin owns, only through `$ctx->accounting()->accounts()`, acting as a person with `accounting:settings`. | current | 1.132 |
-| `Accounting\Ledger` | Post balanced entries (minor units of the base currency) and `reverse()` them as your plugin, idempotent by key, only through `$ctx->accounting()->ledger()`; read entries and balances. The container copy reads and refuses writes (`use_plugin_context`). | current | 1.132 |
-| `Accounting\Periods` | The month a date is in, whether it is open, the lock date. | current | 1.132 |
-| `Accounting\Reports` | The trial balance for a range, optionally one branch. | current | 1.132 |
+| `Accounting\Accounts` | The chart in tree order, by code and by role (`receivable`, `sales_tax_output`...); `create()` adds an account your plugin owns, only through `$ctx->accounting()->accounts()`, acting as a person with `accounting:settings`. | current | 1.154 |
+| `Accounting\Ledger` | Post balanced entries (minor units of the base currency) and `reverse()` them as your plugin, idempotent by key, only through `$ctx->accounting()->ledger()`; read entries and balances. The container copy reads and refuses writes (`use_plugin_context`). | current | 1.154 |
+| `Accounting\Periods` | The month a date is in, whether it is open, the lock date. | current | 1.154 |
+| `Accounting\Reports` | The trial balance for a range, optionally one branch. | current | 1.154 |
 
 `Context\AccountingScope` (`$ctx->accounting()`) holds the four. Refusals throw `Accounting\AccountingRejected` with a stable `reason`: `no_workspace`, `forbidden`, `not_found`, `invalid`, `unbalanced`, `period_closed`, `conflict`, `vetoed`, `use_plugin_context`.
 
@@ -145,6 +152,8 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginOnboardingInterface` | A guided setup | sdk/README |
 | `PluginWorkspaceTemplatesInterface` | Workspace templates | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
 | `PluginWorkspaceLifecycleInterface` | Called when the plugin is turned on or off in a workspace | Workspace-Plugins |
+| `PluginInstallLifecycleInterface` | Called once when the plugin is installed and once per upgrade, after its migrations (1.152) | [Plugin-Development](Plugin-Development.md) |
+| `Contribute\PluginCapabilitiesInterface` | The context services and own tables the plugin uses (1.151) | [Plugin-Development](Plugin-Development.md) |
 | `Settings\PluginSettingsInterface`, `Secrets\PluginSecretFieldsInterface` | Settings, and the secret fields an admin fills | Plugin-Development |
 | `Tenant\PluginTablesInterface` | The tables you own, for tenant-isolation checks | sdk/README |
 | `DataType\PluginDataTypesInterface` | Records with a lifecycle and delete guards | [Plugin-Data-Types](Plugin-Data-Types.md) |
@@ -159,6 +168,7 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginInboxSourcesInterface` | Inbox sources (`Inbox\InboxSource`, `Inbox\KeysetInboxSource`) | Plugin-Development |
 | `Contribute\CorePermissionRequestsInterface` | Core permissions your roles need, granted only when an operator approves them per role and workspace (1.130). Check with the host service `Contribute\CorePermissionGrants`. | this page |
 | `Contribute\PluginThemesInterface` | Theme files (the format of `schemas/theme/v1.json`), each checked on load; they appear in the workspace's theme picker, where a person chooses one (1.125). Read the result with `$ctx->themes()`, a `Theme\WorkspaceTheme`. | [30-themes](../design/30-themes.md) |
+| `Contribute\WorkspaceQuoteConversion` | What an accepted quote turns into: `key()`, `label()`, `canConvert()` and `convert()`, given a read-only `Sales\QuoteSnapshot` and answering a `Sales\ConversionCheck` or `Sales\ConversionResult` (1.154). Core's inventory (sales orders) and accounting (invoices) implement it. | [34-quotes-receipts-and-import](../design/34-quotes-receipts-and-import.md) |
 | `PluginThemeInterface` | **Deprecated 1.125**, use `PluginThemesInterface`. One of your own GET routes that answers design-token overrides (`{"data": {"primary": "#rrggbb"}}`). The host validates every key and value and falls back to no overrides on any error. | this page |
 | `Rbac\PluginResourceTypesInterface` | Resource types roles can be granted on | Plugin-Development |
 | `Ou\PluginOuTypesInterface` | Kinds of organisational unit (campus, faculty, clinic), so a consumer can ask for "every unit of kind X" | this page |

@@ -577,6 +577,14 @@
     "en": "See one published version of a template",
     "ar": "عرض إصدار منشور من قالب"
   },
+  "get_api_document_stamps": {
+    "en": "List company stamps",
+    "ar": "عرض أختام الشركة"
+  },
+  "get_api_document_stamps_id": {
+    "en": "Show a company stamp",
+    "ar": "عرض ختم الشركة"
+  },
   "get_api_document_template_slots": {
     "en": "See which templates the plugins use for each purpose",
     "ar": "عرض القوالب التي تستخدمها الإضافات"
@@ -723,6 +731,18 @@
   "get_api_inventory_locations_id": {
     "en": "Get a place",
     "ar": "عرض موقع"
+  },
+  "get_api_inventory_lots": {
+    "en": "List an item's batches",
+    "ar": "عرض دفعات صنف"
+  },
+  "get_api_inventory_lots_expiring": {
+    "en": "List batches expiring soon",
+    "ar": "عرض الدفعات التي تنتهي صلاحيتها قريباً"
+  },
+  "get_api_inventory_lots_id": {
+    "en": "Show a batch",
+    "ar": "عرض دفعة"
   },
   "get_api_inventory_operations": {
     "en": "List stock adjustments, counts and transfers",
@@ -1100,6 +1120,14 @@
     "en": "Export the theme in use as a theme file",
     "ar": "تصدير السمة المستخدمة كملف سمة"
   },
+  "get_api_themes_export_tokens": {
+    "en": "Export the theme in use for another tool",
+    "ar": "تصدير المظهر المستخدم لأداة أخرى"
+  },
+  "get_api_themes_themeid": {
+    "en": "Get one theme's file",
+    "ar": "عرض ملف مظهر"
+  },
   "get_api_time_window_types": {
     "en": "List the kinds of period in your workspace",
     "ar": "عرض أنواع الفترات"
@@ -1254,6 +1282,10 @@
     "en": "Change who can see a document",
     "ar": "تغيير من يستطيع رؤية مستند"
   },
+  "patch_api_document_stamps_id": {
+    "en": "Change a company stamp",
+    "ar": "تعديل ختم الشركة"
+  },
   "patch_api_document_themes_ref": {
     "ar": "تعديل سمة مستندات"
   },
@@ -1279,6 +1311,10 @@
   "patch_api_inventory_locations_id": {
     "en": "Change a place",
     "ar": "تعديل موقع"
+  },
+  "patch_api_inventory_lots_id": {
+    "en": "Correct a batch's dates or notes",
+    "ar": "تصحيح تواريخ دفعة أو ملاحظاتها"
   },
   "patch_api_inventory_purchase_orders_id": {
     "en": "Change a draft purchase order",
@@ -1668,6 +1704,18 @@
   },
   "post_api_document_sources_id_suggestions_sid_decision": {
     "ar": "قبول اقتراح أو رفضه"
+  },
+  "post_api_document_stamps": {
+    "en": "Add a company stamp",
+    "ar": "إضافة ختم للشركة"
+  },
+  "post_api_document_stamps_id_archive": {
+    "en": "Archive a company stamp",
+    "ar": "أرشفة ختم الشركة"
+  },
+  "post_api_document_stamps_id_restore": {
+    "en": "Restore a company stamp",
+    "ar": "استعادة ختم الشركة"
   },
   "post_api_document_themes": {
     "ar": "إنشاء سمة مستندات"
@@ -2100,6 +2148,26 @@
     "en": "Import a theme into this workspace",
     "ar": "استيراد سمة إلى مساحة العمل"
   },
+  "post_api_themes_compare": {
+    "en": "Compare two themes side by side",
+    "ar": "مقارنة مظهرين جنباً إلى جنب"
+  },
+  "post_api_themes_convert": {
+    "en": "Turn a theme from another tool into a theme file",
+    "ar": "تحويل مظهر من أداة أخرى إلى ملف مظهر"
+  },
+  "post_api_themes_package": {
+    "en": "Package a theme for the store",
+    "ar": "تجهيز مظهر للمتجر"
+  },
+  "post_api_themes_preview": {
+    "en": "Preview a draft theme",
+    "ar": "معاينة مسودة مظهر"
+  },
+  "post_api_themes_tokens": {
+    "en": "Export a draft theme for another tool",
+    "ar": "تصدير مسودة مظهر لأداة أخرى"
+  },
   "post_api_time_window_types": {
     "en": "Add a period kind, or adopt a built-in one",
     "ar": "إضافة نوع فترة"
@@ -2217,6 +2285,10 @@
   "put_api_document_sources_id_draft": {
     "en": "Save a document's draft",
     "ar": "حفظ مسودة مستند"
+  },
+  "put_api_document_stamps_id_holders": {
+    "en": "Choose who holds a company stamp",
+    "ar": "اختيار من يحمل ختم الشركة"
   },
   "put_api_document_template_slots_key": {
     "en": "Choose a template for a plugin, or clear it",
@@ -2359,5 +2431,169 @@
   "taskaat_update_task": {
     "en": "Change a task in Taskaat",
     "ar": "تعديل مهمة في Taskaat"
+  },
+  "get_api_usage": {
+    "en": "See what your workspace used against what its plan includes",
+    "ar": "عرض ما استخدمته مساحة العمل مقارنة بما تشمله باقتها"
+  },
+  "get_api_sales_quotes": {
+    "en": "List quotes",
+    "ar": "عرض عروض الأسعار"
+  },
+  "post_api_sales_quotes": {
+    "en": "Draft a quote",
+    "ar": "إعداد مسودة عرض سعر"
+  },
+  "get_api_sales_quotes_id": {
+    "en": "Show a quote",
+    "ar": "عرض عرض سعر"
+  },
+  "patch_api_sales_quotes_id": {
+    "en": "Change a draft quote",
+    "ar": "تعديل مسودة عرض سعر"
+  },
+  "post_api_sales_quotes_id_submit": {
+    "en": "Send a quote for approval",
+    "ar": "إرسال عرض سعر للموافقة"
+  },
+  "post_api_sales_quotes_id_send": {
+    "en": "Send a quote to the customer",
+    "ar": "إرسال عرض سعر إلى العميل"
+  },
+  "post_api_sales_quotes_id_link": {
+    "en": "Make a new link to a quote",
+    "ar": "إنشاء رابط جديد لعرض سعر"
+  },
+  "post_api_sales_quotes_id_decision": {
+    "en": "Record the customer's answer to a quote",
+    "ar": "تسجيل رد العميل على عرض سعر"
+  },
+  "post_api_sales_quotes_id_revise": {
+    "en": "Make a new revision of a quote",
+    "ar": "إنشاء نسخة معدّلة من عرض سعر"
+  },
+  "post_api_sales_quotes_id_cancel": {
+    "en": "Withdraw a quote",
+    "ar": "سحب عرض سعر"
+  },
+  "get_api_sales_quotes_id_targets": {
+    "en": "What a quote can turn into",
+    "ar": "ما يمكن تحويل عرض السعر إليه"
+  },
+  "post_api_sales_quotes_id_convert": {
+    "en": "Turn a quote into an order or an invoice",
+    "ar": "تحويل عرض سعر إلى أمر بيع أو فاتورة"
+  },
+  "get_api_sales_settings": {
+    "en": "Show the sales settings",
+    "ar": "عرض إعدادات المبيعات"
+  },
+  "patch_api_sales_settings": {
+    "en": "Change the sales settings",
+    "ar": "تعديل إعدادات المبيعات"
+  },
+  "get_api_inventory_imports_kind": {
+    "en": "List imports of items or opening stock",
+    "ar": "عرض عمليات استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "post_api_inventory_imports_kind": {
+    "en": "Upload a spreadsheet of items or opening stock",
+    "ar": "رفع جدول أصناف أو رصيد افتتاحي"
+  },
+  "get_api_inventory_imports_kind_id": {
+    "en": "Show an import of items or opening stock",
+    "ar": "عرض عملية استيراد أصناف أو رصيد افتتاحي"
+  },
+  "post_api_inventory_imports_kind_id_check": {
+    "en": "Check what an import will do",
+    "ar": "فحص ما ستفعله عملية الاستيراد"
+  },
+  "post_api_inventory_imports_kind_id_run": {
+    "en": "Run an import of items or opening stock",
+    "ar": "تنفيذ استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "post_api_inventory_imports_kind_id_undo": {
+    "en": "Undo an import of items or opening stock",
+    "ar": "التراجع عن استيراد الأصناف أو الرصيد الافتتاحي"
+  },
+  "get_api_inventory_imports_kind_id_skipped_csv": {
+    "en": "Download the rows an import skipped",
+    "ar": "تنزيل الصفوف التي تخطاها الاستيراد"
+  },
+  "get_api_calendar_walkins": {
+    "en": "See who is waiting at the front desk",
+    "ar": "عرض من ينتظر في الاستقبال"
+  },
+  "post_api_calendar_walkins": {
+    "en": "Add a walk-in to the queue",
+    "ar": "إضافة زبون بدون حجز إلى الدور"
+  },
+  "get_api_calendar_walkins_services": {
+    "en": "List the services a walk-in can choose",
+    "ar": "عرض الخدمات المتاحة لزبون بدون حجز"
+  },
+  "get_api_calendar_walkins_staff": {
+    "en": "List the staff for walk-ins, free ones first",
+    "ar": "عرض الفريق للزبائن بدون حجز، المتاحون أولاً"
+  },
+  "post_api_calendar_walkins_assign": {
+    "en": "Hand a walk-in to the person chosen",
+    "ar": "تسليم زبون بدون حجز للشخص المختار"
+  },
+  "post_api_calendar_walkins_id_assign": {
+    "en": "Hand a walk-in to the next free person",
+    "ar": "تسليم زبون بدون حجز لأول شخص متاح"
+  },
+  "post_api_calendar_walkins_id_left": {
+    "en": "Mark that a walk-in left",
+    "ar": "تسجيل مغادرة زبون بدون حجز"
+  },
+  "get_api_calendar_commission_rates": {
+    "en": "List staff commission rates",
+    "ar": "عرض نسب عمولة الفريق"
+  },
+  "post_api_calendar_commission_rates": {
+    "en": "Set a commission rate",
+    "ar": "تحديد نسبة عمولة"
+  },
+  "delete_api_calendar_commission_rates_id": {
+    "en": "Remove a commission rate",
+    "ar": "إزالة نسبة عمولة"
+  },
+  "get_api_calendar_commission_periods": {
+    "en": "List the commission report periods",
+    "ar": "عرض فترات تقرير العمولة"
+  },
+  "get_api_calendar_commission_report": {
+    "en": "See what each member of staff earned",
+    "ar": "عرض ما حصل عليه كل موظف من عمولة"
+  },
+  "get_api_calendar_commission_staff": {
+    "en": "List the staff a rate can be set for",
+    "ar": "عرض الموظفين الذين يمكن تحديد نسبة لهم"
+  },
+  "get_api_calendar_commission_services": {
+    "en": "List the services a rate can be set for",
+    "ar": "عرض الخدمات التي يمكن تحديد نسبة لها"
+  },
+  "get_api_calendar_commission_closes": {
+    "en": "List closed commission periods",
+    "ar": "عرض فترات العمولة المقفلة"
+  },
+  "get_api_calendar_commission_closes_periods": {
+    "en": "List the commission periods that can be closed",
+    "ar": "عرض فترات العمولة التي يمكن إقفالها"
+  },
+  "post_api_calendar_commission_closes": {
+    "en": "Close a commission period",
+    "ar": "إقفال فترة عمولة"
+  },
+  "post_api_calendar_commission_closes_id_book": {
+    "en": "Send a closed commission period to the books",
+    "ar": "إرسال فترة عمولة مقفلة إلى الدفاتر"
+  },
+  "get_api_calendar_price_list": {
+    "en": "Open the price list to print",
+    "ar": "فتح قائمة الأسعار للطباعة"
   }
 }

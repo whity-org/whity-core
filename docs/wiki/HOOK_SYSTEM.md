@@ -267,6 +267,8 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `route.completed.async` | `ROUTE_COMPLETED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
 | `route.signed` | `ROUTE_SIGNED` | observe | Somebody signed on a signing step. Payload also has `step_id`. |
 | `route.signed.async` | `ROUTE_SIGNED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
+| `route.stamped` | `ROUTE_STAMPED` | observe | A holder applied a company stamp on a stamp step (#1729). Payload also has `step_id` and `stamp_id`. |
+| `route.stamped.async` | `ROUTE_STAMPED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
 | `document.finalised` | `DOCUMENT_FINALISED` | observe | A route's finalise step made its final document. Payload: `id` (the document), `document_id`, `route_id`, `subject_type`, `subject_id`, `artifact_id`, `tenant_id`. |
 | `document.finalised.async` | `DOCUMENT_FINALISED_ASYNC` | queued | Fired after the change is saved. Payloads carry ids, never content: read what you need through the API, as the person or plugin you act for. Every route payload has `route_id`, `subject_type`, `subject_id`, `document_id` (null for a form submission with no … |
 | `form.submitted` | `FORM_SUBMITTED` | observe | Somebody sent a form. Payload: `id` (the submission), `form_id`, `tenant_id`, `actor_profile_id` (null when it was anonymous), `route_id` (null when it has none). |
@@ -364,6 +366,10 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `stock.level.below_reorder.async` | `STOCK_LEVEL_BELOW_REORDER_ASYNC` | queued |  |
 | `stock.level.restored` | `STOCK_LEVEL_RESTORED` | observe | Back at or above the reorder level. Payload: `tenant_id`, `rule_id`, `variant_id`, `location_id`, `available`, `min_quantity`. |
 | `stock.level.restored.async` | `STOCK_LEVEL_RESTORED_ASYNC` | queued |  |
+| `stock.lot.expiring` | `STOCK_LOT_EXPIRING` | observe | A batch with stock expires within the workspace's warning window (7 days unless changed); once per batch, from the daily job. Payload: `tenant_id`, `lot_id`, `variant_id`, `item_id`, `code`, `expires_on`, `on_hand`. |
+| `stock.lot.expiring.async` | `STOCK_LOT_EXPIRING_ASYNC` | queued |  |
+| `stock.lot.expired` | `STOCK_LOT_EXPIRED` | observe | A batch with stock passed its expiry date; once, the day after. Payload as `stock.lot.expiring`. |
+| `stock.lot.expired.async` | `STOCK_LOT_EXPIRED_ASYNC` | queued |  |
 | `inventory.order.submitting` | `INVENTORY_ORDER_SUBMITTING` | veto | Before an order goes to its route or is approved (SDK 1.129). Payload: `tenant_id`, `order_id`, `kind`, `number`, `contact_id`, `location_id`, `currency`, `total_minor`, `acting_profile_id`, `lines` (`variant_id`, `quantity`, `price_minor`, `line_total_minor`). Throw `HookVetoException` to refuse it (409 with your reason). |
 | `inventory.order.created` | `INVENTORY_ORDER_CREATED` | observe | An order was drafted. Every `inventory.order.*` notification carries `tenant_id`, `order_id`, `kind`, `number`, `contact_id`, `status`, `acting_profile_id`. |
 | `inventory.order.created.async` | `INVENTORY_ORDER_CREATED_ASYNC` | queued |  |
@@ -377,12 +383,29 @@ Payload notes come from the constant's own comment in `Events.php`; where a row 
 | `inventory.order.done.async` | `INVENTORY_ORDER_DONE_ASYNC` | queued |  |
 | `inventory.order.cancelled` | `INVENTORY_ORDER_CANCELLED` | observe | Cancelled before anything arrived. |
 | `inventory.order.cancelled.async` | `INVENTORY_ORDER_CANCELLED_ASYNC` | queued |  |
+| `sales.quote.sending` | `SALES_QUOTE_SENDING` | veto | Before a quote goes to the customer, its first send or a revision (SDK 1.132). Payload: `tenant_id`, `quote_id`, `number`, `revision`, `contact_id`, `currency`, `total_minor`, `valid_until`, `acting_profile_id`, `lines` (`variant_id` or null, `description`, `quantity`, `price_minor`, `line_total_minor`). Throw `HookVetoException` to refuse it (409 with your reason). |
+| `sales.quote.created` | `SALES_QUOTE_CREATED` | observe | A quote or a revision was drafted. Every `sales.quote.*` notification carries `tenant_id`, `quote_id`, `number` (null until sent), `revision`, `contact_id`, `status`, `total_minor`, `currency`, `acting_profile_id` (null when the customer answered online). |
+| `sales.quote.created.async` | `SALES_QUOTE_CREATED_ASYNC` | queued |  |
+| `sales.quote.sent` | `SALES_QUOTE_SENT` | observe | Sent to the customer, with its number. |
+| `sales.quote.sent.async` | `SALES_QUOTE_SENT_ASYNC` | queued |  |
+| `sales.quote.accepted` | `SALES_QUOTE_ACCEPTED` | observe | The customer accepted, online or as a person recorded. Also `decided_by_name`, `online`. |
+| `sales.quote.accepted.async` | `SALES_QUOTE_ACCEPTED_ASYNC` | queued |  |
+| `sales.quote.declined` | `SALES_QUOTE_DECLINED` | observe | The customer declined. Also `decided_by_name`, `online`, `reason`. |
+| `sales.quote.declined.async` | `SALES_QUOTE_DECLINED_ASYNC` | queued |  |
+| `sales.quote.expired` | `SALES_QUOTE_EXPIRED` | observe | Past its valid-until date without an answer. |
+| `sales.quote.expired.async` | `SALES_QUOTE_EXPIRED_ASYNC` | queued |  |
+| `sales.quote.converted` | `SALES_QUOTE_CONVERTED` | observe | Turned into a target. Also `target` (`sales_order`, `invoice`) and `target_id`. |
+| `sales.quote.converted.async` | `SALES_QUOTE_CONVERTED_ASYNC` | queued |  |
+| `sales.quote.cancelled` | `SALES_QUOTE_CANCELLED` | observe | Withdrawn before the customer answered. |
+| `sales.quote.cancelled.async` | `SALES_QUOTE_CANCELLED_ASYNC` | queued |  |
+| `calendar.commission.closed` | `CALENDAR_COMMISSION_CLOSED` | observe | An owner closed a commission period (WHIT-1334). Carries `tenant_id`, `close_id`, `from`, `to`, `acting_profile_id` and `lines` (`profile_id`, `currency`, `bookings`, `sales_minor`, `commission_minor`). |
+| `calendar.commission.closed.async` | `CALENDAR_COMMISSION_CLOSED_ASYNC` | queued |  |
 
 ### Accounting
 
 | Event | Constant | Kind | Notes |
 | --- | --- | --- | --- |
-| `accounting.entry.posting` | `ACCOUNTING_ENTRY_POSTING` | veto | Before a journal entry posts, inside its transaction (SDK 1.132). Payload: `tenant_id`, `journal`, `date`, `memo`, `source_type`, `source_id`, `acting_profile_id`, `reverses_entry_id`, `lines` (`account_id`, `debit_minor`, `credit_minor`, `contact_id`, `ou_id`). Throw `HookVetoException` to refuse the entry. |
+| `accounting.entry.posting` | `ACCOUNTING_ENTRY_POSTING` | veto | Before a journal entry posts, inside its transaction (SDK 1.154). Payload: `tenant_id`, `journal`, `date`, `memo`, `source_type`, `source_id`, `acting_profile_id`, `reverses_entry_id`, `lines` (`account_id`, `debit_minor`, `credit_minor`, `contact_id`, `ou_id`). Throw `HookVetoException` to refuse the entry. |
 | `accounting.entry.posted` | `ACCOUNTING_ENTRY_POSTED` | observe | Inside the transaction, after the entry, its lines and the balances are written. Payload: `tenant_id`, `entry_id`, `number`, `journal`, `date`, `source_type`, `source_id`, `reverses_entry_id`, `total_minor`, `currency`, `acting_profile_id`. |
 | `accounting.entry.posted.async` | `ACCOUNTING_ENTRY_POSTED_ASYNC` | queued |  |
 | `accounting.entry.reversed` | `ACCOUNTING_ENTRY_REVERSED` | observe | Payload: `tenant_id`, `entry_id` (the original), `reversal_entry_id`, `acting_profile_id`. |

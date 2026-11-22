@@ -174,6 +174,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.qr_public_detail',
             // WHIT-920: whether an applicant sees who reviewed their form. Off.
             'forms.show_reviewer_names',
+            // #1730: whether the public check names who signed. Off.
+            'documents.qr_public_signer_names',
             // #999 — how many people a USER GROUP preview SHOWS. Not a ceiling
             // on resolution: the count a preview reports is exact and unbounded,
             // this is the size of the sample beside it.
@@ -206,6 +208,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.instant_booking',
             // WHIT-1173: one booking, several services back to back.
             'calendar.multi_service_booking',
+            // WHIT-1334: the walk-in queue at the front desk.
+            'calendar.walkins_enabled',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // WS.5, WS.19: the operator's website (global-only).
@@ -233,6 +237,15 @@ final class SettingsRegistryCorePinTest extends TestCase
             // WHIT-1234: purchasing.
             'inventory.purchase_route_template_id',
             'inventory.over_receipt_percent',
+            // WHIT-1235: batches and expiry.
+            'inventory.fefo',
+            'inventory.expiry_warning_days',
+            'sales.quote_valid_days',
+            'sales.quote_route_template_id',
+            'sales.email_quote',
+            'sales.email_invoice',
+            'sales.email_receipt',
+            'sales.email_reminder',
         ];
     }
 
@@ -340,7 +353,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'licensing.billing_basis' => 'activated',
             'seats.enforcement' => 'warn',
             'seats.count_invited' => 'true',
-            'meters.enforcement' => 'block',
+            'meters.enforcement' => 'warn',
             // Tax defaults to ZERO, not to any country's rate: charging tax
             // an operator is not registered to collect is a worse failure than
             // not charging it, and a default correct for one jurisdiction and
@@ -426,6 +439,8 @@ final class SettingsRegistryCorePinTest extends TestCase
             'documents.qr_public_detail' => 'minimal',
             // WHIT-920: OFF. Applicants see stages and outcomes, not reviewers.
             'forms.show_reviewer_names' => 'false',
+            // #1730: OFF. The public check shows capacities, not names.
+            'documents.qr_public_signer_names' => 'false',
             // Ten faces: enough to recognise a group at a glance, small enough
             // that nobody mistakes the sample for the list.
             'groups.preview_sample_size' => '10',
@@ -461,6 +476,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.weekend_days' => 'friday,saturday',
             'calendar.instant_booking' => 'true',
             'calendar.multi_service_booking' => 'false',
+            'calendar.walkins_enabled' => 'false',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',
@@ -482,6 +498,14 @@ final class SettingsRegistryCorePinTest extends TestCase
             'inventory.transfers_one_step' => 'false',
             'inventory.purchase_route_template_id' => '0',
             'inventory.over_receipt_percent' => '0',
+            'inventory.fefo' => 'true',
+            'inventory.expiry_warning_days' => '7',
+            'sales.quote_valid_days' => '30',
+            'sales.quote_route_template_id' => '0',
+            'sales.email_quote' => 'true',
+            'sales.email_invoice' => 'true',
+            'sales.email_receipt' => 'true',
+            'sales.email_reminder' => 'true',
         ];
     }
 

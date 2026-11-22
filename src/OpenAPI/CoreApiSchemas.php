@@ -149,6 +149,7 @@ final class CoreApiSchemas
             self::documentAgentRoutes(),
             self::savedBlockRoutes(),
             self::documentThemeRoutes(),
+            self::companyStampRoutes(),
             self::documentTemplateSlotRoutes(),
             self::workspacePluginRoutes(),
             self::documentRecordRoutes(),
@@ -179,6 +180,8 @@ final class CoreApiSchemas
             self::externalBillingRoutes(),
             ContactsApiSchemas::routes(),
             InventoryApiSchemas::routes(),
+            ImportApiSchemas::routes(),
+            SalesApiSchemas::routes(),
             AccountingApiSchemas::routes(),
             ContactsApiSchemas::customFieldRoutes()
         ));
@@ -3083,6 +3086,22 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // #1688: the embed screen's bridge asks for this; the handler checks
+            // the screen's own permission and answers 404 for anything else.
+            [
+                'method' => 'POST',
+                'path' => '/api/plugin-frames/{feature}/token',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'A five-minute token for an embedded plugin screen, bound to the routes of its plugin',
+                    'tags' => ['frontend'],
+                    'responses' => [
+                        200 => self::jsonResponse('The token and its lifetime in seconds', 'PluginFrameTokenResponse'),
+                        404 => self::errorResponse('No embed screen by that id that the caller may see'),
+                    ] + self::authErrors(),
+                ],
+            ],
         ];
     }
 
@@ -4551,6 +4570,28 @@ final class CoreApiSchemas
                 'tags' => ['theme'],
                 'responses' => [200 => self::jsonResponse('The theme file', 'ThemeExportResponse')] + self::authErrors(),
             ]),
+            // TH.25: resolved tokens for other tools.
+            self::permissionRoute('GET', '/api/themes/export/tokens', 'settings:read', [
+                'summary' => 'Export the theme in use as CSS, JSON, Tailwind or Flutter',
+                'description' => 'Free (TH.25): the theme this workspace uses, with its main colour, colour overrides and tweaks, as resolved tokens: every colour for light and dark after the guard rails, every radius and size with Whity\'s defaults, the fonts by family name and the motion timings. css is custom properties, json the Design Tokens Community Group format, tailwind a Tailwind v4 @theme file, flutter a Dart file like whity_tokens\' AppTokens with Material 3 colour schemes.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'format', 'in' => 'query', 'required' => true, 'description' => 'css, json, tailwind or flutter', 'schema' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter']]]],
+                'responses' => [
+                    200 => self::jsonResponse('The file, its name and media type', 'ThemeTokensResponse'),
+                    422 => self::errorResponse('Unknown format'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/tokens', 'settings:write', [
+                'summary' => 'Export a draft theme as CSS, JSON, Tailwind or Flutter',
+                'description' => 'The theme editor\'s export (TH.25): a theme file, saved or not, as resolved tokens in the same formats as GET /api/themes/export/tokens. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'ThemeTokensRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The file, its name and media type', 'ThemeTokensResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                    422 => self::errorResponse('Unknown format, or the theme has problems'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('POST', '/api/themes', 'settings:write', [
                 'summary' => 'Import a theme file into this workspace',
                 'description' => 'A theme file in the format of schemas/theme/v1.json: choices, never CSS. Importing the same id again replaces it. It is not applied until branding_theme is set to its id. With check=1 nothing is saved: the answer says which version is installed and what the file changes (TH.16).',
@@ -4562,6 +4603,60 @@ final class CoreApiSchemas
                     201 => self::jsonResponse('The theme was imported', 'ImportThemeResponse'),
                     413 => self::errorResponse('The file is larger than 32 KB'),
                     422 => self::errorResponse('The file is not a valid theme, or uses a whity. id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/convert', 'settings:write', [
+                'summary' => 'Turn a theme from shadcn, Tailwind or Material Theme Builder into a theme file',
+                'description' => 'Free (TH.25): shadcn CSS variables (:root and .dark), a Tailwind v4 @theme block, or Material Theme Builder JSON become a Whity theme file. Colours become the main colour and colours set by hand for the roles Whity has, the radius the nearest shape preset, the font its pair; status colours stay Whity\'s. Nothing is saved: import the result with POST /api/themes.',
+                'tags' => ['theme'],
+                'request' => 'ConvertThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The theme file, what was kept in words, and a preview', 'ConvertThemeResponse'),
+                    413 => self::errorResponse('The source is larger than 64 KB'),
+                    422 => self::errorResponse('Nothing usable was found; the error says what to paste'),
+                ] + self::authErrors(),
+            ]),
+            // TH.25: the live editor.
+            self::permissionRoute('GET', '/api/themes/{themeId}', 'settings:read', [
+                'summary' => 'Get one theme\'s file, for the editor',
+                'description' => 'The theme file as installed. editable is true for the workspace\'s own themes (imported or made in the editor); any other is changed as a copy.',
+                'tags' => ['theme'],
+                'parameters' => [['name' => 'themeId', 'in' => 'path', 'required' => true, 'description' => 'The theme\'s id, like acme.harbour', 'schema' => ['type' => 'string']]],
+                'responses' => [
+                    200 => self::jsonResponse('The theme file', 'ThemeFileResponse'),
+                    404 => self::errorResponse('This workspace has no theme with that id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/preview', 'settings:write', [
+                'summary' => 'Preview a draft theme in the live editor',
+                'description' => 'Free (TH.25): compiles a draft theme file as it would be used, with every colour for light and dark, the type, shape, density and motion values, what the guard rails change, and the roles a colour may be set by hand for. A draft with problems answers valid=false and lists them all. Nothing is saved; saving is POST /api/themes with {theme, source: "editor"}.',
+                'tags' => ['theme'],
+                'request' => 'ImportThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The compiled draft, or its problems', 'ThemePreviewResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/compare', 'settings:read', [
+                'summary' => 'Compare two themes side by side',
+                'description' => 'The side-by-side diff (TH.25): what the newer theme changes, field by field as a re-import says it (TH.16), and both themes compiled for a preview, every colour in both modes. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'CompareThemesRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What changes and both previews', 'CompareThemesResponse'),
+                    413 => self::errorResponse('The themes are larger than 64 KB together'),
+                    422 => self::errorResponse('One of the themes has problems; the error says which'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/themes/package', 'settings:write', [
+                'summary' => 'Package a theme for the store',
+                'description' => 'Publishing (TH.25): the theme as a store-ready package, a theme-only plugin zip that ships it through the plugin theme interface (SDK 1.125), with manifest.json listing every file\'s sha256. The publisher downloads it and submits it to the store; a direct upload comes with the Whity ID store\'s publisher API. Whity\'s own themes cannot be packaged. Nothing is saved.',
+                'tags' => ['theme'],
+                'request' => 'PackageThemeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The package, its name and its sha256', 'ThemePackageResponse'),
+                    413 => self::errorResponse('The theme is larger than 32 KB'),
+                    422 => self::errorResponse('The theme has problems, or is one of Whity\'s own'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/themes/{themeId}', 'settings:write', [
@@ -6394,6 +6489,31 @@ final class CoreApiSchemas
                 'resets_at' => self::str(true),
             ], ['key', 'kind', 'used', 'limit', 'over', 'resets_at']),
             'PlanLimitListResponse' => self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('PlanLimit')]),
+            // Section 33 §5: one usage meter for one month, from the usage ledger.
+            'UsageMeter' => self::object([
+                'meter' => ['type' => 'string', 'enum' => ['seats', 'customers', 'inventory.items', 'invoices', 'storage.bytes', 'messages.outbound', 'agents', 'api.calls']],
+                'key' => self::str() + ['description' => 'The entitlement its base is set on.'],
+                'kind' => ['type' => 'string', 'enum' => ['counted', 'snapshot']],
+                'unit' => ['type' => 'string', 'enum' => ['count', 'bytes']],
+                'used' => self::int(),
+                'peak' => self::int() + ['description' => 'The month\'s highest reading; for a counted meter, the same as used.'],
+                'base' => self::int(true) + ['description' => 'Null when there is no limit.'],
+                'state' => ['type' => 'string', 'enum' => ['unlimited', 'ok', 'near', 'over']],
+                'dimensions' => [
+                    'type' => 'object',
+                    'description' => 'The meter split: messages by channel, API calls by `api` or `mcp`, agents by `runs`, `tool_calls`, `tokens_in`, `tokens_out`.',
+                    'additionalProperties' => ['type' => 'integer'],
+                ],
+                'resets_at' => self::str(true),
+            ], ['meter', 'key', 'kind', 'unit', 'used', 'peak', 'base', 'state', 'dimensions', 'resets_at']),
+            'UsageReport' => self::object([
+                'period' => self::str() + ['description' => 'YYYY-MM, in the workspace\'s time zone.'],
+                'current' => self::bool(),
+                'resets_at' => self::str(true),
+                'meters' => ['type' => 'array', 'items' => SchemaBuilder::ref('UsageMeter')],
+                'periods' => ['type' => 'array', 'items' => self::str(), 'description' => 'Months with usage, newest first.'],
+            ], ['period', 'current', 'resets_at', 'meters', 'periods']),
+            'UsageReportResponse' => self::dataEnvelope(SchemaBuilder::ref('UsageReport')),
 
             // ── Subscription / billing state (WC-billing) ─────────────────────
             'PlanRef' => self::object([
@@ -6719,6 +6839,8 @@ final class CoreApiSchemas
                 // WHIT-921: the template a `finalise` step renders the final
                 // document with. Null on every other step.
                 'final_template_id' => self::int(true),
+                // #1729: the company stamp a `stamp` step asks for. Null elsewhere.
+                'stamp_id' => self::int(true),
                 // WHIT-1016: the values a person letting it through here fills in.
                 'inputs' => ['type' => 'array', 'items' => SchemaBuilder::ref('RouteStepInput')],
                 // WHIT-1018: the subject's people questions whose answers this step leaves out.
@@ -6877,7 +6999,10 @@ final class CoreApiSchemas
                         // WHIT-921: `finalise` makes the final document. It
                         // must be the last step, at most one, and needs a render
                         // service; it names no rule and nobody acts on it.
-                        'kind' => ['type' => 'string', 'enum' => ['sign', 'finalise'], 'nullable' => true],
+                        // #1729: `stamp` asks a holder of the company stamp
+                        // `stamp_id` to apply it, answered like a signing step.
+                        'kind' => ['type' => 'string', 'enum' => ['sign', 'stamp', 'finalise'], 'nullable' => true],
+                        'stamp_id' => self::int(true) + ['description' => "On a stamp step: one of the company stamps of the workspace (GET /api/document-stamps)."],
                         'sign_capacity' => self::str(true) + ['description' => 'On a signing step: the capacity the signer signs in, such as "Director". At most 200 characters.'],
                         'sign_on_behalf_of' => self::str(true) + ['description' => 'On a signing step: whom the signer signs for, such as the workspace. At most 200 characters.'],
                         'final_template_id' => self::int(true) + ['description' => 'On a `finalise` step: the document template to render with. Absent uses the template the subject names: the final document template of a form, or the template of a document.'],
@@ -7037,7 +7162,93 @@ final class CoreApiSchemas
                 'by' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
                 'at' => self::str() + ['description' => 'Server time, UTC, to the second.'],
                 'subject_version' => self::int(),
+                // #1729: a signature, or a company stamp a holder applied.
+                'kind' => ['type' => 'string', 'enum' => ['signature', 'stamp']],
+                'stamp' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('AppliedStamp')]],
             ], ['id', 'by', 'at', 'subject_version']),
+            'AppliedStamp' => self::object([
+                'id' => self::int(true),
+                'name' => self::str(),
+                'legal_name' => self::str(),
+                'image' => self::str() + ['description' => 'On the audit: the PNG or JPEG data URL that was applied.'],
+            ], ['name', 'legal_name']),
+            'CompanyStampHolders' => self::object([
+                'people' => ['type' => 'array', 'items' => self::int(), 'description' => 'Profile ids of members of this workspace.'],
+                'roles' => ['type' => 'array', 'items' => self::int(), 'description' => 'Role ids; everyone holding one holds the stamp.'],
+            ], []),
+            'CompanyStamp' => self::object([
+                'id' => self::int(),
+                'name' => self::str(),
+                'legal_name' => self::str(),
+                'image' => self::str() + ['description' => 'A PNG or JPEG data URL, at most 512 KB.'],
+                'image_hash' => self::str(),
+                'holders' => self::object([
+                    'people' => ['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name'])],
+                    'roles' => ['type' => 'array', 'items' => self::object(['role_id' => self::int(), 'name' => self::str()], ['role_id', 'name'])],
+                ], ['people', 'roles']),
+                'created_at' => self::str(),
+                'updated_at' => self::str(),
+                'archived_at' => self::str(true),
+            ], ['id', 'name', 'legal_name', 'image', 'holders', 'archived_at']),
+            'CompanyStampResponse' => self::dataEnvelope(SchemaBuilder::ref('CompanyStamp')),
+            'CompanyStampListResponse' => self::listEnvelope('CompanyStamp'),
+            'CompanyStampRequest' => self::object([
+                'name' => self::str() + ['description' => 'At most 200 characters.'],
+                'legal_name' => self::str() + ['description' => 'The legal name the stamp stands for. At most 300 characters.'],
+                'image' => self::str() + ['description' => 'A PNG or JPEG data URL, at most 512 KB, 32 to 4000 pixels a side.'],
+                'holders' => SchemaBuilder::ref('CompanyStampHolders') + ['description' => 'Who may apply the stamp: profile ids in `people`, role ids in `roles`.'],
+            ], ['name', 'legal_name', 'image']),
+            'CompanyStampUpdateRequest' => self::object([
+                'name' => self::str() + ['description' => 'The new name of the stamp. At most 200 characters.'],
+                'legal_name' => self::str() + ['description' => 'The new legal name the stamp stands for. At most 300 characters.'],
+                'image' => self::str() + ['description' => 'A new image: a PNG or JPEG data URL, at most 512 KB. Stamps already applied keep their own copy.'],
+            ], []),
+            'StampingContext' => self::object([
+                'route_id' => self::int(),
+                'can_stamp' => self::bool(),
+                'is_holder' => self::bool(),
+                'step' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'id' => self::int(),
+                        'position' => self::int(),
+                        'label' => self::str(true),
+                        'quorum' => ['type' => 'string', 'enum' => ['all', 'any']],
+                    ],
+                    'required' => ['id', 'position', 'quorum'],
+                ],
+                'stamp' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('AppliedStamp')]],
+                'subject' => [
+                    'type' => 'object',
+                    'nullable' => true,
+                    'properties' => [
+                        'type' => self::str(),
+                        'id' => self::int(),
+                        'title' => self::str(true),
+                        'version' => self::int(),
+                        'content_hash' => self::str(),
+                    ],
+                    'required' => ['type', 'id', 'version', 'content_hash'],
+                ],
+                'consent_version' => self::str(),
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'provider_key' => self::str(true),
+                    'email_hint' => self::str(true),
+                    'signed_in_again' => self::bool(),
+                ], ['method', 'signed_in_again']),
+            ], ['route_id', 'can_stamp', 'is_holder', 'consent_version', 'second_factor']),
+            'StampingContextResponse' => self::dataEnvelope(SchemaBuilder::ref('StampingContext')),
+            'StampRequest' => self::object([
+                'content_hash' => self::str(),
+                'consent' => self::bool(),
+                'consent_version' => self::str() + ['description' => 'The stamp consent version from the stamping context.'],
+                'second_factor' => self::object([
+                    'method' => ['type' => 'string', 'enum' => ['totp', 'email_code', 'fresh_sign_in']],
+                    'code' => self::str(true),
+                ], ['method']),
+            ], ['content_hash', 'consent', 'consent_version', 'second_factor']),
             'SigningContext' => self::object([
                 'route_id' => self::int(),
                 'can_sign' => self::bool(),
@@ -7092,6 +7303,10 @@ final class CoreApiSchemas
             // A signature record, as the audit page shows it.
             'SignatureRecord' => self::object([
                 'id' => self::int(),
+                // #1729: a signature, or a company stamp a holder applied. A stamp
+                // has no drawn `appearance`; `stamp` has its names and image.
+                'kind' => ['type' => 'string', 'enum' => ['signature', 'stamp']],
+                'stamp' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('AppliedStamp')]],
                 'route_id' => self::int(),
                 'event_id' => self::int(),
                 'step_id' => self::int(),
@@ -10909,6 +11124,7 @@ final class CoreApiSchemas
                 'currency' => self::str(),
                 'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
                 'multi_service_booking' => self::bool() + ['description' => 'On: one booking may hold several services back to back (WHIT-1173). Default off.'],
+                'walkins_enabled' => self::bool() + ['description' => 'On: the walk-in queue at the front desk (WHIT-1334). Default off.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -10921,7 +11137,79 @@ final class CoreApiSchemas
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
                 'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
                 'multi_service_booking' => self::bool() + ['description' => 'On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off.'],
+                'walkins_enabled' => self::bool() + ['description' => 'Turn the walk-in queue at the front desk on or off (WHIT-1334). Default off.'],
             ], []),
+            'CalendarWalkin' => self::object([
+                'id' => self::int(),
+                'position' => self::int() + ['description' => 'Place in the queue, 1 is next (waiting list only).'],
+                'name' => self::str(),
+                'phone' => self::str(),
+                'service_id' => self::int(),
+                'service' => self::str() + ['description' => 'The service name in the caller language (waiting list only).'],
+                'preferred_profile_id' => self::int(true),
+                'preferred' => self::str() + ['description' => 'Who they asked for, by name (waiting list only).'],
+                'note' => self::str(),
+                'status' => self::str() + ['enum' => ['waiting', 'assigning', 'served', 'left']],
+                'added_at' => self::str(),
+                'waited_minutes' => self::int(),
+                'assigned_profile_id' => self::int(true),
+                'booking_id' => self::int(true),
+                'contact_id' => self::int(true),
+            ], ['id', 'name', 'service_id']),
+            'CalendarWalkinRequest' => self::object([
+                'name' => self::str() + ['maxLength' => 200, 'description' => 'Their name, as they gave it.'],
+                'phone' => self::str() + ['description' => 'Optional; used to find or add the customer in Contacts when served.'],
+                'service_id' => self::int() + ['description' => 'The service they want, from GET /api/calendar/walkins/services.'],
+                'profile_id' => self::int() + ['description' => 'Who they asked for; empty for whoever is free.'],
+                'note' => self::str() + ['maxLength' => 500, 'description' => 'Anything the desk should know.'],
+            ], ['name', 'service_id']),
+            'CalendarWalkinAssignRequest' => self::object([
+                'walkin_id' => self::int() + ['description' => 'The walk-in to serve, from GET /api/calendar/walkins.'],
+                'profile_id' => self::int() + ['description' => 'Who serves them, from GET /api/calendar/walkins/staff.'],
+            ], ['walkin_id', 'profile_id']),
+            'CalendarCommissionRate' => self::object([
+                'id' => self::int(),
+                'profile_id' => self::int(),
+                'person' => self::str(),
+                'service_id' => self::int(true) + ['description' => 'Null: the rate for every service without one of its own.'],
+                'service' => self::str(),
+                'percent' => self::str() + ['description' => 'As read, such as 12.5%.'],
+                'percent_bp' => self::int() + ['description' => 'Basis points: 1250 is 12.5%.'],
+            ], ['id', 'profile_id', 'percent_bp']),
+            'CalendarCommissionRateRequest' => self::object([
+                'profile_id' => self::int() + ['description' => 'The member of staff, from GET /api/calendar/commission/staff.'],
+                'service_id' => self::int() + ['description' => 'Empty for every service.'],
+                'percent' => self::str() + ['description' => 'A number from 0 to 100, such as 30 or 12.5.'],
+            ], ['profile_id', 'percent']),
+            'CalendarCommissionCloseRequest' => self::object([
+                'period' => self::str() + ['description' => 'A period that has ended, such as last_month.'],
+            ], ['period']),
+            'CalendarCommissionReportRow' => self::object([
+                'profile_id' => self::int(),
+                'person' => self::str(),
+                'currency' => self::str(),
+                'bookings' => self::int(),
+                'sales_minor' => self::int(),
+                'commission_minor' => self::int(),
+                'rated' => self::bool() + ['description' => 'False when the person has no rate.'],
+                'sales' => self::str(),
+                'commission' => self::str(),
+            ], ['profile_id', 'currency', 'bookings', 'sales_minor', 'commission_minor']),
+            'CalendarCommissionClose' => self::object([
+                'id' => self::int(),
+                'from' => self::str() + ['description' => 'First day, in the workspace time zone.'],
+                'to' => self::str() + ['description' => 'Last day, included.'],
+                'period' => self::str(),
+                'closed_at' => self::str(),
+                'closed_by_profile_id' => self::int(true),
+                'expense_ref' => self::str(true) + ['description' => 'What the books called it; null until booked.'],
+                'books' => self::str(),
+                'total' => self::str(),
+                'lines' => ['type' => 'array', 'items' => self::object([
+                    'profile_id' => self::int(), 'person' => self::str(), 'currency' => self::str(), 'bookings' => self::int(),
+                    'sales_minor' => self::int(), 'commission_minor' => self::int(),
+                ], ['profile_id', 'currency', 'commission_minor'])],
+            ], ['id', 'from', 'to', 'lines']),
             'CalendarStaff' => self::object([
                 'profile_id' => self::int(),
                 'display_name' => self::str(),
@@ -10997,6 +11285,7 @@ final class CoreApiSchemas
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
                 'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
                 'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
+                'item_id' => self::int(true) + ['description' => 'The inventory service item that holds its name and price (WHIT-1334).'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServiceRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
@@ -11061,7 +11350,7 @@ final class CoreApiSchemas
                 'blocks_until' => self::str() + ['description' => 'End including the buffer after.'],
                 'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
                 'hold_expires_at' => self::str(true),
-                'source' => self::str() + ['enum' => ['staff', 'public', 'agent']],
+                'source' => self::str() + ['enum' => ['staff', 'public', 'agent', 'walkin']],
                 'price_minor' => self::int(true),
                 'currency' => self::str(),
                 'cancelled_by' => self::str(true),
@@ -11433,6 +11722,12 @@ final class CoreApiSchemas
             // `dropped` is NOT required: it is present only for a caller holding
             // plugins:read, and its absence is what says "not yours to read" as
             // distinct from an empty array's "nothing was refused".
+            'PluginFrameTokenResponse' => self::object([
+                'data' => self::object([
+                    'token' => self::str(),
+                    'expiresIn' => self::int(),
+                ], ['token', 'expiresIn']),
+            ], ['data']),
             'FrontendFeatureListResponse' => self::object(
                 [
                     'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('FrontendFeature')],
@@ -11535,7 +11830,8 @@ final class CoreApiSchemas
                     'type' => self::str(),
                     'label' => self::object(['en' => self::str(), 'ar' => self::str()], ['en', 'ar']),
                     'plugin' => self::str(),
-                ], ['type', 'label', 'plugin'])],
+                    'email_default' => self::bool(),
+                ], ['type', 'label', 'plugin', 'email_default'])],
             ], ['data', 'transactional_prefixes', 'plugin_types']),
             'PushDevice' => self::object([
                 'id' => self::int(),
@@ -11797,6 +12093,12 @@ final class CoreApiSchemas
                         'new_domains' => ['type' => 'array', 'items' => ['type' => 'string']],
                     ], ['version', 'new_permissions', 'new_domains']), ['nullable' => true]),
                 ], ['source', 'installed_at', 'permissions', 'outside_domains']),
+                // SDK 1.151 (#1693): the services and tables the plugin declared it
+                // uses; null when it declares nothing.
+                'capabilities' => array_merge(self::object([
+                    'services' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    'tables' => ['type' => 'array', 'items' => ['type' => 'string']],
+                ], ['services', 'tables']), ['nullable' => true]),
             ], ['id', 'name', 'enabled', 'file']),
             'WorkspacePluginInstallResponse' => self::object([
                 'data' => self::object([
@@ -12162,7 +12464,7 @@ final class CoreApiSchemas
                 'options' => self::object([
                     'shape' => ['type' => 'array', 'items' => self::str()],
                     'density' => ['type' => 'array', 'items' => self::str()],
-                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str()], ['id', 'name'])],
+                    'font' => ['type' => 'array', 'items' => self::object(['id' => self::str(), 'name' => self::str(), 'stack' => self::str(), 'heading_stack' => self::str()], ['id', 'name'])],
                 ], ['shape', 'density', 'font']),
                 'colour_overrides' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The workspace\'s colour overrides, light and dark, kept when the tweaks are saved.'],
             ], ['current', 'themes'])),
@@ -12171,11 +12473,20 @@ final class CoreApiSchemas
                 'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json) with the main colour, colour overrides and tweaks folded in.'],
                 'filename' => self::str(),
             ], ['theme', 'filename'])),
+            'ThemeTokensRequest' => self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json).'],
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter'], 'description' => 'css for CSS variables, json for Design Tokens JSON, tailwind for a Tailwind v4 @theme file, flutter for a Dart file.'],
+            ], ['theme', 'format']),
+            'ThemeTokensResponse' => self::dataEnvelope(self::object([
+                'format' => ['type' => 'string', 'enum' => ['css', 'json', 'tailwind', 'flutter'], 'description' => 'The format the file is in.'],
+                'filename' => self::str(),
+                'media_type' => self::str(),
+                'content' => self::str() + ['description' => 'The file\'s text.'],
+            ], ['format', 'filename', 'media_type', 'content'])),
             'ImportThemeRequest' => [
                 'type' => 'object',
-                'description' => 'A theme file (schemas/theme/v1.json).',
+                'description' => 'A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme.',
                 'additionalProperties' => false,
-                'required' => ['schemaVersion', 'id', 'version', 'name'],
                 'properties' => [
                     '$schema' => ['type' => 'string', 'description' => 'The schema address, https://whity.dev/schema/theme/v1.json.'],
                     'schemaVersion' => ['type' => 'integer', 'description' => 'The format version, 1.'],
@@ -12186,11 +12497,13 @@ final class CoreApiSchemas
                     'author' => ['type' => 'object', 'description' => 'Who made it: name.'],
                     'colour' => ['type' => 'object', 'description' => 'seeds (primary, secondary, tertiary as #rrggbb), scheme, neutral, contrast and overrides per mode.'],
                     'type' => ['type' => 'object', 'description' => 'family and headingFamily from the allowed fonts, scale, titleWeight and emphasis.'],
-                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round) and morph.'],
+                    'shape' => ['type' => 'object', 'description' => 'preset (square, crisp, whity, soft, round, pebble, cut), morph, and components: a preset for buttons, fields, chips, cards, dialogs, tables or navigation.'],
                     'density' => ['type' => 'string', 'description' => 'compact, standard or comfortable.'],
                     'elevation' => ['type' => 'object', 'description' => 'style (plane, soft, flat) and float.'],
                     'motion' => ['type' => 'object', 'description' => 'preset: calm, standard or expressive.'],
                     'documents' => ['type' => 'object', 'description' => 'Defaults for the workspace\'s document theme: accentUse, titleFace, largePrint.'],
+                    'theme' => ['type' => 'object', 'description' => 'Instead of the fields above: the theme file, with source.'],
+                    'source' => ['type' => 'string', 'enum' => ['editor'], 'description' => 'With theme: editor when it was made or changed in the theme editor (TH.25).'],
                 ],
             ],
             'ImportThemeResponse' => self::dataEnvelope(self::object([
@@ -12203,6 +12516,57 @@ final class CoreApiSchemas
                     'to' => self::str(true),
                 ], ['field', 'from', 'to'])],
             ], ['id', 'version'])),
+            // TH.25: a theme from another tool, as a theme file to import.
+            'ConvertThemeRequest' => self::object([
+                'format' => ['type' => 'string', 'enum' => ['shadcn', 'tailwind', 'material'], 'description' => 'shadcn CSS variables, a Tailwind v4 @theme block, or Material Theme Builder JSON.'],
+                'source' => self::str() + ['description' => 'The CSS or JSON as pasted or read from the file, at most 64 KB.'],
+                'name' => self::str() + ['description' => 'The theme\'s name; "Imported from …" when empty.'],
+            ], ['format', 'source']),
+            'ConvertThemeResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'A theme file (schemas/theme/v1.json), not saved yet.'],
+                'notes' => ['type' => 'array', 'items' => self::str(), 'description' => 'What was kept and what was not, in plain words.'],
+                'preview' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Colours for light and dark, and the corner radii.'],
+                'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
+            ], ['theme', 'notes', 'preview', 'adjustments'])),
+            'ThemeFileResponse' => self::dataEnvelope(self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file (schemas/theme/v1.json).'],
+                'source' => self::str() + ['description' => 'whity, plugin, import, editor or store.'],
+                'editable' => self::bool() + ['description' => 'True for the workspace\'s own themes; any other is changed as a copy.'],
+            ], ['theme', 'source', 'editable'])),
+            'ThemePreviewResponse' => self::dataEnvelope(self::object([
+                'valid' => self::bool(),
+                'problems' => ['type' => 'array', 'items' => self::str(), 'description' => 'Every problem with the draft, in words; empty when valid.'],
+                'light' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Every colour role for light, as #rrggbb.'],
+                'dark' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Every colour role for dark, as #rrggbb.'],
+                'vars' => ['type' => 'object', 'additionalProperties' => ['type' => 'string'], 'description' => 'Type, shape, density and motion values.'],
+                'fonts' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']],
+                'adjustments' => ['type' => 'array', 'items' => ['type' => 'object', 'additionalProperties' => ['type' => 'string']], 'description' => 'What the guard rails change: mode, role and change.'],
+                'roles' => ['type' => 'array', 'items' => self::str(), 'description' => 'The colour roles a theme may set by hand.'],
+            ], ['valid', 'problems'])),
+            'CompareThemesRequest' => self::object([
+                'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme file, such as the installed version.'],
+                'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme file, such as a file to import or the editor\'s draft.'],
+            ], ['before', 'after']),
+            'CompareThemesResponse' => self::dataEnvelope(self::object([
+                'changes' => ['type' => 'array', 'description' => 'What the newer theme changes, field by field.', 'items' => self::object([
+                    'field' => self::str(),
+                    'from' => self::str(true),
+                    'to' => self::str(true),
+                ], ['field', 'from', 'to'])],
+                'before' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The older theme compiled: light, dark, vars, fonts, adjustments.'],
+                'after' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The newer theme compiled, the same way.'],
+            ], ['changes', 'before', 'after'])),
+            'PackageThemeRequest' => self::object([
+                'theme' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'The theme file to package, as saved (schemas/theme/v1.json).'],
+            ], ['theme']),
+            'ThemePackageResponse' => self::dataEnvelope(self::object([
+                'plugin' => self::str() + ['description' => 'The plugin\'s name in the package, like AcmeHarbourTheme.'],
+                'filename' => self::str(),
+                'media_type' => self::str(),
+                'sha256' => self::str() + ['description' => 'The zip\'s sha256, which the store checks.'],
+                'size_bytes' => self::int(),
+                'content_base64' => self::str() + ['description' => 'The zip, base64-encoded.'],
+            ], ['plugin', 'filename', 'media_type', 'sha256', 'size_bytes', 'content_base64'])),
             'DeleteThemeResponse' => self::dataEnvelope(self::object(['deleted' => self::bool()], ['deleted'])),
 
             // ── Forgotten-password + 2FA-recovery (WC-password-reset-2fa-recovery) ──
@@ -12814,7 +13178,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + AccountingApiSchemas::components();
+        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components() + AccountingApiSchemas::components();
     }
 
     /**
@@ -15205,6 +15569,20 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('This workspace\'s limits', 'PlanLimitListResponse'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('GET', '/api/usage', 'billing:view', [
+                'summary' => 'Every usage meter for this workspace and month',
+                'description' =>
+                    'Seats, customers, items, invoices, storage, messages (by channel), agents (runs and '
+                    . 'tool calls) and API calls, each with what was used, the base (null when there is no '
+                    . 'limit) and whether it is near or past it. Past a base is a warning only: nothing '
+                    . 'is refused (BM.4). The current month is read live; an earlier one as it was kept.',
+                'tags' => ['billing'],
+                'parameters' => [self::queryParam('period', 'string', 'A month, YYYY-MM; the current month when left out.')],
+                'responses' => [
+                    200 => self::jsonResponse('This workspace\'s usage', 'UsageReportResponse'),
+                    422 => self::errorResponse('The month is not written YYYY-MM'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/billing/receipts', 'billing:view', [
                 'summary' => 'What this tenant has paid',
                 'description' =>
@@ -16462,6 +16840,45 @@ final class CoreApiSchemas
                     ] + self::authErrors(),
                 ],
             ],
+            // #1729: applying a company stamp on a `stamp` step. Session-gated
+            // like signing; the handler checks the caller holds the stamp.
+            [
+                'method' => 'GET',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/stamping',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'What you see before applying a company stamp: the step, the stamp, whether you hold it, the content hash, the consent version and how you will confirm',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('The stamping context', 'StampingContextResponse'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                    ] + self::authErrors(),
+                ],
+            ],
+            [
+                'method' => 'POST',
+                'path' => '/api/documents/{id:\\d+}/routes/{routeId:\\d+}/stamp',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Apply the company stamp your open stamp step asks for',
+                    'description' => 'Only a holder of the stamp (named, or through a role) can apply it. Needs the stamp consent line '
+                        . 'in its current wording, the content hash you were shown and the second check your account uses, as '
+                        . 'for a signature. The act and a sealed stamp record (with the names and image of the stamp copied in) '
+                        . 'are written together. An authorised person applying the image, not a certified electronic seal.',
+                    'tags' => ['documents'],
+                    'request' => 'StampRequest',
+                    'responses' => [
+                        201 => self::jsonResponse('The stamp record and the trail entry', 'SignResponse'),
+                        403 => self::errorResponse('You do not hold this company stamp'),
+                        404 => self::errorResponse('Document or route not found, or not visible to the caller'),
+                        409 => self::errorResponse('The content changed since you opened it'),
+                        422 => self::errorResponse('Consent or second check missing or not correct, or nothing here waits for your stamp'),
+                        429 => self::errorResponse('Too many tries'),
+                    ] + self::authErrors(),
+                ],
+            ],
             [
                 'method' => 'GET',
                 'path' => '/api/documents/{id:\\d+}/audit',
@@ -17664,8 +18081,9 @@ final class CoreApiSchemas
                                             ],
                                             'stage' => [
                                                 'type' => 'string',
-                                                'description' => 'Only at the `stage` and `described` disclosure levels',
-                                                'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted'],
+                                                'description' => 'Only at the `stage`, `described` and `signed` disclosure levels',
+                                                'enum' => ['issued', 'forwarded', 'acknowledged', 'returned', 'noted',
+                                                    'sent_back', 'resubmitted', 'signed', 'stamped', 'declined'],
                                             ],
                                             'stage_on' => [
                                                 'type' => 'string',
@@ -17693,6 +18111,26 @@ final class CoreApiSchemas
                                                 ],
                                                 'required' => ['revision', 'issued_on'],
                                             ],
+                                            'signatures' => [
+                                                'type' => 'array',
+                                                'description' => 'Only at `signed` (#1730): the signatures and company stamps on the document, as capacities with dates. `name` only when the workspace turned on documents.qr_public_signer_names.',
+                                                'items' => [
+                                                    'type' => 'object',
+                                                    'properties' => [
+                                                        'kind' => ['type' => 'string', 'enum' => ['signature', 'stamp']],
+                                                        'capacity' => ['type' => 'string', 'nullable' => true, 'description' => 'The capacity signed in, or the legal name a stamp stands for'],
+                                                        'on_behalf_of' => ['type' => 'string', 'nullable' => true],
+                                                        'version' => ['type' => 'integer'],
+                                                        'signed_on' => ['type' => 'string', 'nullable' => true, 'description' => 'Date only'],
+                                                        'name' => ['type' => 'string'],
+                                                    ],
+                                                    'required' => ['kind', 'capacity', 'on_behalf_of', 'version', 'signed_on'],
+                                                ],
+                                            ],
+                                            'trail_intact' => [
+                                                'type' => 'boolean',
+                                                'description' => 'Only at `signed` (#1730): false when the hash chain of the document trail is broken, so the record behind the paper was changed.',
+                                            ],
                                             'brand' => [
                                                 'nullable' => true,
                                                 'allOf' => [SchemaBuilder::ref('PublicWorkspaceBrand')],
@@ -17704,6 +18142,37 @@ final class CoreApiSchemas
                                 ],
                             ]
                         ),
+                        429 => self::errorResponse('Too many verification attempts from this address'),
+                        503 => self::errorResponse('Verification is temporarily unavailable'),
+                    ],
+                ],
+            ],
+            [
+                'method' => 'GET',
+                'path' => '/api/document-verifications/{token}/files/{sha256:[0-9a-fA-F]{64}}',
+                'requiredRole' => null,
+                'requiredPermission' => null,
+                'schema' => [
+                    'summary' => 'Check a file: is this PDF the one the issuer stored? (public, rate-limited)',
+                    'description' => 'The browser hashes the PDF and sends only its SHA-256; the file never leaves the '
+                        . 'visitor\'s device (#1730). `current` is the newest PDF of the document, `earlier` an older one. '
+                        . 'Every code that does not verify answers `none` with the same 200, so this cannot be asked '
+                        . 'whether a code exists.',
+                    'tags' => ['documents'],
+                    'responses' => [
+                        200 => self::jsonResponse('Whether the file matches', [
+                            'type' => 'object',
+                            'properties' => [
+                                'data' => [
+                                    'type' => 'object',
+                                    'properties' => [
+                                        'match' => ['type' => 'string', 'enum' => ['current', 'earlier', 'none']],
+                                    ],
+                                    'required' => ['match'],
+                                ],
+                            ],
+                        ]),
+                        422 => self::errorResponse('Not a SHA-256'),
                         429 => self::errorResponse('Too many verification attempts from this address'),
                         503 => self::errorResponse('Verification is temporarily unavailable'),
                     ],
@@ -18863,6 +19332,70 @@ final class CoreApiSchemas
     }
 
     /**
+     * Company stamps (#1729): a name, the legal name it stands for, an image and
+     * its holders. Anyone who reads documents lists them, so a route's author can
+     * choose one; `documents:stamps` changes them. Archived, never deleted.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function companyStampRoutes(): array
+    {
+        $notFound = [404 => self::errorResponse('Stamp not found')];
+
+        return [
+            self::permissionRoute('GET', '/api/document-stamps', 'documents:read', [
+                'summary' => "The workspace's company stamps, with their holders",
+                'description' => 'Archived stamps are left out unless `?archived=true`.',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamps', 'CompanyStampListResponse')] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-stamps', 'documents:stamps', [
+                'summary' => 'Add a company stamp',
+                'description' => 'Applying it is an authorised person applying the image, not a certified electronic seal.',
+                'tags' => ['documents'],
+                'request' => 'CompanyStampRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The stamp', 'CompanyStampResponse'),
+                    422 => self::errorResponse('A name, legal name, image or holder could not be used'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/document-stamps/{id:\d+}', 'documents:read', [
+                'summary' => 'One company stamp, with its holders',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamp', 'CompanyStampResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/document-stamps/{id:\d+}', 'documents:stamps', [
+                'summary' => "Change a stamp's name, legal name or image. Stamps already applied keep their own copy.",
+                'tags' => ['documents'],
+                'request' => 'CompanyStampUpdateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The stamp', 'CompanyStampResponse'),
+                    422 => self::errorResponse('A name, legal name or image could not be used'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/document-stamps/{id:\d+}/holders', 'documents:stamps', [
+                'summary' => "Replace a stamp's holders: named people and roles",
+                'tags' => ['documents'],
+                'request' => 'CompanyStampHolders',
+                'responses' => [
+                    200 => self::jsonResponse('The stamp', 'CompanyStampResponse'),
+                    422 => self::errorResponse('A holder is not in this workspace, or a role is not one it has'),
+                ] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-stamps/{id:\d+}/archive', 'documents:stamps', [
+                'summary' => 'Archive a stamp. New stamp steps cannot ask for it; records already made keep it.',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamp', 'CompanyStampResponse')] + $notFound + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/document-stamps/{id:\d+}/restore', 'documents:stamps', [
+                'summary' => 'Bring an archived stamp back',
+                'tags' => ['documents'],
+                'responses' => [200 => self::jsonResponse('The stamp', 'CompanyStampResponse')] + $notFound + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
      * Document themes (editor M4d; E.44, DOCUMENT-THEMES.md 5).
      *
      * Reads use documents:read, writes the workspace's own themes with
@@ -19764,6 +20297,170 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/closes', 'calendar:commission', [
+                'summary' => 'Every closed commission period, newest first',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Closes', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionClose')])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/closes/periods', 'calendar:commission', [
+                'summary' => 'The commission periods that may be closed now',
+                'description' => 'Ended, and touching no closed day.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Periods', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str(), 'from' => self::str(), 'to' => self::str()], ['id', 'label', 'from', 'to'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/closes', 'calendar:commission', [
+                'summary' => 'Close a commission period',
+                'description' => 'Freezes each person\'s totals, fires calendar.commission.closed, and sends it to the books when something books commission (WHIT-1334).',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCommissionCloseRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The close', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionClose'))),
+                    409 => self::errorResponse('Not ended, already closed, or nothing to close'),
+                    422 => self::errorResponse('Unknown period'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/closes/{id:\d+}/book', 'calendar:commission', [
+                'summary' => 'Send a closed commission period to the books again',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The close', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionClose'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Already booked, or the books cannot take it'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/rates', 'calendar:commission', [
+                'summary' => 'Every commission rate, by member of staff',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Rates', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionRate')])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/commission/rates', 'calendar:commission', [
+                'summary' => 'Set a commission rate, for every service or one',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCommissionRateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The rate', self::dataEnvelope(SchemaBuilder::ref('CalendarCommissionRate'))),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('DELETE', '/api/calendar/commission/rates/{id:\d+}', 'calendar:commission', [
+                'summary' => 'Remove a commission rate',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Removed', self::dataEnvelope(self::object(['removed' => self::bool()], ['removed']))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/periods', 'calendar:commission', [
+                'summary' => 'The periods the commission report covers',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Periods', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::str(), 'label' => self::str(), 'from' => self::str(), 'to' => self::str()], ['id', 'label', 'from', 'to'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/report', 'calendar:commission', [
+                'summary' => 'What each member of staff earned in a period',
+                'description' => 'From done bookings (confirmed and already over), each service line at its own price, in the workspace time zone.',
+                'tags' => ['calendar'],
+                'parameters' => [self::queryParam('period', 'string', 'this_month (default), last_month, this_week, last_7_days or last_30_days.')],
+                'responses' => [
+                    200 => self::jsonResponse('One row per person and currency', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarCommissionReportRow')])),
+                    422 => self::errorResponse('Unknown period'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/staff', 'calendar:commission', [
+                'summary' => 'The staff a commission rate can be set for',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Staff', self::dataEnvelope(['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/commission/services', 'calendar:commission', [
+                'summary' => 'The services a commission rate can be set for',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/price-list', 'calendar:read', [
+                'summary' => 'The price list as a page to print',
+                'description' => 'A whole HTML page: every active service in English and Arabic, how long it takes and its price, from its inventory service item (WHIT-1334).',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => ['description' => 'The page', 'content' => ['text/html' => ['schema' => self::str()]]],
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/walkins', 'calendar:front_desk', [
+                'summary' => 'Who is waiting at the front desk, first come first served',
+                'description' => 'Needs the walk-ins switch of the workspace (WHIT-1334); off answers 409 with reason walkins_off.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The queue', self::dataEnvelope(['type' => 'array', 'items' => SchemaBuilder::ref('CalendarWalkin')])),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins', 'calendar:front_desk', [
+                'summary' => 'Add someone who came in without a booking',
+                'tags' => ['calendar'],
+                'request' => 'CalendarWalkinRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/walkins/services', 'calendar:front_desk', [
+                'summary' => 'The services a walk-in can choose',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Services', self::dataEnvelope(['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])])),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/walkins/staff', 'calendar:front_desk', [
+                'summary' => 'The bookable staff, free ones first',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('Staff', self::dataEnvelope(['type' => 'array', 'items' => self::object(['profile_id' => self::int(), 'name' => self::str(), 'free' => self::bool(), 'label' => self::str()], ['profile_id', 'name', 'free', 'label'])])),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins/assign', 'calendar:front_desk', [
+                'summary' => 'Hand a walk-in to the person chosen',
+                'description' => 'Books the service now for that person, checked in, without emailing anyone; the booking finds or adds the customer in Contacts.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarWalkinAssignRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
+                    422 => self::errorResponse('Not valid'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins/{id:\d+}/assign', 'calendar:front_desk', [
+                'summary' => 'Hand a walk-in to the next free person',
+                'description' => 'The one they asked for if free, else the first with no booking now.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Nobody is free, no longer waiting, or walk-ins are off'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/walkins/{id:\d+}/left', 'calendar:front_desk', [
+                'summary' => 'They left without being served',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The walk-in', self::dataEnvelope(SchemaBuilder::ref('CalendarWalkin'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('Walk-ins are off, or no longer waiting'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('DELETE', '/api/calendar/bookings/{id:\d+}/check-in', 'calendar:write', [

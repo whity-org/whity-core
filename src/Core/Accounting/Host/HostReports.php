@@ -8,7 +8,7 @@ use Whity\Core\Accounting\AccountingReports;
 use Whity\Sdk\Accounting\Reports;
 use Whity\Sdk\Accounting\TrialBalance;
 
-/** Reports from the ledger for plugins, read-only (SDK 1.132, WHIT-1318). */
+/** Reports from the ledger for plugins, read-only (SDK 1.154, WHIT-1318). */
 final class HostReports implements Reports
 {
     public function __construct(

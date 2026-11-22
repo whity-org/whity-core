@@ -1775,6 +1775,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         foreach ($this->registeredPlugins as $pluginKey => $info) {
             $this->agentPresetRegistry?->unregisterPlugin((string) $pluginKey);
             $this->router->unregisterByNamespace($info['namespacePrefix']);
+            \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
+            \Whity\Core\Plugin\PluginRouteLimits::removeOwner((string) $info['namespacePrefix']);
             // A reload re-declares them from the plugin as it is now.
             $this->templateSlotRegistry?->unregister($info['plugin']->getName());
             $this->documentFieldRegistry?->removeOwner($info['plugin']->getName());
@@ -2438,7 +2440,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      * (WHIT-1030). A declaration that throws or is malformed costs that plugin
      * its entries here and nothing else.
      *
-     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string}>
+     * `email_default`: whether email starts on for a person who never chose
+     * for the type (#2209).
+     *
+     * @return list<array{type: string, label: array{en: string, ar: string}, plugin: string, email_default: bool}>
      */
     public function declaredNotificationTypes(): array
     {
@@ -2456,8 +2461,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             }
             try {
                 $slug = \Whity\Core\Plugin\PluginIdentity::slugOf($plugin);
-                foreach (\Whity\Core\Notification\PluginNotificationTypes::of($plugin, $slug) as $type => $label) {
-                    $declared[] = ['type' => $type, 'label' => $label, 'plugin' => $slug];
+                foreach (\Whity\Core\Notification\PluginNotificationTypes::declared($plugin, $slug) as $type => $declaration) {
+                    $declared[] = ['type' => $type, 'label' => $declaration['label'], 'plugin' => $slug, 'email_default' => $declaration['emailDefault']];
                 }
             } catch (Throwable $e) {
                 $this->logWarning("Plugin {$pluginKey} declares invalid notification types: " . $e->getMessage());
@@ -3144,6 +3149,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
+        \Whity\Core\Plugin\PluginRouteLimits::removeOwner((string) $info['namespacePrefix']);
         // A disabled or uninstalled plugin vouches for nothing (#1872): its
         // customer-grade permissions are privileged for customers again.
         \Whity\Core\Identity\CustomerGradePermissions::remove($pluginKey);
@@ -4032,6 +4039,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 
         $registered = $this->registerCapabilities($plugin, $namespacePrefix, $pluginKey);
 
+        // What it declared it uses (SDK 1.151, #1693): in discovery order, so the
+        // first plugin to declare a table owns it in every process.
+        \Whity\Core\Plugin\PluginCapabilities::register($plugin, $this->logger);
+
         // Seed plugin-declared roles and permission grants into the database.
         // The seeder is optional (not wired in tests that lack a DB); errors
         // are swallowed internally so a seeding failure never prevents the
@@ -4438,6 +4449,26 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                         . 'route and was NOT registered (first registration wins).'
                     );
                     continue;
+                }
+
+                // A per-route limit (SDK 1.152, #1686), kept for the route the
+                // router really resolves to this plugin's handler.
+                if (array_key_exists('rateLimit', $route)) {
+                    $limitRefusal = \Whity\Core\Plugin\PluginRouteLimits::refusal($route['rateLimit']);
+                    $served = $this->router->versionedPath((string) $path);
+                    $probe = (string) preg_replace('/\{[^}]+\}/', '1', $served);
+                    $resolved = $limitRefusal === null
+                        ? $this->router->match(new \Whity\Core\Request(strtoupper((string) $method), $probe, [], ''))
+                        : null;
+                    if ($limitRefusal === null && $resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
+                        \Whity\Core\Plugin\PluginRouteLimits::add((string) $namespacePrefix, (string) $method, (string) $resolved['path'], (int) $route['rateLimit']);
+                    } else {
+                        $this->logWarning(
+                            "Plugin {$pluginKey} route {$method} {$path}: "
+                            . ($limitRefusal ?? 'its rateLimit could not be tied to the route')
+                            . '; it is registered without a limit of its own.'
+                        );
+                    }
                 }
 
                 if ($serviceScope !== null) {

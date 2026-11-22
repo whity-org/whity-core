@@ -221,9 +221,9 @@ final class RouteStepInputs
                 'A stage that only tells people cannot ask them for values: nobody acts on it.'
             );
         }
-        if ($kind === RouteStepKind::SIGN || $kind === RouteStepKind::FINALISE) {
+        if ($kind === RouteStepKind::SIGN || $kind === RouteStepKind::STAMP || $kind === RouteStepKind::FINALISE) {
             throw new InvalidArgumentException(
-                'Signing and final document stages cannot ask for values. Ask for them on the stage before.'
+                'Signing, stamp and final document stages cannot ask for values. Ask for them on the stage before.'
             );
         }
     }

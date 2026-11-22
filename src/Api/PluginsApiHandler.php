@@ -300,6 +300,23 @@ class PluginsApiHandler
             }
             $plugins = $this->withRecords($plugins);
 
+            // What each plugin declared it uses (SDK 1.151, #1693); null when it
+            // declares nothing and so keeps every service until 2.0.
+            $plugins = array_map(
+                static function (array $plugin): array {
+                    $declared = null;
+                    foreach ([$plugin['name'] ?? null, $plugin['id'] ?? null] as $key) {
+                        if (is_string($key) && $declared === null) {
+                            $declared = \Whity\Core\Plugin\PluginCapabilities::of($key);
+                        }
+                    }
+                    $plugin['capabilities'] = $declared;
+
+                    return $plugin;
+                },
+                $plugins
+            );
+
             // Errors and file names describe the deployment, not the workspace
             // asking: a stack trace can carry paths and other workspaces' data.
             $operator = PluginOperatorGate::isOperator();
@@ -424,21 +441,34 @@ class PluginsApiHandler
         try {
             (new PluginMigrationRunner($this->pdo))->applyForPlugin($plugin);
         } catch (\Throwable $e) {
-            // The plugin stays DISABLED (we never reached reEnablePlugin). Log
-            // the raw cause server-side; surface only a safe typed error.
-            error_log('[PluginsApiHandler] enable migration failed for ' . $key . ': ' . $e->getMessage());
-
-            $this->auditLogger?->record('plugin.enable.migrate_failed', [
-                'target_type' => 'plugin',
-                'metadata' => ['plugin' => $plugin->getName(), 'result' => 'migrate_failed'],
-            ]);
-
-            throw new PluginEnableMigrationFailed(
-                'The plugin could not be enabled because its database migration failed.',
-                ['plugin' => $plugin->getName()],
-                $e
-            );
+            $this->migrationFailed($plugin, $key, $e);
         }
+
+        // SDK 1.152 (#1686): installed or upgraded, once per version. A failing
+        // callback is logged and retried next time; it never blocks the enable.
+        try {
+            (new \Whity\Core\Plugin\PluginInstallCallbacks($this->pdo))->run($plugin);
+        } catch (\Throwable $e) {
+            error_log('[PluginsApiHandler] install callbacks for ' . $key . ' failed: ' . $e::class);
+        }
+    }
+
+    private function migrationFailed(\Whity\Sdk\PluginInterface $plugin, string $key, \Throwable $e): never
+    {
+        // The plugin stays DISABLED (we never reached reEnablePlugin). Log
+        // the raw cause server-side; surface only a safe typed error.
+        error_log('[PluginsApiHandler] enable migration failed for ' . $key . ': ' . $e->getMessage());
+
+        $this->auditLogger?->record('plugin.enable.migrate_failed', [
+            'target_type' => 'plugin',
+            'metadata' => ['plugin' => $plugin->getName(), 'result' => 'migrate_failed'],
+        ]);
+
+        throw new PluginEnableMigrationFailed(
+            'The plugin could not be enabled because its database migration failed.',
+            ['plugin' => $plugin->getName()],
+            $e
+        );
     }
 
     /**

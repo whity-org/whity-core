@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * One posted journal entry (SDK 1.132, WHIT-1318, register AC.3). Never
+ * One posted journal entry (SDK 1.154, WHIT-1318, register AC.3). Never
  * changed and never deleted; a correction is another entry, the mirror, with
  * `reversesEntryId` set. Amounts are in the books' base currency's minor
  * units. `hash` chains it to the entry before it in the workspace (AC.4).

@@ -12,8 +12,12 @@ use Whity\Core\Settings\SettingsService;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Theme\ThemeCompiler;
 use Whity\Core\Theme\ThemeFonts;
+use Whity\Core\Theme\ThemeImporter;
+use Whity\Core\Theme\ThemeImportProblem;
 use Whity\Core\Theme\ThemeLibrary;
+use Whity\Core\Theme\ThemePackage;
 use Whity\Core\Theme\ThemeRepository;
+use Whity\Core\Theme\ThemeTokenExport;
 use Whity\Core\Theme\ThemeTweaks;
 use Whity\Core\Theme\ThemeValidator;
 
@@ -21,14 +25,27 @@ use Whity\Core\Theme\ThemeValidator;
  * The themes a workspace can choose, and importing a theme file (WHIT-1225,
  * TH.13, TH.14). Applying a theme is free: choosing one is the
  * `branding_theme` setting through `PATCH /api/settings`, like the main
- * colour. Making themes is Whity Studio's (paid); core only takes a finished
- * file.
+ * colour. Making themes is free in core too (TH.25): converting from other
+ * tools here, and the editor.
  *
  *   GET    /api/v1/themes            settings:read   the list, each with a preview
  *   GET    /api/v1/themes/export     settings:read   the theme in use as a file (TH.16)
+ *   GET    /api/v1/themes/export/tokens  settings:read  the theme in use as CSS, JSON,
+ *                                                    Tailwind or Flutter (TH.25)
+ *   POST   /api/v1/themes/tokens     settings:write  a draft from the editor, the same way
  *   POST   /api/v1/themes            settings:write  import a theme file (JSON body);
  *                                                    `?check=1` only checks it and says
  *                                                    what a newer version changes
+ *   POST   /api/v1/themes/convert    settings:write  turn shadcn CSS, a Tailwind @theme block
+ *                                                    or Material Theme Builder JSON into a
+ *                                                    theme file; nothing is saved (TH.25)
+ *   GET    /api/v1/themes/{themeId}  settings:read   one theme's file, for the editor
+ *   POST   /api/v1/themes/preview    settings:write  compile a draft for the live editor;
+ *                                                    nothing is saved (TH.25)
+ *   POST   /api/v1/themes/compare    settings:read   two themes side by side: what changes
+ *                                                    and both previews (TH.25)
+ *   POST   /api/v1/themes/package    settings:write  a theme as a store-ready plugin zip
+ *                                                    for its publisher to submit (TH.25)
  *   DELETE /api/v1/themes/{themeId}  settings:write  remove an imported theme
  *
  * The free tweaks (TH.15: shape, density, font pair) are part of the
@@ -83,7 +100,8 @@ final class ThemesApiHandler
                 ];
             }
 
-            $fonts = array_map(static fn (string $id): array => ['id' => $id, 'name' => ThemeFonts::name($id)], ThemeFonts::ids());
+            // TH.20: each pair with its CSS stacks, so the picker previews it in its own faces.
+            $fonts = array_map(static fn (string $id): array => ['id' => $id, 'name' => ThemeFonts::name($id), 'stack' => ThemeFonts::stack($id), 'heading_stack' => ThemeFonts::stack($id, true)], ThemeFonts::ids());
 
             return Response::json(['data' => [
                 'current' => $current,
@@ -118,6 +136,54 @@ final class ThemesApiHandler
         }, true);
     }
 
+    /**
+     * TH.25 (30-themes 11, 14.7): the theme in use, with everything the
+     * workspace set, as resolved tokens for another tool. Free.
+     */
+    public function exportTokens(Request $request): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request): Response {
+            $format = (string) self::queryParam($request, 'format');
+            if (!in_array($format, ThemeTokenExport::FORMATS, true)) {
+                return Response::error('Choose css, json, tailwind or flutter.', 422);
+            }
+            [$chosen, $seed, $overrides] = $this->adjustments($tenantId);
+            $library = new ThemeLibrary($this->repository, $this->pluginThemes);
+            $theme = ($chosen !== '' ? $library->find($tenantId, $chosen) : null) ?? $library->find($tenantId, ThemeLibrary::DEFAULT_ID)
+                ?? ThemeLibrary::builtIn()[ThemeLibrary::DEFAULT_ID];
+            $values = $tenantId === 0 ? $this->settings->getGlobal() : $this->settings->effective($tenantId);
+            $file = ThemeTweaks::export($theme, $seed, $overrides, (string) ($values[SettingsRegistry::SITE_NAME] ?? ''));
+            if (ThemeValidator::validate($file) !== []) {
+                return Response::error('The theme in use could not be exported.', 500);
+            }
+
+            return Response::json(['data' => ThemeTokenExport::export($file, $format)], 200);
+        }, true);
+    }
+
+    /** TH.25: a draft from the editor as resolved tokens, the same way; nothing is saved. */
+    public function tokens(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > self::MAX_BYTES + 256) {
+                return Response::error('The theme is too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $format = is_array($decoded) && is_string($decoded['format'] ?? null) ? $decoded['format'] : '';
+            $theme = is_array($decoded) ? ($decoded['theme'] ?? null) : null;
+            if (!in_array($format, ThemeTokenExport::FORMATS, true)) {
+                return Response::error('Choose css, json, tailwind or flutter.', 422);
+            }
+            $errors = ThemeValidator::validate($theme);
+            if ($errors !== [] || !is_array($theme)) {
+                return Response::error('This theme can\'t be exported yet.', 422, ['theme' => implode(' ', array_slice($errors, 0, 5))]);
+            }
+
+            return Response::json(['data' => ThemeTokenExport::export($theme, $format)], 200);
+        });
+    }
+
     public function import(Request $request): Response
     {
         return $this->inWorkspace(function (int $tenantId) use ($request): Response {
@@ -144,10 +210,194 @@ final class ThemesApiHandler
                     'changes' => $installed === null ? [] : ThemeTweaks::changes($installed, $theme),
                 ]], 200);
             }
-            $this->repository->save($tenantId, $theme, 'import', false, self::profileId($request));
+            // TH.25: a theme made or changed in the editor says so, as an import says it came from a file.
+            $source = is_array($decoded) && ($decoded['source'] ?? null) === 'editor' && is_array($decoded['theme'] ?? null) ? 'editor' : 'import';
+            $this->repository->save($tenantId, $theme, $source, false, self::profileId($request));
 
             return Response::json(['data' => ['id' => $theme['id'], 'version' => $theme['version']]], 201);
         });
+    }
+
+    /**
+     * TH.25 (30-themes 11, 14.7): a theme made with shadcn, Tailwind or
+     * Material Theme Builder, as a Whity theme file with what was kept in
+     * words and a preview. Nothing is saved; importing it is `POST /themes`.
+     */
+    public function convert(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            if (strlen($request->getBody()) > ThemeImporter::MAX_BYTES + 1024) {
+                return Response::error('This is too long to be a theme. Paste only the colour variables.', 413);
+            }
+            $body = json_decode($request->getBody(), true);
+            $format = is_array($body) && is_string($body['format'] ?? null) ? $body['format'] : '';
+            $source = is_array($body) && is_string($body['source'] ?? null) ? $body['source'] : '';
+            $name = is_array($body) && is_string($body['name'] ?? null) ? $body['name'] : '';
+            try {
+                $result = ThemeImporter::convert($format, $source, $name);
+            } catch (ThemeImportProblem $problem) {
+                return Response::error('This could not be turned into a theme.', 422, ['source' => $problem->reason()]);
+            }
+            $compiled = ThemeCompiler::compile($result['theme']);
+            if ($compiled['adjustments'] !== []) {
+                $result['notes'][] = count($compiled['adjustments']) === 1
+                    ? 'One colour is changed when the theme is used, so text on it stays readable.'
+                    : count($compiled['adjustments']) . ' colours are changed when the theme is used, so text on them stays readable.';
+            }
+
+            return Response::json(['data' => [
+                'theme' => $result['theme'],
+                'notes' => $result['notes'],
+                'preview' => [
+                    'light' => self::swatch($compiled['light'], 'light'),
+                    'dark' => self::swatch($compiled['dark'], 'dark'),
+                    'radius' => $compiled['vars']['wy-radius-control'] ?? '10px',
+                    'card_radius' => $compiled['vars']['wy-radius-card'] ?? '12px',
+                ],
+                'adjustments' => $compiled['adjustments'],
+            ]], 200);
+        });
+    }
+
+    /**
+     * One theme's file, as the editor starts from it (TH.25). `editable` is
+     * true for the workspace's own (imported or made here); any other is
+     * changed as a copy.
+     *
+     * @param array<string, mixed> $params
+     */
+    public function show(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($params): Response {
+            $id = (string) ($params['themeId'] ?? '');
+            if (preg_match(ThemeValidator::ID_RE, $id) !== 1) {
+                return Response::error('Theme not found', 404);
+            }
+            foreach ((new ThemeLibrary($this->repository, $this->pluginThemes))->available($tenantId) as $entry) {
+                if (($entry['theme']['id'] ?? null) === $id) {
+                    return Response::json(['data' => [
+                        'theme' => $entry['theme'],
+                        'source' => $entry['source'],
+                        'editable' => in_array($entry['source'], ['import', 'editor'], true),
+                    ]], 200);
+                }
+            }
+
+            return Response::error('Theme not found', 404);
+        });
+    }
+
+    /**
+     * The live editor's preview (TH.25, 30-themes 11): a draft theme compiled
+     * as it would be used, with every colour in both modes so the editor can
+     * show light and dark side by side whatever mode the person is in, the
+     * roles a colour may be set by hand for, and every problem with the draft
+     * so the editor can say them all at once. Nothing is saved.
+     */
+    public function preview(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > self::MAX_BYTES) {
+                return Response::error('The theme is too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $theme = is_array($decoded) && is_array($decoded['theme'] ?? null) ? $decoded['theme'] : $decoded;
+            $errors = ThemeValidator::validate($theme);
+            if ($errors !== []) {
+                return Response::json(['data' => ['valid' => false, 'problems' => array_slice($errors, 0, 20)]], 200);
+            }
+
+            return Response::json(['data' => ['valid' => true, 'problems' => []] + self::previewOf($theme) + ['roles' => ThemeCompiler::overridableRoles()]], 200);
+        });
+    }
+
+    /**
+     * The side-by-side diff (TH.25, 30-themes 11 and 14.7): two theme files,
+     * what the newer one changes in words (as a re-import says it, TH.16)
+     * and both compiled for a preview. Nothing is saved.
+     */
+    public function compare(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > 2 * self::MAX_BYTES + 256) {
+                return Response::error('The themes are too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $before = is_array($decoded) ? ($decoded['before'] ?? null) : null;
+            $after = is_array($decoded) ? ($decoded['after'] ?? null) : null;
+            foreach (['before' => $before, 'after' => $after] as $which => $theme) {
+                $errors = ThemeValidator::validate($theme);
+                if ($errors !== [] || !is_array($theme)) {
+                    return Response::error('These themes can\'t be compared.', 422, [$which => implode(' ', array_slice($errors, 0, 5))]);
+                }
+            }
+            if (!is_array($before) || !is_array($after)) {
+                return Response::error('These themes can\'t be compared.', 422);
+            }
+
+            return Response::json(['data' => [
+                'changes' => ThemeTweaks::changes($before, $after),
+                'before' => self::previewOf($before),
+                'after' => self::previewOf($after),
+            ]], 200);
+        }, true);
+    }
+
+    /**
+     * Publishing (TH.25, 30-themes 11): a theme as a store-ready package, a
+     * theme-only plugin zip (ThemePackage), for its publisher to download and
+     * submit. Whity's own themes are not the workspace's to publish. Nothing
+     * is saved; the editor saves the theme first.
+     */
+    public function package(Request $request): Response
+    {
+        return $this->inWorkspace(function () use ($request): Response {
+            $body = $request->getBody();
+            if (strlen($body) > self::MAX_BYTES + 256) {
+                return Response::error('The theme is too large.', 413);
+            }
+            $decoded = json_decode($body, true);
+            $theme = is_array($decoded) && is_array($decoded['theme'] ?? null) ? $decoded['theme'] : null;
+            $errors = ThemeValidator::validate($theme);
+            if ($errors === [] && is_array($theme) && str_starts_with((string) $theme['id'], 'whity.')) {
+                $errors[] = 'Whity\'s own themes are published by Whity. Make a copy to publish your own.';
+            }
+            if ($errors !== [] || !is_array($theme)) {
+                return Response::error('This theme can\'t be packaged yet.', 422, ['theme' => implode(' ', array_slice($errors, 0, 5))]);
+            }
+            $package = ThemePackage::build($theme);
+
+            return Response::json(['data' => [
+                'plugin' => $package['plugin'],
+                'filename' => $package['filename'],
+                'media_type' => $package['media_type'],
+                'sha256' => $package['sha256'],
+                'size_bytes' => $package['size_bytes'],
+                'content_base64' => base64_encode($package['content']),
+            ]], 200);
+        });
+    }
+
+    /**
+     * A valid theme compiled for a preview: every colour in both modes, the
+     * values, the fonts by name and what the guard rails change.
+     *
+     * @param array<string, mixed> $theme
+     * @return array<string, mixed>
+     */
+    private static function previewOf(array $theme): array
+    {
+        $compiled = ThemeCompiler::compile($theme);
+
+        return [
+            'light' => array_merge(ThemeCompiler::base('light'), $compiled['light']),
+            'dark' => array_merge(ThemeCompiler::base('dark'), $compiled['dark']),
+            'vars' => $compiled['vars'] === [] ? new \stdClass() : $compiled['vars'],
+            'fonts' => ['body' => ThemeFonts::name($compiled['fonts']['body']), 'heading' => ThemeFonts::name($compiled['fonts']['heading'])],
+            'adjustments' => $compiled['adjustments'],
+        ];
     }
 
     /** @param array<string, mixed> $params */

@@ -21,7 +21,8 @@
       "propertyNames": { "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$" },
       "additionalProperties": { "$ref": "#/$defs/hex" }
     },
-    "fontId": { "enum": ["noto", "plex", "readex", "cairo", "kufi"] }
+    "shapePreset": { "enum": ["square", "crisp", "whity", "soft", "round", "pebble", "cut"] },
+    "fontId": { "enum": ["noto", "plex", "readex", "cairo", "kufi", "rubik", "alexandria", "naskh", "ibm-kufi"] }
   },
   "properties": {
     "$schema": { "type": "string", "maxLength": 200 },
@@ -74,8 +75,22 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "preset": { "enum": ["square", "crisp", "whity", "soft", "round", "pebble", "cut"] },
-        "morph": { "enum": ["off", "on"] }
+        "preset": { "$ref": "#/$defs/shapePreset" },
+        "morph": { "enum": ["off", "on"] },
+        "components": {
+          "type": "object",
+          "description": "A shape preset for one component family, never pixels (TH.21).",
+          "additionalProperties": false,
+          "properties": {
+            "buttons": { "$ref": "#/$defs/shapePreset" },
+            "fields": { "$ref": "#/$defs/shapePreset" },
+            "chips": { "$ref": "#/$defs/shapePreset" },
+            "cards": { "$ref": "#/$defs/shapePreset" },
+            "dialogs": { "$ref": "#/$defs/shapePreset" },
+            "tables": { "$ref": "#/$defs/shapePreset" },
+            "navigation": { "$ref": "#/$defs/shapePreset" }
+          }
+        }
       }
     },
     "density": { "enum": ["compact", "standard", "comfortable"] },

@@ -24,6 +24,10 @@ class CliRunner
         'totp'       => 'Whity\Cli\Commands\TotpCommand',
         // WHIT-1232: stock levels recomputed from the append-only ledger.
         'inventory:rebuild-levels' => 'Whity\Cli\Commands\InventoryCommand',
+        // Section 33 §5: the usage ledger's stored bytes and snapshots.
+        'usage:storage-rebuild' => 'Whity\Cli\Commands\UsageCommand',
+        'usage:snapshot' => 'Whity\Cli\Commands\UsageCommand',
+        'calendar:copy-salons' => 'Whity\Cli\Commands\CalendarCopySalonsCommand',
         // WHIT-1318: account balances recomputed from the ledger, and its hash chain checked.
         'accounting:rebuild-balances' => 'Whity\Cli\Commands\AccountingRebuildBalancesCommand',
         'accounting:verify-chain' => 'Whity\Cli\Commands\AccountingVerifyChainCommand',

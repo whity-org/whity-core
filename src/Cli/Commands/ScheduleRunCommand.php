@@ -263,6 +263,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1235: batches expiring and expired, once a day at 05:00 UTC;
+        // each batch is told once.
+        if ($now->format('H:i') === '05:00') {
+            $this->queue->dispatch(\Whity\Core\Inventory\LotExpiryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'inventory-lot-expiry-' . $now->format('Ymd'),
+            ]);
+        }
+
         // EM.1: the agents' daily summary, once an hour; the job sends only
         // where it is 18:00, and at most once a day per person.
         if ((int) $now->format('i') === 0) {
@@ -277,6 +286,23 @@ final class ScheduleRunCommand implements CliCommand
             $this->queue->dispatch(\Whity\Mcp\Tools\McpCallKeysPruneJob::NAME, [], [
                 'tenant_id' => 0,
                 'idempotency_key' => 'mcp-call-keys-prune-' . $bucket,
+            ]);
+        }
+
+        // Section 33 §5: the usage ledger's snapshot meters, once a day. Every
+        // hour tries, and the day's key keeps it to one run.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Usage\UsageSnapshotJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'usage-snapshot-' . $now->format('Ymd'),
+            ]);
+        }
+
+        // WHIT-1321: sent quotes past their valid-until date, once an hour.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Sales\QuoteExpiryJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'sales-quote-expiry-' . $bucket,
             ]);
         }
 

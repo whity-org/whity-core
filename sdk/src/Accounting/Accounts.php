@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * The workspace's chart of accounts, for a plugin (SDK 1.132, WHIT-1318,
+ * The workspace's chart of accounts, for a plugin (SDK 1.154, WHIT-1318,
  * register AC.8).
  *
  * Reach it through the plugin context, `$ctx->accounting()->accounts()`, or

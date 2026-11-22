@@ -54,6 +54,9 @@ final class CalendarApiHandler
 
     private ?TaskDueDates $taskDueDates = null;
 
+    /** WHIT-1334 (SL.8): each service's inventory item, kept in step after a save. */
+    private ?\Whity\Core\Calendar\ServiceItems $serviceItems = null;
+
     private const MAX_RANGE_DAYS = 62;
     /** Year asks for a whole year; a leap year and a clock change fit. */
     private const MAX_COUNT_DAYS = 367;
@@ -163,6 +166,7 @@ final class CalendarApiHandler
                 'weekend_days' => SettingsRegistry::CALENDAR_WEEKEND_DAYS,
                 'instant_booking' => SettingsRegistry::CALENDAR_INSTANT_BOOKING,
                 'multi_service_booking' => SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING,
+                'walkins_enabled' => SettingsRegistry::CALENDAR_WALKINS_ENABLED,
             ];
             $writes = [];
             foreach ($map as $field => $key) {
@@ -360,7 +364,7 @@ final class CalendarApiHandler
 
     public function createService(Request $request): Response
     {
-        return $this->run($request, 'services', function (int $tenantId) use ($request): Response {
+        return $this->run($request, 'services', function (int $tenantId, int $actor) use ($request): Response {
             $body = JsonBody::parsed($request);
             $values = $this->serviceValues($tenantId, $body, null);
             $id = $this->services->insert($tenantId, $values);
@@ -368,6 +372,7 @@ final class CalendarApiHandler
             foreach ($values['staff_profile_ids'] as $profileId) {
                 $this->calendar->ensureStaff($tenantId, $profileId);
             }
+            $this->syncItem($tenantId, $id, $actor);
 
             return Response::json(['data' => $this->services->find($tenantId, $id)], 201);
         });
@@ -376,7 +381,7 @@ final class CalendarApiHandler
     /** @param array<string, string> $params */
     public function updateService(Request $request, array $params): Response
     {
-        return $this->run($request, 'services', function (int $tenantId) use ($request, $params): Response {
+        return $this->run($request, 'services', function (int $tenantId, int $actor) use ($request, $params): Response {
             $existing = $this->services->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Service');
             $values = $this->serviceValues($tenantId, JsonBody::parsed($request), $existing);
             $this->services->update($tenantId, $existing['id'], $values);
@@ -384,6 +389,7 @@ final class CalendarApiHandler
             foreach ($values['staff_profile_ids'] as $profileId) {
                 $this->calendar->ensureStaff($tenantId, $profileId);
             }
+            $this->syncItem($tenantId, $existing['id'], $actor);
 
             return Response::json(['data' => $this->services->find($tenantId, $existing['id'])]);
         });
@@ -642,6 +648,24 @@ final class CalendarApiHandler
     }
 
     /** ADR 0018: tasks due on the calendar, read from Taskaat. */
+    public function setServiceItems(\Whity\Core\Calendar\ServiceItems $serviceItems): void
+    {
+        $this->serviceItems = $serviceItems;
+    }
+
+    /** Write a saved service to its item; a failure is logged and never undoes the save. */
+    private function syncItem(int $tenantId, int $serviceId, int $actor): void
+    {
+        if ($this->serviceItems === null) {
+            return;
+        }
+        try {
+            $this->serviceItems->sync($tenantId, $serviceId, $actor > 0 ? $actor : null);
+        } catch (\Throwable $e) {
+            error_log('[CalendarApiHandler] service ' . $serviceId . ' item not kept in step: ' . $e->getMessage());
+        }
+    }
+
     public function setTaskDueDates(TaskDueDates $taskDueDates): void
     {
         $this->taskDueDates = $taskDueDates;

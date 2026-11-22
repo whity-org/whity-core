@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * One month of the books (SDK 1.132, WHIT-1318, register AC.7): `open` takes
+ * One month of the books (SDK 1.154, WHIT-1318, register AC.7): `open` takes
  * entries, `closed` and `locked` refuse them.
  */
 final class Period

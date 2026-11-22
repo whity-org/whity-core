@@ -751,7 +751,7 @@ final class EntryPointServiceWiringRealBootTest extends TestCase
             \Whity\Sdk\Inventory\Locations::class,
             \Whity\Sdk\Inventory\Stock::class,
             \Whity\Sdk\Inventory\Units::class,
-            // Accounting (SDK 1.132, WHIT-1318): a job that posts to the books reaches the same services.
+            // Accounting (SDK 1.154, WHIT-1318): a job that posts to the books reaches the same services.
             \Whity\Sdk\Accounting\Accounts::class,
             \Whity\Sdk\Accounting\Ledger::class,
             \Whity\Sdk\Accounting\Periods::class,

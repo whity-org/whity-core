@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * One account in the workspace's chart (SDK 1.132, WHIT-1318, register AC.8).
+ * One account in the workspace's chart (SDK 1.154, WHIT-1318, register AC.8).
  *
  * `type` is `asset`, `liability`, `equity`, `income` or `expense`. A heading
  * (`isGroup`) holds no lines. `role` names what the books use it for

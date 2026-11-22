@@ -108,6 +108,73 @@ export const GENERAL_SETTING_KEYS: readonly GeneralSettingKey[] = ['support_emai
 export const DISPLAY_SETTING_KEYS: readonly string[] = ['ui.hide_dates'];
 
 /**
+ * What the public check of a document's QR code tells a holder (#1036, #1730):
+ * how much it discloses, and at the `signed` level whether it names who signed.
+ * Per workspace, from the registry, like the company details below.
+ */
+export const DOCUMENT_CHECK_SETTING_KEYS: readonly string[] = [
+  'documents.qr_public_detail',
+  'documents.qr_public_signer_names',
+];
+
+/**
+ * The levels of `documents.qr_public_detail`, each in plain words: a short name
+ * for the choice and what that level adds, shown under it once chosen.
+ *
+ * @i18n-keys admin
+ *   settings.qrDetail.undated.label = Without a date
+ *   settings.qrDetail.undated.help = Says only that the document is genuine and who issued it, with no date.
+ *   settings.qrDetail.minimal.label = Basic
+ *   settings.qrDetail.minimal.help = Says that the document is genuine, who issued it and when.
+ *   settings.qrDetail.stage.label = With its stage
+ *   settings.qrDetail.stage.help = Also says where the document is now, and tells a withdrawn code from an unknown one.
+ *   settings.qrDetail.described.label = Described
+ *   settings.qrDetail.described.help = Also says what kind of document it is, its revision and how many pages it has.
+ *   settings.qrDetail.signed.label = Signed
+ *   settings.qrDetail.signed.help = Adds who signed as their roles, with dates, and warns when the signing record was changed.
+ */
+export function qrDetailLevelCopy(t: TranslateFn, level: string): { label: string; help: string } | null {
+  switch (level) {
+    case 'undated':
+      return {
+        label: t('settings.qrDetail.undated.label', 'Without a date'),
+        help: t('settings.qrDetail.undated.help', 'Says only that the document is genuine and who issued it, with no date.'),
+      };
+    case 'minimal':
+      return {
+        label: t('settings.qrDetail.minimal.label', 'Basic'),
+        help: t('settings.qrDetail.minimal.help', 'Says that the document is genuine, who issued it and when.'),
+      };
+    case 'stage':
+      return {
+        label: t('settings.qrDetail.stage.label', 'With its stage'),
+        help: t(
+          'settings.qrDetail.stage.help',
+          'Also says where the document is now, and tells a withdrawn code from an unknown one.'
+        ),
+      };
+    case 'described':
+      return {
+        label: t('settings.qrDetail.described.label', 'Described'),
+        help: t(
+          'settings.qrDetail.described.help',
+          'Also says what kind of document it is, its revision and how many pages it has.'
+        ),
+      };
+    case 'signed':
+      return {
+        label: t('settings.qrDetail.signed.label', 'Signed'),
+        help: t(
+          'settings.qrDetail.signed.help',
+          'Adds who signed as their roles, with dates, and warns when the signing record was changed.'
+        ),
+      };
+    default:
+      return null;
+  }
+}
+
+/**
  * The workspace's company details (WHIT-788): what its documents, letterheads
  * and invoices print. Plain text from the registry, so they need no bespoke
  * controls.
@@ -179,6 +246,20 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
       help: t(
         'settings.meta.ui.hide_dates.help',
         'Stop showing dates and times anywhere in the interface. Everything is still recorded — timestamps stay in the database, in the audit trail and in the API, and turning this off brings them all back. The public document-verification page is not affected; it has its own setting.'
+      ),
+    },
+    'documents.qr_public_detail': {
+      label: t('settings.meta.documents.qr_public_detail.label', 'What the check shows'),
+      help: t(
+        'settings.meta.documents.qr_public_detail.help',
+        'How much a person learns when they scan the code on one of your documents. Nobody needs to sign in to see it.'
+      ),
+    },
+    'documents.qr_public_signer_names': {
+      label: t('settings.meta.documents.qr_public_signer_names.label', 'Show the names of people who signed'),
+      help: t(
+        'settings.meta.documents.qr_public_signer_names.help',
+        'Off: the check says “Signed as Director”. On: it also says who that was.'
       ),
     },
     'maintenance.active': {

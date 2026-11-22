@@ -210,6 +210,8 @@ final class RoutingPresenter
             'sign_on_behalf_of' => isset($step['sign_on_behalf_of']) ? (string) $step['sign_on_behalf_of'] : null,
             // WHIT-921: the template a finalise step renders with; null elsewhere.
             'final_template_id' => isset($step['final_template_id']) ? (int) $step['final_template_id'] : null,
+            // #1729: the company stamp a `stamp` step asks for; null elsewhere.
+            'stamp_id' => isset($step['stamp_id']) ? (int) $step['stamp_id'] : null,
             // WHIT-1016: the values a person letting it through here fills in.
             'inputs' => RouteStepInputs::decode($step['inputs'] ?? null),
             // WHIT-1018: the subject's people questions whose answers are left out here.

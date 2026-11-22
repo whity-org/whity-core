@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Whity\Sdk\Context;
 
 use Whity\Sdk\Audit\AuditTrail;
+use Whity\Sdk\Database\WorkspaceTables;
 use Whity\Sdk\Documents\PluginDocumentStore;
 use Whity\Sdk\Http\Outbound\AddressPolicy;
 use Whity\Sdk\Http\Outbound\HttpClient;
 use Whity\Sdk\Jobs\JobQueue;
+use Whity\Sdk\Log\ErrorReporter;
+use Whity\Sdk\Log\PluginLog;
 use Whity\Sdk\Notification\Notifier;
 use Whity\Sdk\Secrets\WorkspaceSecrets;
 use Whity\Sdk\Settings\PluginSettingsStore;
@@ -27,6 +30,10 @@ use Whity\Sdk\Theme\WorkspaceTheme;
  * A service this host doesn't provide throws {@see ServiceUnavailable} when
  * asked for, never earlier, so a plugin that uses only settings loads on a host
  * without, say, documents.
+ *
+ * A plugin that declares its services
+ * ({@see \Whity\Sdk\Contribute\PluginCapabilitiesInterface}, SDK 1.151) gets
+ * only those: any other throws {@see ServiceNotDeclared}.
  */
 interface PluginScope
 {
@@ -78,8 +85,28 @@ interface PluginScope
 
     /**
      * Core's books in this workspace: the chart, the ledger, the months and the
-     * reports (SDK 1.132, WHIT-1318). Its `ledger()` and `accounts()` are bound
+     * reports (SDK 1.154, WHIT-1318). Its `ledger()` and `accounts()` are bound
      * to this plugin, the only way a plugin writes the books.
      */
     public function accounting(): AccountingScope;
+
+    /**
+     * This plugin's own tables in this workspace (SDK 1.151, #1693): every call
+     * is held to the workspace by the host. Needs the plugin to declare
+     * {@see Service::DATABASE} and its tables with
+     * {@see \Whity\Sdk\Contribute\PluginCapabilitiesInterface}.
+     */
+    public function database(): WorkspaceTables;
+
+    /**
+     * This plugin's log, scrubbed like core's error tracker and tagged with the
+     * plugin and workspace (SDK 1.152, #1686). Needs no declaration.
+     */
+    public function log(): PluginLog;
+
+    /**
+     * Report a caught error to the deployment's error tracker, scrubbed and
+     * tagged (SDK 1.152, #1686). Needs no declaration.
+     */
+    public function errors(): ErrorReporter;
 }

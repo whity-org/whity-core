@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * A journal entry to post, in the workspace the call runs in (SDK 1.132,
+ * A journal entry to post, in the workspace the call runs in (SDK 1.154,
  * WHIT-1318).
  *
  * `journal` is a journal's code (`GEN`, or one your plugin added). `date` is

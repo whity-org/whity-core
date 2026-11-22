@@ -55,6 +55,10 @@ final class HostPluginServices
                 new \Whity\Core\Theme\ThemeLibrary($themes, $pluginThemes),
             ));
         }
+        // SDK 1.152 (#1686): where a plugin's $ctx->log() writes, scrubbed.
+        if ($logger !== null) {
+            \Whity\register_service(LoggerInterface::class, $logger);
+        }
         // SDK 1.124 (D3): the one entry point; it reaches the factories below
         // and the ones each entry point binds itself, at call time.
         \Whity\register_service(\Whity\Sdk\PluginContext::class, new HostPluginContext());
@@ -64,6 +68,12 @@ final class HostPluginServices
         \Whity\register_service(\Whity\Sdk\Audit\PluginAudit::class, new \Whity\Core\Audit\HostPluginAudit($pdo, $audit));
         \Whity\register_service(\Whity\Sdk\Jobs\PluginJobQueue::class, new \Whity\Core\Queue\HostPluginJobQueue(new \Whity\Core\Queue\JobRepository($pdo)));
         $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
+        // #2209: plugin notices may go by email, through the same gate as
+        // core's (the workspace's email switch, then the person's choice).
+        $notificationSettings = new \Whity\Core\Settings\SettingsService(
+            new \Whity\Core\Settings\GlobalSettingsRepository($pdo),
+            new \Whity\Core\Settings\TenantSettingsRepository($pdo),
+        );
         \Whity\register_service(PluginNotifier::class, new HostPluginNotifier(
             $pdo,
             new NotificationDispatcher(
@@ -74,6 +84,7 @@ final class HostPluginServices
                 $logger,
                 new NotificationPreferenceResolver(new NotificationPreferenceRepository($pdo)),
                 $audit,
+                new \Whity\Core\Mail\EmailGate($notificationSettings, $pdo),
             ),
             $logger,
             null,
@@ -83,6 +94,11 @@ final class HostPluginServices
                 $activation->resetRequest();
 
                 return !$activation->isOn($plugin, $tenantId);
+            },
+            static function (int $tenantId) use ($notificationSettings): string {
+                $locale = (string) ($notificationSettings->effective($tenantId)[\Whity\Core\Settings\SettingsRegistry::LOCALE] ?? 'en');
+
+                return str_starts_with(strtolower(trim($locale)), 'ar') ? 'ar' : 'en';
             },
         ));
     }

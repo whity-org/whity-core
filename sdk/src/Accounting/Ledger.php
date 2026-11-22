@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Accounting;
 
 /**
- * Core's double-entry ledger, for a plugin (SDK 1.132, WHIT-1318, register
+ * Core's double-entry ledger, for a plugin (SDK 1.154, WHIT-1318, register
  * AC.3, AC.4).
  *
  * Reach it through the plugin context: `$ctx->accounting()->ledger()`. That

@@ -7,7 +7,7 @@ namespace Whity\Sdk\Accounting;
 use Whity\Sdk\SdkException;
 
 /**
- * Something a caller of an accounting host service can fix (SDK 1.132,
+ * Something a caller of an accounting host service can fix (SDK 1.154,
  * WHIT-1318): an entry that doesn't balance, a date in a closed month, an
  * account that isn't in the chart, a person without the permission, a call
  * made outside any workspace.

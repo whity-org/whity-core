@@ -12,7 +12,7 @@ use Whity\Sdk\Accounting\AccountingRejected;
 use Whity\Sdk\PluginInterface;
 
 /**
- * What the accounting host services share (SDK 1.132, WHIT-1318), the same
+ * What the accounting host services share (SDK 1.154, WHIT-1318), the same
  * rules as inventory's:
  *
  * - THE WORKSPACE is the one the call runs in ({@see TenantContext}), read on

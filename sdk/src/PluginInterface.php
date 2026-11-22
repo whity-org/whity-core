@@ -131,8 +131,14 @@ interface PluginInterface
      *   the permission you ask for. No requiredPermission or requiredRole, and not
      *   public: a declaration with either is NOT registered. Service routes
      *   are never MCP tools.
+     * - 'rateLimit' (int, optional, SDK 1.152, #1686): the most calls a minute
+     *   one person may make to this route (one address, when nobody is signed
+     *   in), from 1 to 10000. Past it the host answers 429 with `Retry-After`
+     *   before your handler runs. It is on top of the deployment's own limits,
+     *   never instead of them. Any other value is ignored with a logged warning
+     *   and the route registers without its own limit.
      *
-     * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>, service?: string}>
+     * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>, service?: string, rateLimit?: int}>
      */
     public function getRoutes(): array;
 

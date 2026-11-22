@@ -25,7 +25,7 @@ use Whity\Database\Database;
 final class GuidelineStartersRealEngineTest extends TestCase
 {
     private const DOCUMENTS = [
-        'editor.quote', 'editor.invoice', 'editor.credit-note', 'editor.receipt',
+        'editor.quote', 'editor.invoice', 'editor.credit-note', 'editor.receipt', 'editor.receipt-80mm',
         'editor.statement', 'editor.payment-reminder', 'editor.delivery-note',
         'editor.payslip', 'editor.employment-letter', 'editor.leave-approval',
         'editor.report', 'editor.letter', 'editor.purchase-order',

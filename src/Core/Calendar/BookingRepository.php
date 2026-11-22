@@ -32,6 +32,8 @@ final class BookingRepository
     public const SOURCE_STAFF = 'staff';
     public const SOURCE_PUBLIC = 'public';
     public const SOURCE_AGENT = 'agent';
+    /** WHIT-1334: handed over from the walk-in queue at the front desk. */
+    public const SOURCE_WALKIN = 'walkin';
 
     private const COLUMNS = 'b.id, b.service_id, b.profile_id, b.customer_profile_id, b.customer_name, b.customer_email,
         b.customer_phone, b.customer_note, b.starts_at, b.ends_at, b.blocks_from, b.blocks_until, b.status,

@@ -55,6 +55,20 @@ final class ItemService
     ) {
     }
 
+    /** @var (\Closure(int, int, ?int): void)|null puts an item's stock without a batch into the batch OPENING */
+    private ?\Closure $openingLots = null;
+
+    /**
+     * How turning batches on for an item with stock moves that stock into
+     * the batch OPENING (WHIT-1235, design 31 §3.5); the ledger provides it.
+     *
+     * @param \Closure(int, int, ?int): void $openingLots (tenant, item, actor)
+     */
+    public function useOpeningLots(\Closure $openingLots): void
+    {
+        $this->openingLots = $openingLots;
+    }
+
     // ── reading ──────────────────────────────────────────────────────────
 
     /**
@@ -189,8 +203,9 @@ final class ItemService
         return (int) $this->db->run(
             'SELECT COUNT(*) FROM inv_variants v
                JOIN inv_items i ON i.tenant_id = v.tenant_id AND i.id = v.item_id
-              WHERE v.tenant_id = :tenant_id AND v.archived_at IS NULL AND i.archived_at IS NULL',
-            [':tenant_id' => $tenantId]
+              WHERE v.tenant_id = :tenant_id AND v.archived_at IS NULL AND i.archived_at IS NULL AND i.kind <> :service',
+            // WHIT-1334 (SL.8, Q2): service items are not counted.
+            [':tenant_id' => $tenantId, ':service' => 'service']
         )->fetchColumn();
     }
 
@@ -223,7 +238,7 @@ final class ItemService
                 [
                     ':tenant_id' => $tenantId, ':name' => $names['name'], ':names' => $names['names'],
                     ':description' => $common['description'] ?? '', ':kind' => $kind, ':category_id' => $common['category_id'] ?? null,
-                    ':unit_id' => (int) $unit['id'], ':tracking' => 'none', ':expires' => DbBool::of($common['expires'] ?? false),
+                    ':unit_id' => (int) $unit['id'], ':tracking' => $common['tracking'] ?? 'none', ':expires' => DbBool::of($common['expires'] ?? false),
                     ':shelf_life_days' => $common['shelf_life_days'] ?? null, ':sale_price' => $common['sale_price_minor'] ?? null,
                     ':purchase_price' => $common['purchase_price_minor'] ?? null, ':currency' => $common['currency'] ?? null,
                     ':tax_category' => $common['tax_category'] ?? '', ':owner_plugin' => $ownerPlugin, ':actor' => $actor,
@@ -294,10 +309,14 @@ final class ItemService
         }
         $variants = array_key_exists('variants', $input) ? $this->variantInputs($input, $itemId) : null;
 
-        $this->db->transaction(function () use ($tenantId, $itemId, $sets, $params, $variants, $input, $hasPermission): void {
+        $this->db->transaction(function () use ($tenantId, $itemId, $sets, $params, $variants, $input, $hasPermission, $row, $actor): void {
             if ($sets !== []) {
                 $sets[] = 'updated_at = CURRENT_TIMESTAMP';
                 $this->db->run('UPDATE inv_items SET ' . implode(', ', $sets) . ' WHERE tenant_id = :tenant_id AND id = :id', $params);
+            }
+            if (($params[':tracking'] ?? null) === 'lot' && $row['tracking'] === 'none' && $this->hasStock($tenantId, $itemId)) {
+                // Stock already here goes into the batch OPENING, now that the item keeps batches.
+                ($this->openingLots ?? throw new \LogicException('Opening lots need the ledger'))($tenantId, $itemId, $actor);
             }
             if ($variants !== null) {
                 $this->syncVariants($tenantId, $itemId, $variants);
@@ -526,8 +545,14 @@ final class ItemService
             }
             $out['category_id'] = $category;
         }
-        if (array_key_exists('tracking', $input) && $input['tracking'] !== 'none') {
-            throw InventoryRejectedException::field('tracking', 'Batches and serial numbers arrive in a later update; tracking must be "none" for now');
+        if (array_key_exists('tracking', $input)) {
+            if (!in_array($input['tracking'], ['none', 'lot', 'serial'], true)) {
+                throw InventoryRejectedException::field('tracking', 'tracking is none, lot (batches) or serial (serial numbers)');
+            }
+            if ($row !== null && $input['tracking'] !== $row['tracking']) {
+                $this->trackingCanChange($tenantId, $row, (string) $input['tracking']);
+            }
+            $out['tracking'] = $input['tracking'];
         }
         if (array_key_exists('expires', $input)) {
             $out['expires'] = self::flag($input['expires'], 'expires');
@@ -773,6 +798,38 @@ final class ItemService
         }
     }
 
+
+    /**
+     * Batches can be turned on while an item has stock (that stock goes into
+     * the batch OPENING); serial numbers, and turning batches off, only while
+     * it has none.
+     *
+     * @param array<string, mixed> $row
+     */
+    private function trackingCanChange(int $tenantId, array $row, string $to): void
+    {
+        if (!$this->hasStock($tenantId, (int) $row['id'])) {
+            return;
+        }
+        if ($row['tracking'] === 'none' && $to === 'lot' && $this->openingLots !== null) {
+            return;
+        }
+        $message = match (true) {
+            $to === 'serial' => $row['name'] . ' has stock, so serial numbers can\'t be turned on: each piece would need its own. Bring its stock to 0 first.',
+            $to === 'none' => $row['name'] . ' has stock in batches, so batches can\'t be turned off. Bring its stock to 0 first.',
+            default => $row['name'] . ' has stock, so this can\'t change now. Bring its stock to 0 first.',
+        };
+        throw new InventoryRejectedException($message, 409, ['field' => 'tracking']);
+    }
+
+    private function hasStock(int $tenantId, int $itemId): bool
+    {
+        return $this->db->one(
+            'SELECT 1 AS hit FROM inv_levels l JOIN inv_variants v ON v.tenant_id = l.tenant_id AND v.id = l.variant_id
+              WHERE l.tenant_id = :tenant_id AND v.item_id = :item_id AND l.on_hand <> 0 LIMIT 1',
+            [':tenant_id' => $tenantId, ':item_id' => $itemId]
+        ) !== null;
+    }
 
     private function hasMoves(int $tenantId, int $itemId): bool
     {

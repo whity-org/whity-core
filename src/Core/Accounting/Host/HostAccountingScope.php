@@ -13,7 +13,7 @@ use Whity\Sdk\Context\ServiceUnavailable;
 use Whity\Sdk\PluginInterface;
 
 /**
- * `$ctx->accounting()` for one plugin (SDK 1.132, WHIT-1318). Periods and
+ * `$ctx->accounting()` for one plugin (SDK 1.154, WHIT-1318). Periods and
  * reports are the container's host services; `ledger()` and `accounts()` are
  * the container's copies bound to this plugin, so its entries and accounts
  * carry this plugin's name. Nothing is kept per request: the services read

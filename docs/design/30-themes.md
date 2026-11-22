@@ -114,6 +114,10 @@ A theme sets **choices**. The engine turns choices into **tokens**. Tokens are w
 | `tajawal` | Tajawal | Tajawal | Light, modern |
 | `almarai` | Almarai | Almarai | Bold, retail |
 | `kufi` | Noto Sans | Noto Kufi Arabic | Formal Arabic headings |
+| `rubik` | Rubik | Rubik | Soft geometric; retail and salons (TH.20) |
+| `alexandria` | Alexandria | Alexandria | Contemporary Kufi; tech and schools (TH.20) |
+| `naskh` | Noto Serif | Noto Naskh Arabic | Classic, for law and print-like brands; product screens only, print keeps E.46 (TH.20) |
+| `ibm-kufi` | IBM Plex Sans | IBM Plex Sans Arabic for text, Noto Kufi Arabic for headings | Formal with a corporate body (TH.20) |
 
 Mono stays Geist Mono (3.4). New fonts join through a PR that adds the files, licence and metrics, never through a theme.
 
@@ -322,6 +326,24 @@ This section first described Whity Studio, a paid tool for making themes. On 21 
 - **Versions.** History, compare and restore, and publishing a new version to the workspaces using it.
 - **Publish to the store** as the theme's publisher.
 
+**The live editor (built, WHIT-1225).**
+- **Where:** Settings › Branding › Theme, from "Make a theme" or a theme's Edit / Make a copy (`/admin/settings/branding/theme?from=<id>`), for people with `settings:write` in a workspace.
+- **What it edits:** every choice in section 3 is a closed control: the main, second and accent colours, colour style, greys and contrast; colours set by hand per role and mode; text and heading fonts, text size, title weight and emphasis; corners, morph and each family's corners (14.2); spacing; shadows, shadow strength and animations. "Default" removes the choice, so the theme follows Whity's.
+- **The preview:** every change goes to `POST /api/v1/themes/preview`, the same compiler and guard rails a theme gets in use. The answer carries every colour for both modes, so light and dark sit side by side whatever mode the person is in. It also says what the guard rails change and lists every problem at once.
+- **How the preview is drawn:** the draft's values go only onto two `[data-theme-preview]` elements (`previewThemeCss`), which recompute the shape values as `:root` does. They hold the real components: tabs, a card with a field, check box, switch and buttons, a table, badges and the chart colours. The page around them keeps the workspace's theme.
+- **Saving:** saving goes through the theme import with `source: "editor"`. The workspace's own theme (imported or made here) gets its next patch version; any other is saved as a copy under `workspace.<name>` with no author. "Save and use" also sets `branding_theme`.
+- **Not in this step:** generating seeds from the logo or a colour wheel, presets to start from, the wider preview across key screens, the contrast report, versions, export of resolved tokens, and publishing. Export and the side-by-side diff came next (below, 14.7); publishing waits on the store.
+
+**Publishing (built, WHIT-1225, decided 21 Nov 2026).** Publish in the editor saves the theme, then makes its store package and hands it to the publisher to download and submit to the store.
+- **The package:** `ThemePackage`, through `POST /api/v1/themes/package` (`settings:write`). It is a theme-only plugin zip that ships the theme through the plugin theme interface (SDK 1.125), the way the workspace templates ship theirs.
+- **What's inside:** one top-level folder named after the plugin, the plugin installer's own format. The plugin class only returns the theme file next to it.
+- **Nothing typed becomes code:** the class and namespace come from the theme id (letters and digits). The name and version are read from the theme file at runtime.
+- **Checksums:** `manifest.json` lists every file's sha256. Fixed file times mean the same theme always makes the same bytes, and the zip's sha256 is shown with the download.
+- **Whity's own themes** can't be packaged: make a copy to publish your own.
+- **Direct upload** comes once the Whity ID store module has a publisher API. The store is moving into Whity ID, so the old store plugin gets no upload.
+
+**Next: versions (decided 21 Nov 2026, not built).** Each save of a workspace's own theme keeps its earlier versions: a history list, compare any two with the side-by-side diff, and restore one as a new version. Workspaces using a theme move to a new version when it is published to them. This needs a table for the versions, a migration whose number is asked for at PR time.
+
 The editor is built last in the order of TH.24, after the per-component overrides. Whether the wider Studio product (records and pages, R.2) moves the same way is for the business-model register, not this spec.
 
 ## 12. Build plan (phase 2, after approval)
@@ -412,6 +434,15 @@ A theme may give one of a fixed list of component families its own preset:
   - a container and its edge-to-edge children (tables in cards, tabs in a page header) get matching inner radii automatically.
 - Out of scope: per-screen or per-component pixels, and avatars or status dots (they stay round, §3.3).
 
+**Built (WHIT-1225):**
+- The theme file's `shape.components` takes any of the seven families, each a preset name (`schemas/theme/v1.json`). The compiler writes that preset's whole radius set at the theme's density as `--wy-<family>-radius-*`, with its own corner (`--wy-<family>-corner-shape`) and morph, which follows the theme's `shape.morph` or the family preset's default. A family on the theme's own preset writes nothing.
+- Every radius utility reads a `--shape-*` property, set on `:root` and again on each family's elements, found by their `data-slot` (`SHAPE_FAMILIES` in `src/design/tokens/generate-tokens.js`): buttons (`button`, `icon-button`); fields (inputs, text areas, select triggers, search, tags, bilingual, phone, code, date and time triggers); chips (badges, actor chips, the phone filter chips); cards; dialogs (dialog, alert, sheet, popover, select, menus, menu bar, command palette); tables (the table container, the data table); navigation (sidebar nav, tab lists, toggle groups, view toggle, menu bar).
+- Anything inside a family's element without a family of its own follows it, so a container and its children match; edge-to-edge children are clipped by the container (§3.3).
+- Round is already the largest preset and its pill is half the control's own height, so `fields` and `cards` can't pass Round's cap.
+- The free shape tweak (TH.15) changes the theme's preset; families the theme set keep their own.
+- The CI check (`shape-clip-check.mjs`) runs two mixes as well as every preset: Round with every family on another preset, and Square with every family rounded.
+- Making them in the editor is the last step of TH.24.
+
 ### 14.3 Density
 
 - **Per area:** `density` stays one value, plus optional `density.tables` and `density.forms`. A clinic can have roomy forms and compact appointment tables.
@@ -473,11 +504,47 @@ All free in core (TH.16, TH.25).
 | --- | --- |
 | Export the theme in use as a Whity theme file (JSON v1) | the picker (built, #2343) |
 | Import a Whity theme file | the picker |
-| Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343); the editor adds a side-by-side diff |
-| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the editor (11), the last step of TH.24 |
-| Export resolved tokens as CSS, JSON, Tailwind or Flutter | the editor (11) |
+| Re-import a newer version of an imported theme | says what changed in words before replacing (built, #2343), with the two versions side by side (built, WHIT-1225, see below) |
+| Import from shadcn CSS variables, a Tailwind v4 `@theme`, or Material Theme Builder JSON | the picker's "Import from another tool" (built, WHIT-1225, see below); the editor will open the result to change it |
+| Export resolved tokens as CSS, JSON, Tailwind or Flutter | the picker's Export menu for the theme in use; `POST /themes/tokens` for a draft (built, WHIT-1225, see below) |
 | Share a theme with another workspace you own | export and import now; a "Use in…" button with the editor |
 | Store packages (signed, hashed, through Whity ID, per the store move) | install free; a publisher may sell a theme through Whity Pay (TH.13); publishing from the editor |
+
+**The importers (built, WHIT-1225, TH.25).** `POST /api/v1/themes/convert` (`settings:write`) turns what another tool made into a Whity theme file and saves nothing. The picker shows the result with a preview and what was kept in words, then adds it through the same checked import as a theme file (TH.16), so a newer version still says what it changes (`ThemeImporter`).
+
+- **shadcn:** the `:root` and `.dark` blocks, including inside `@layer base`. Colours can be oklch, hsl, shadcn's bare `h s% l%`, rgb or hex; alpha is dropped.
+- **Tailwind v4:** the `@theme` block's `--color-*`, following `var()` within the block.
+- **Material Theme Builder JSON:** `coreColors` become the seeds, and the light and dark schemes become the roles Whity has. Surface containers lowest to highest become surfaces 1 to 5, and the scheme is Tonal.
+- **Colours:** the main colour (`primary`) becomes the seed. Each colour whose role Whity has becomes a colour set by hand in its mode. Status colours stay Whity's (TH.7), and the guard rails still apply when the theme is used, so the result says how many colours they will change.
+- **Radius and font:** `--radius` (shadcn's `rounded-lg`) becomes the nearest preset: 0 is Square, up to 6px Crisp, up to 11px Whity, up to 15px Soft, and larger Round. A font becomes its pair only when Whity has it with an Arabic face; otherwise the theme keeps Noto Sans and says so.
+- **Id and name:** the id is `imported.<name>`, and the name is plain text.
+- **Not yet built:** the side-by-side diff and publishing, the rest of section 11.
+
+
+**Token export (built, WHIT-1225, TH.25).** `ThemeTokenExport` writes a theme's resolved tokens for another tool. Resolved means what the workspace sees:
+- every colour for light and dark after the guard rails;
+- every radius and size with Whity's defaults (`ThemeCompiler::resolvedShape`), and each family's own corners (14.2);
+- the fonts by family name, never Whity's CSS variables (`ThemeFonts::families`);
+- the motion timings.
+
+The formats:
+- **CSS:** custom properties on `:root`, with dark under `.dark`.
+- **JSON:** the W3C Design Tokens Community Group format. A spring easing has no token type, so it is a described `linear()`.
+- **Tailwind:** a Tailwind v4 file with `@theme` (`--color-*`, `--radius-*` including `--radius-<family>-*`, heights as `--spacing-*`, fonts and easing) and dark under `.dark` in `@layer base`.
+- **Flutter:** a Dart class in the shape of whity_tokens' `AppTokens` (`lightColors`, `darkColors`, `radius`, `size`, fonts), plus Material 3 `lightScheme` and `darkScheme` and a `theme(Brightness)`.
+
+Where it is available:
+- `GET /api/v1/themes/export/tokens?format=` exports the theme in use with everything the workspace set. The picker's Export menu offers it beside the theme file.
+- `POST /api/v1/themes/tokens` exports a draft.
+- The theme name goes into a comment as plain text, and nothing in it can close the comment.
+
+**The side-by-side diff (built, WHIT-1225, TH.25).** `POST /api/v1/themes/compare` (`settings:read`) takes two theme files. It returns what the newer one changes, field by field as a re-import says it (TH.16, including each family's corners), and both compiled with every colour in both modes. Nothing is saved.
+
+`ThemeDiff` shows the changes in words and the two drawn with the same components as the editor's preview, light or dark. Each sits on its own `[data-theme-preview="before-…"]` or `"after-…"` element, so the page's own theme is untouched. It appears in two places:
+- when a newer version of an imported theme is added: "Now (1.0.0)" next to "New (1.1.0)";
+- in the editor's Compare, which shows the draft next to where it started.
+
+The picker and the editor now show the server's reason when a theme is refused, read from the error's `details`.
 
 ### 14.8 Free and paid
 

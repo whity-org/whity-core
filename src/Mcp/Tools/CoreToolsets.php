@@ -109,6 +109,11 @@ final class CoreToolsets
             'titleAr'     => 'المحاسبة',
             'description' => 'The chart of accounts, journal entries, periods and the trial balance.',
         ],
+        'core.sales' => [
+            'title'       => 'Sales',
+            'titleAr'     => 'المبيعات',
+            'description' => 'Quotes to customers: drafting, sending, the customer\'s answer and turning them into orders or invoices.',
+        ],
         'core.convening' => [
             'title'       => 'Meetings',
             'titleAr'     => 'الاجتماعات',
@@ -182,6 +187,7 @@ final class CoreToolsets
         'contacts'                 => 'core.contacts',
         'custom-fields'            => 'core.contacts',
         'inventory'                => 'core.inventory',
+        'sales'                    => 'core.sales',
         'accounting'               => 'core.accounting',
         'chat'                     => 'core.chat',
         'taxonomy'                 => 'core.taxonomy',

@@ -14,10 +14,18 @@
  * the theme (saved in `branding_theme_overrides` next to the colour
  * overrides), export the theme in use as a file, and see in words what a
  * newer version of an imported theme changes before it replaces the old one.
+ *
+ * Free since TH.25: turn a theme made with shadcn, Tailwind or Material Theme
+ * Builder into a theme file (POST /themes/convert), see it and what was kept
+ * in words, then add it through the same checked import.
+ *
+ * Free since TH.25: export the theme in use for another tool, as CSS
+ * variables, design tokens JSON, Tailwind CSS or a Flutter file.
  */
 
 import { useRef, useState } from 'react';
-import { IconCheck, IconDownload, IconTrash, IconUpload } from '@tabler/icons-react';
+import Link from 'next/link';
+import { IconCheck, IconChevronDown, IconDownload, IconFileImport, IconPalette, IconTrash, IconUpload } from '@tabler/icons-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,15 +39,30 @@ import {
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
+import { Input } from '@whity/ui/input';
+import { Textarea } from '@whity/ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@whity/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@whity/ui/select';
 import { useLanguageCode, useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
+import { ThemeDiff } from '@/components/theme-diff';
 import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { useRefreshBranding } from '@/lib/branding-context';
 import { useThemeMode } from '@/lib/theme-mode-context';
 
 type Swatch = Record<string, string>;
+
+/** The workspace's own themes: imported from a file or made in the editor (TH.25). */
+const OWN = ['import', 'editor'];
 
 export interface ThemeListItem {
   id: string;
@@ -57,13 +80,28 @@ export interface ThemeListItem {
 }
 
 export type TweakKey = 'shape' | 'density' | 'font';
+
+export interface FontOption {
+  id: string;
+  name: string;
+  /** The pair's CSS stacks (TH.20), checked before they reach a style attribute. */
+  stack?: string;
+  heading_stack?: string;
+}
+
+const FONT_STACK = /^var\(--font-[a-z0-9-]+\)(?:, var\(--font-[a-z0-9-]+\))*, ui-sans-serif, system-ui, sans-serif$/;
+
+/** A font stack for a style attribute, only when it has the one shape the engine writes. */
+export function fontStack(value: string | undefined): string | undefined {
+  return value !== undefined && FONT_STACK.test(value) ? value : undefined;
+}
 export type Tweaks = Record<TweakKey, string | null>;
 
 interface ThemeList {
   current: string;
   themes: ThemeListItem[];
   tweaks?: Tweaks;
-  options?: { shape: string[]; density: string[]; font: { id: string; name: string }[] };
+  options?: { shape: string[]; density: string[]; font: FontOption[] };
   colour_overrides?: { light?: Record<string, string>; dark?: Record<string, string> };
 }
 
@@ -75,6 +113,8 @@ export interface ThemeChange {
 
 interface PendingImport {
   theme: unknown;
+  /** The installed version's file, for the side-by-side diff (TH.25); null when it can't be read. */
+  installed: unknown;
   name: string;
   from: string;
   to: string;
@@ -94,8 +134,41 @@ export function overridesValue(colour: ThemeList['colour_overrides'], tweaks: Tw
   return Object.keys(out).length === 0 ? '' : JSON.stringify(out);
 }
 
+export const TOKEN_FORMATS = ['css', 'json', 'tailwind', 'flutter'] as const;
+export type TokenFormat = (typeof TOKEN_FORMATS)[number];
+
+/** An export format in plain words (TH.25). */
+export function tokenFormatName(format: TokenFormat, t: TranslateFn): string {
+  return {
+    css: t('theme.export.css', 'CSS variables'),
+    json: t('theme.export.json', 'Design tokens (JSON)'),
+    tailwind: t('theme.export.tailwind', 'Tailwind CSS'),
+    flutter: t('theme.export.flutter', 'Flutter'),
+  }[format];
+}
+
+/** Hands the person a file to keep, made here from text. */
+export function saveFile(content: string, filename: string, type: string): void {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * The reason the server gave in words, from an error's `details` (Response::error),
+ * so the person reads what to fix rather than a general message.
+ */
+export function errorReason(error: unknown, key: string): string | undefined {
+  const details = (error as { details?: Record<string, unknown> } | undefined)?.details;
+  const reason = details?.[key];
+  return typeof reason === 'string' && reason.trim() !== '' ? reason : undefined;
+}
+
 /** A tweak's option in plain words. */
-function optionName(key: TweakKey, value: string, t: TranslateFn, fonts: { id: string; name: string }[]): string {
+function optionName(key: TweakKey, value: string, t: TranslateFn, fonts: FontOption[]): string {
   if (key === 'font') return fonts.find((f) => f.id === value)?.name ?? value;
   if (key === 'shape') {
     const names: Record<string, string> = {
@@ -135,6 +208,13 @@ export function changeText(change: ThemeChange, t: TranslateFn): string {
     'type.titleWeight': t('theme.change.titleWeight', 'Title weight'),
     'shape.preset': t('theme.change.shape', 'Corners'),
     'shape.morph': t('theme.change.morph', 'Shape change on press'),
+    'shape.components.buttons': t('theme.change.corners.buttons', 'Corners of buttons'),
+    'shape.components.fields': t('theme.change.corners.fields', 'Corners of fields'),
+    'shape.components.chips': t('theme.change.corners.chips', 'Corners of chips and tags'),
+    'shape.components.cards': t('theme.change.corners.cards', 'Corners of cards'),
+    'shape.components.dialogs': t('theme.change.corners.dialogs', 'Corners of dialogs and menus'),
+    'shape.components.tables': t('theme.change.corners.tables', 'Corners of tables'),
+    'shape.components.navigation': t('theme.change.corners.navigation', 'Corners of tabs and the sidebar'),
     density: t('theme.change.density', 'Spacing'),
     'elevation.style': t('theme.change.elevation', 'Shadows and borders'),
     'elevation.float': t('theme.change.float', 'Shadow strength'),
@@ -166,7 +246,7 @@ function pick(text: Record<string, string> | null | undefined, lang: string | nu
 }
 
 /** A colour role in plain words: token names are not for people (A.3). */
-function roleName(role: string, t: TranslateFn): string {
+export function roleName(role: string, t: TranslateFn): string {
   if (role === 'primary' || role === 'brand') return t('theme.role.primary', 'The main colour');
   if (role.endsWith('-foreground') && (role.startsWith('primary') || role.startsWith('brand'))) return t('theme.role.buttonText', 'Button text');
   if (role === 'ring') return t('theme.role.ring', 'The focus outline');
@@ -201,10 +281,10 @@ export function adjustmentText(change: string, rawRole: string, t: TranslateFn):
   }
 }
 
-function ThemePreview({ item, dark }: { item: ThemeListItem; dark: boolean }) {
-  const s = (dark ? item.preview.dark : item.preview.light) ?? {};
-  const radius = safe(item.preview.radius, PX, '10px');
-  const cardRadius = safe(item.preview.card_radius, PX, '12px');
+function ThemePreview({ preview, dark }: { preview: ThemeListItem['preview']; dark: boolean }) {
+  const s = (dark ? preview.dark : preview.light) ?? {};
+  const radius = safe(preview.radius, PX, '10px');
+  const cardRadius = safe(preview.card_radius, PX, '12px');
   return (
     <div
       aria-hidden="true"
@@ -232,6 +312,212 @@ function ThemePreview({ item, dark }: { item: ThemeListItem; dark: boolean }) {
         </div>
       </div>
     </div>
+  );
+}
+
+type ConvertFormat = 'shadcn' | 'tailwind' | 'material';
+
+interface Converted {
+  theme: unknown;
+  notes: string[];
+  preview: ThemeListItem['preview'];
+}
+
+/**
+ * TH.25: paste or choose what another tool made, see it as a Whity theme and
+ * what was kept, then add it. Nothing is saved until "Add this theme".
+ */
+function ConvertThemeDialog({
+  open,
+  onOpenChange,
+  onAdd,
+  dark,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onAdd: (theme: unknown) => Promise<boolean>;
+  dark: boolean;
+}) {
+  const t = useTranslation('admin');
+  const [format, setFormat] = useState<ConvertFormat>('shadcn');
+  const [name, setName] = useState('');
+  const [source, setSource] = useState('');
+  const [problem, setProblem] = useState<string | null>(null);
+  const [result, setResult] = useState<Converted | null>(null);
+  const [working, setWorking] = useState(false);
+  const file = useRef<HTMLInputElement>(null);
+
+  const formats: Record<ConvertFormat, { label: string; hint: string; accept: string }> = {
+    shadcn: {
+      label: t('theme.convert.shadcn', 'shadcn'),
+      hint: t('theme.convert.shadcnHint', 'Paste the :root and .dark blocks from your globals.css.'),
+      accept: '.css,text/css,text/plain',
+    },
+    tailwind: {
+      label: t('theme.convert.tailwind', 'Tailwind CSS'),
+      hint: t('theme.convert.tailwindHint', 'Paste the @theme block with your --color-* variables.'),
+      accept: '.css,text/css,text/plain',
+    },
+    material: {
+      label: t('theme.convert.material', 'Material Theme Builder'),
+      hint: t('theme.convert.materialHint', 'Export as JSON from Material Theme Builder and paste or choose the file.'),
+      accept: '.json,application/json',
+    },
+  };
+
+  const reset = () => {
+    setResult(null);
+    setProblem(null);
+  };
+
+  const convert = async () => {
+    setWorking(true);
+    setProblem(null);
+    try {
+      const { data: body, error: convertError } = await api.POST('/api/v1/themes/convert', {
+        body: { format, source, name },
+      });
+      if (convertError || !body) {
+        const reason = errorReason(convertError, 'source');
+        setProblem(reason ?? t('theme.convert.failed', 'This could not be turned into a theme. Check what you pasted and try again.'));
+        return;
+      }
+      setResult({ theme: body.data.theme, notes: body.data.notes, preview: body.data.preview as ThemeListItem['preview'] });
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const add = async () => {
+    if (!result) return;
+    setWorking(true);
+    try {
+      if (await onAdd(result.theme)) {
+        onOpenChange(false);
+        setSource('');
+        setName('');
+        reset();
+      }
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) reset();
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent data-testid="theme-convert" className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>{t('theme.convert.title', 'Import from another tool')}</DialogTitle>
+          <DialogDescription>
+            {t('theme.convert.description', 'Bring the colours, corners and font of a theme made with shadcn, Tailwind or Material Theme Builder.')}
+          </DialogDescription>
+        </DialogHeader>
+        {result === null ? (
+          <div className="grid gap-4">
+            <div className="grid gap-1.5">
+              <span className="text-sm font-medium" id="theme-convert-format">
+                {t('theme.convert.format', 'Made with')}
+              </span>
+              <Select value={format} onValueChange={(value) => setFormat(value as ConvertFormat)}>
+                <SelectTrigger aria-labelledby="theme-convert-format" data-testid="theme-convert-format">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(formats) as ConvertFormat[]).map((key) => (
+                    <SelectItem key={key} value={key}>
+                      {formats[key].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Input
+              label={t('theme.convert.name', 'Name')}
+              value={name}
+              maxLength={80}
+              placeholder={t('theme.convert.namePlaceholder', 'Imported from {tool}', { tool: formats[format].label })}
+              onChange={(event) => setName(event.target.value)}
+            />
+            <div className="grid gap-1.5">
+              <label className="text-sm font-medium" htmlFor="theme-convert-source">
+                {format === 'material' ? t('theme.convert.json', 'JSON') : t('theme.convert.css', 'CSS')}
+              </label>
+              <Textarea
+                id="theme-convert-source"
+                value={source}
+                rows={8}
+                dir="ltr"
+                spellCheck={false}
+                className="font-mono"
+                aria-describedby="theme-convert-hint"
+                aria-invalid={problem !== null || undefined}
+                onChange={(event) => {
+                  setSource(event.target.value);
+                  setProblem(null);
+                }}
+              />
+              <p id="theme-convert-hint" className="text-xs text-muted-foreground">
+                {formats[format].hint}
+              </p>
+              {problem && (
+                <p role="alert" className="text-xs text-destructive">
+                  {problem}
+                </p>
+              )}
+            </div>
+            <input
+              ref={file}
+              type="file"
+              accept={formats[format].accept}
+              className="sr-only"
+              aria-label={t('theme.convert.file', 'Choose a file')}
+              onChange={(event) => {
+                const chosen = event.target.files?.[0];
+                if (chosen) void chosen.text().then((text) => setSource(text));
+                event.target.value = '';
+              }}
+            />
+          </div>
+        ) : (
+          <div className="grid gap-3" data-testid="theme-convert-result">
+            <ThemePreview preview={result.preview} dark={dark} />
+            <ul className="grid list-disc gap-1 ps-5 text-sm">
+              {result.notes.map((note) => (
+                <li key={note}>{note}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <DialogFooter>
+          {result === null ? (
+            <>
+              <Button variant="outline" disabled={working} onClick={() => file.current?.click()}>
+                <IconUpload aria-hidden="true" />
+                {t('theme.convert.file', 'Choose a file')}
+              </Button>
+              <Button disabled={working || source.trim() === ''} onClick={() => void convert()}>
+                {t('theme.convert.go', 'Make the theme')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="outline" disabled={working} onClick={reset}>
+                {t('theme.convert.back', 'Back')}
+              </Button>
+              <Button disabled={working} onClick={() => void add()}>
+                {t('theme.convert.add', 'Add this theme')}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -274,18 +560,13 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
     }
   };
 
-  const exportTheme = async () => {
+  /** TH.25: the theme in use as resolved tokens for another tool. */
+  const exportTokens = async (format: TokenFormat) => {
     setBusy('export');
     try {
-      const { data: body, error: exportError } = await api.GET('/api/v1/themes/export');
+      const { data: body, error: exportError } = await api.GET('/api/v1/themes/export/tokens', { params: { query: { format } } });
       if (exportError || !body) throw new Error('export');
-      const { theme, filename } = body.data;
-      const url = URL.createObjectURL(new Blob([`${JSON.stringify(theme, null, 2)}\n`], { type: 'application/json' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(url);
+      saveFile(body.data.content, body.data.filename, body.data.media_type);
     } catch {
       addToast(t('theme.export.failed', 'The theme could not be exported. Try again.'), 'error');
     } finally {
@@ -293,17 +574,62 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
     }
   };
 
-  const saveImport = async (theme: unknown) => {
+  const exportTheme = async () => {
+    setBusy('export');
+    try {
+      const { data: body, error: exportError } = await api.GET('/api/v1/themes/export');
+      if (exportError || !body) throw new Error('export');
+      const { theme, filename } = body.data;
+      saveFile(`${JSON.stringify(theme, null, 2)}\n`, filename, 'application/json');
+    } catch {
+      addToast(t('theme.export.failed', 'The theme could not be exported. Try again.'), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const saveImport = async (theme: unknown): Promise<boolean> => {
     const { error: importError } = await api.POST('/api/v1/themes', { body: theme as never });
     if (importError) {
-      const reason = (importError as { errors?: { theme?: string } }).errors?.theme;
+      const reason = errorReason(importError, 'theme');
       addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
-      return;
+      return false;
     }
     refetch();
     void refreshAppBranding();
     addToast(t('theme.import.done', 'Theme added. Choose it below to use it.'), 'success');
+    return true;
   };
+
+  /** Checks first, and says what a newer version changes before it replaces the old one (TH.16). */
+  const importTheme = async (theme: unknown): Promise<boolean> => {
+    const { data: checked, error: checkError } = await api.POST('/api/v1/themes', {
+      params: { query: { check: '1' } },
+      body: theme as never,
+    });
+    if (checkError || !checked) {
+      const reason = errorReason(checkError, 'theme');
+      addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
+      return false;
+    }
+    const info = checked.data;
+    const changes = info.changes ?? [];
+    if (info.installed_version && changes.length > 0) {
+      const existing = (data?.themes ?? []).find((item) => item.id === info.id);
+      const { data: installed } = await api.GET('/api/v1/themes/{themeId}', { params: { path: { themeId: info.id } } });
+      setPending({
+        theme,
+        installed: installed?.data.theme ?? null,
+        name: (existing && pick(existing.name, lang)) || info.id,
+        from: info.installed_version,
+        to: info.version,
+        changes,
+      });
+      return true;
+    }
+    return saveImport(theme);
+  };
+  const [converting, setConverting] = useState(false);
 
   const apply = async (id: string) => {
     setBusy(id);
@@ -335,30 +661,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
         addToast(t('theme.import.notJson', 'This file isn’t a theme file.'), 'error');
         return;
       }
-      // TH.16: check first, and say what a newer version changes before it replaces the old one.
-      const { data: checked, error: checkError } = await api.POST('/api/v1/themes', {
-        params: { query: { check: '1' } },
-        body: theme as never,
-      });
-      if (checkError || !checked) {
-        const reason = (checkError as { errors?: { theme?: string } } | undefined)?.errors?.theme;
-        addToast(reason ?? t('theme.import.failed', 'This theme file can’t be used.'), 'error');
-        return;
-      }
-      const info = checked.data;
-      const changes = info.changes ?? [];
-      if (info.installed_version && changes.length > 0) {
-        const existing = (data?.themes ?? []).find((item) => item.id === info.id);
-        setPending({
-          theme,
-          name: (existing && pick(existing.name, lang)) || info.id,
-          from: info.installed_version,
-          to: info.version,
-          changes,
-        });
-        return;
-      }
-      await saveImport(theme);
+      await importTheme(theme);
     } finally {
       setBusy(null);
       if (fileInput.current) fileInput.current.value = '';
@@ -402,10 +705,25 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
           </CardDescription>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" disabled={busy !== null || !data} onClick={() => void exportTheme()}>
-            <IconDownload aria-hidden="true" />
-            {t('theme.export', 'Export theme')}
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" disabled={busy !== null || !data}>
+                <IconDownload aria-hidden="true" />
+                {t('theme.export', 'Export theme')}
+                <IconChevronDown aria-hidden="true" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => void exportTheme()}>{t('theme.export.file', 'Theme file, for Whity')}</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>{t('theme.export.forOther', 'For another tool')}</DropdownMenuLabel>
+              {TOKEN_FORMATS.map((format) => (
+                <DropdownMenuItem key={format} onSelect={() => void exportTokens(format)}>
+                  {tokenFormatName(format, t)}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
         {canWrite && scope === 'tenant' && (
           <>
             <input
@@ -423,6 +741,17 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
               <IconUpload aria-hidden="true" />
               {t('theme.import', 'Add a theme file')}
             </Button>
+            <Button variant="outline" disabled={busy !== null} onClick={() => setConverting(true)}>
+              <IconFileImport aria-hidden="true" />
+              {t('theme.convert.open', 'Import from another tool')}
+            </Button>
+            <ConvertThemeDialog open={converting} onOpenChange={setConverting} onAdd={importTheme} dark={resolved === 'dark'} />
+            <Button variant="outline" asChild>
+              <Link href="/admin/settings/branding/theme">
+                <IconPalette aria-hidden="true" />
+                {t('theme.make', 'Make a theme')}
+              </Link>
+            </Button>
           </>
         )}
         </div>
@@ -437,7 +766,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
             const name = pick(item.name, lang) || item.id;
             return (
               <li key={item.id} className="grid gap-3 rounded-card border bg-card p-3" data-theme-id={item.id}>
-                <ThemePreview item={item} dark={resolved === 'dark'} />
+                <ThemePreview preview={item.preview} dark={resolved === 'dark'} />
                 <div className="grid gap-1">
                   <div className="flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold">{name}</span>
@@ -467,6 +796,9 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                   {item.source === 'import' && (
                     <p className="text-xs text-muted-foreground">{t('theme.imported', 'Added by this workspace')}</p>
                   )}
+                  {item.source === 'editor' && (
+                    <p className="text-xs text-muted-foreground">{t('theme.made', 'Made in this workspace')}</p>
+                  )}
                 </div>
                 {canWrite && (
                   <div className="flex flex-wrap gap-2">
@@ -475,7 +807,16 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                         {t('theme.use', 'Use this theme')}
                       </Button>
                     )}
-                    {item.source === 'import' && scope === 'tenant' && (
+                    {scope === 'tenant' && (
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={`/admin/settings/branding/theme?from=${encodeURIComponent(item.id)}`}>
+                          {OWN.includes(item.source)
+                            ? t('theme.edit', 'Edit')
+                            : t('theme.copy', 'Make a copy')}
+                        </Link>
+                      </Button>
+                    )}
+                    {OWN.includes(item.source) && scope === 'tenant' && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -517,7 +858,9 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                         <SelectItem value="theme">{t('theme.tweak.fromTheme', 'As the theme sets it')}</SelectItem>
                         {values.map((value) => (
                           <SelectItem key={value} value={value}>
-                            {optionName(key, value, t, options.font)}
+                            <span style={key === 'font' ? { fontFamily: fontStack(options.font.find((f) => f.id === value)?.stack) } : undefined}>
+                              {optionName(key, value, t, options.font)}
+                            </span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -526,6 +869,29 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
                 );
               })}
             </div>
+            {(() => {
+              // TH.20: the chosen pair, one English and one Arabic sentence at title and body size.
+              const font = options.font.find((f) => f.id === tweaks.font);
+              const body = fontStack(font?.stack);
+              if (!font || !body) return null;
+              const heading = fontStack(font.heading_stack) ?? body;
+              return (
+                <div className="grid gap-2 rounded-control bg-muted p-3" data-testid="theme-font-preview">
+                  <p className="text-lg font-semibold" style={{ fontFamily: heading }} lang="en" dir="ltr">
+                    Example Bakery opens at 8:00 on Sunday.
+                  </p>
+                  <p className="text-sm" style={{ fontFamily: body }} lang="en" dir="ltr">
+                    Book a table, order a cake, or ask Ahmad Khalil at the front desk.
+                  </p>
+                  <p className="text-lg font-semibold" style={{ fontFamily: heading }} lang="ar" dir="rtl">
+                    يفتح مخبز المثال الساعة 8:00 يوم الأحد.
+                  </p>
+                  <p className="text-sm" style={{ fontFamily: body }} lang="ar" dir="rtl">
+                    احجز طاولة، أو اطلب كعكة، أو اسأل أحمد خليل في مكتب الاستقبال.
+                  </p>
+                </div>
+              );
+            })()}
           </div>
         )}
         {current && (current.adjustments ?? []).length > 0 && (
@@ -543,7 +909,7 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
         </p>
       </CardContent>
       <AlertDialog open={pending !== null} onOpenChange={(open) => !open && setPending(null)}>
-        <AlertDialogContent data-testid="theme-import-changes">
+        <AlertDialogContent data-testid="theme-import-changes" className={pending?.installed ? 'sm:max-w-3xl' : undefined}>
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t('theme.update.title', 'Update {name} from {from} to {to}?', {
@@ -554,11 +920,22 @@ export function ThemePicker({ scope, canWrite }: ThemePickerProps) {
             </AlertDialogTitle>
             <AlertDialogDescription>{t('theme.update.description', 'The new version changes:')}</AlertDialogDescription>
           </AlertDialogHeader>
-          <ul className="grid gap-1 text-sm">
-            {(pending?.changes ?? []).map((change) => (
-              <li key={change.field}>{changeText(change, t)}</li>
-            ))}
-          </ul>
+          {pending?.installed ? (
+            // TH.25: the two versions side by side, with what changes in words.
+            <ThemeDiff
+              before={pending.installed}
+              after={pending.theme}
+              beforeLabel={t('theme.diff.installed', 'Now ({version})', { version: pending.from })}
+              afterLabel={t('theme.diff.newer', 'New ({version})', { version: pending.to })}
+              describe={changeText}
+            />
+          ) : (
+            <ul className="grid gap-1 text-sm">
+              {(pending?.changes ?? []).map((change) => (
+                <li key={change.field}>{changeText(change, t)}</li>
+              ))}
+            </ul>
+          )}
           <AlertDialogFooter>
             <AlertDialogCancel>{t('theme.update.keep', 'Keep the old version')}</AlertDialogCancel>
             <AlertDialogAction

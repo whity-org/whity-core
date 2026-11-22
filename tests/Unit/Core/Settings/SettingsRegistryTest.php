@@ -100,6 +100,8 @@ final class SettingsRegistryTest extends TestCase
              'documents.qr_enabled', 'documents.qr_public_detail',
              // WHIT-920: whether applicants see who reviewed their form.
              'forms.show_reviewer_names',
+             // #1730: whether the public check names who signed. Off.
+             'documents.qr_public_signer_names',
              // #999: how many people a USER GROUP preview SHOWS beside its
              // (always exact) count. Tenant-overridable — see the governance
              // test below for why this one is not operator-only.
@@ -136,6 +138,7 @@ final class SettingsRegistryTest extends TestCase
              'calendar.weekend_days',
              'calendar.instant_booking',
              'calendar.multi_service_booking',
+             'calendar.walkins_enabled',
              'app.installable',
              'website.plans',
              'website.contact_workspace',
@@ -147,7 +150,13 @@ final class SettingsRegistryTest extends TestCase
              'inventory.approve_adjustments_above', 'inventory.approve_counts_above', 'inventory.adjustment_route_template_id',
              'inventory.count_route_template_id', 'inventory.transfers_one_step',
              // WHIT-1234: purchasing.
-             'inventory.purchase_route_template_id', 'inventory.over_receipt_percent'],
+             'inventory.purchase_route_template_id', 'inventory.over_receipt_percent',
+             // WHIT-1235: batches and expiry.
+             'inventory.fefo', 'inventory.expiry_warning_days',
+             // WHIT-1321: quotes.
+             'sales.quote_valid_days', 'sales.quote_route_template_id',
+             // WHIT-1323: the trading emails' switches.
+             'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder'],
             SettingsRegistry::keys()
         );
     }
@@ -263,7 +272,7 @@ final class SettingsRegistryTest extends TestCase
         // quieter level must not change what an existing tenant discloses.
         self::assertNull(SettingsRegistry::validate('documents.qr_public_detail', 'undated'));
         self::assertSame(
-            ['undated', 'minimal', 'stage', 'described'],
+            ['undated', 'minimal', 'stage', 'described', 'signed'],
             SettingsRegistry::optionsFor('documents.qr_public_detail')
         );
         // 18: 16 on develop (#1014's quorum was the sixteenth) plus these two.
@@ -318,7 +327,9 @@ final class SettingsRegistryTest extends TestCase
         // 55 since WHIT-1173: calendar.multi_service_booking.
         // 57 since WHIT-1225: branding_theme and branding_theme_overrides,
         // each workspace's own theme (TH.1).
-        self::assertCount(57, SettingsRegistry::tenantTextKeys());
+        // 58 since WHIT-1334: calendar.walkins_enabled.
+        // 59 since #1730: documents.qr_public_signer_names.
+        self::assertCount(59, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -495,7 +506,12 @@ final class SettingsRegistryTest extends TestCase
         // 144 since WHIT-1234: purchase route and over-receipt.
         // 145 since WHIT-1308: plugins.store_allow_unsigned.
         // 146 since #2206: billing.local_runs_enabled.
-        self::assertCount(146, $describe);
+        // 148 since WHIT-1321: sales.quote_valid_days and sales.quote_route_template_id.
+        // 152 since WHIT-1323: sales.email_quote, _invoice, _receipt and _reminder.
+        // 154 since WHIT-1235: inventory.fefo and inventory.expiry_warning_days.
+        // 155 since WHIT-1334: calendar.walkins_enabled.
+        // 156 since #1730: documents.qr_public_signer_names.
+        self::assertCount(156, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

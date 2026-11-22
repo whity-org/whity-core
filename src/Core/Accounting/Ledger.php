@@ -29,7 +29,7 @@ use Whity\Sdk\Hooks\HookVetoException;
  * `accounting.entry.posted.async` fires after commit.
  *
  * ENTRIES ARE NEVER CHANGED. Triggers refuse UPDATE and DELETE on
- * `acc_entries` and `acc_lines` (migration 328). {@see self::reverse()} posts
+ * `acc_entries` and `acc_lines` (migration 345). {@see self::reverse()} posts
  * the mirror, linked with `reverses_entry_id`; an entry is reversed once.
  *
  * BALANCED BY CONSTRUCTION. An entry has 2 to 500 lines, each a debit or a

@@ -257,6 +257,10 @@ final class CorePermissions
     // (PermissionRegistry). Migration 172 grants it to every role that held
     // DOCUMENTS_PUBLISH.
     public const DOCUMENTS_THEMES = 'documents:themes';
+    // Company stamps (#1729, migration 336): create, change and archive the
+    // workspace's stamps and choose who holds them. Applying a stamp needs no
+    // permission: being a holder reached by a `stamp` step is the authority.
+    public const DOCUMENTS_STAMPS = 'documents:stamps';
     // Comments and suggestions in the editor (editor M5; E.10, E.29). Suggest
     // is the permission of people who read but don't edit, and of agents,
     // whose every change is a suggestion (E.4); accepting and rejecting stays
@@ -486,6 +490,14 @@ final class CorePermissions
     public const CALENDAR_READ = 'calendar:read';
     public const CALENDAR_WRITE = 'calendar:write';
     public const CALENDAR_MANAGE = 'calendar:manage';
+    // WHIT-1334 (design section 35, SL.4): the walk-in queue at the front
+    // desk. Granted by capability to roles holding calendar:write and
+    // contacts:write, since the booking and the contact are made as that person.
+    public const CALENDAR_FRONT_DESK = 'calendar:front_desk';
+    // WHIT-1334 (design section 35 §4, SL.7): set staff commission rates and
+    // see what each earned. Granted by capability to roles holding
+    // calendar:manage.
+    public const CALENDAR_COMMISSION = 'calendar:commission';
 
     // CONTACTS (migrations 261 and 262, design 3.3 A8). Customers and
     // suppliers as one record, with tags and spreadsheet import. Read and
@@ -510,7 +522,12 @@ final class CorePermissions
     // roles that run the workspace.
     public const PURCHASES_READ = 'purchases:read';
     public const PURCHASES_WRITE = 'purchases:write';
-    // ACCOUNTING (migrations 327-329, WHIT-1318, design section 32). Read goes
+    // Quotes to customers (WHIT-1321, design section 34, QT.8): the roles that
+    // run the workspace. Turning one into an order or an invoice also needs
+    // the target's own permission; approving is the route, never a permission.
+    public const QUOTES_READ = 'quotes:read';
+    public const QUOTES_WRITE = 'quotes:write';
+    // ACCOUNTING (migrations 344-346, WHIT-1318, design section 32). Read goes
     // to the roles that run the workspace; posting, closing and the settings
     // to the roles holding settings:write, and to each workspace's Accountant
     // role. Approving is never a permission (AC.24).
@@ -596,6 +613,7 @@ final class CorePermissions
             self::DOCUMENTS_ISSUE,
             self::DOCUMENTS_WITHDRAW,
             self::DOCUMENTS_THEMES,
+            self::DOCUMENTS_STAMPS,
             self::DOCUMENTS_SUGGEST,
             self::DOCUMENTS_COMMENT,
             self::DOCUMENTS_READ_ALL,
@@ -634,6 +652,8 @@ final class CorePermissions
             self::CALENDAR_READ,
             self::CALENDAR_WRITE,
             self::CALENDAR_MANAGE,
+            self::CALENDAR_FRONT_DESK,
+            self::CALENDAR_COMMISSION,
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,
@@ -645,6 +665,8 @@ final class CorePermissions
             self::STOCK_TRANSFER,
             self::PURCHASES_READ,
             self::PURCHASES_WRITE,
+            self::QUOTES_READ,
+            self::QUOTES_WRITE,
             self::ACCOUNTING_READ,
             self::ACCOUNTING_POST,
             self::ACCOUNTING_CLOSE,
