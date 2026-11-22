@@ -190,6 +190,27 @@ jobs:
       - name: Install Node dependencies
         run: npm ci
 
+      # whity-org/whity-core#2386: the release notes list the web routes this
+      # release adds and removes, against the last release's web/routes.json.
+      # Written as a fragment so the next step folds it in with the rest. A
+      # previous release without the file (before 0.2.32) has nothing to
+      # compare with, so it is skipped.
+      - name: Write the added and removed web routes into the notes
+        run: |
+          PREV=$(git describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)
+          if [ -z "$PREV" ] || ! git cat-file -e "$PREV:web/routes.json" 2>/dev/null; then
+            echo "No web/routes.json in ${PREV:-any earlier release}; nothing to compare."
+            exit 0
+          fi
+          git show "$PREV:web/routes.json" > "$RUNNER_TEMP/routes-prev.json"
+          node web/scripts/route-manifest.mjs --diff "$RUNNER_TEMP/routes-prev.json" > "$RUNNER_TEMP/routes.md"
+          if [ -s "$RUNNER_TEMP/routes.md" ]; then
+            cp "$RUNNER_TEMP/routes.md" "changelog.d/routes-${{ steps.check.outputs.version }}.changed.md"
+            cat "$RUNNER_TEMP/routes.md"
+          else
+            echo "No web routes added or removed since $PREV."
+          fi
+
       - name: Fold changelog fragments into [Unreleased]
         # Each PR adds a file under changelog.d/ instead of editing the shared
         # [Unreleased] section, so parallel PRs stop conflicting (WHIT-791).

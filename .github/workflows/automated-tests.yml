@@ -791,6 +791,32 @@ jobs:
       - name: Changelog fragment guard
         run: php scripts/changelog-assemble.php --check
 
+  # whity-org/whity-core#2386: web/routes.json must describe web/app exactly,
+  # and every nav and settings id the server or the settings area declares
+  # must be in web/lib/routes/stable-ids.json (and none dropped silently).
+  # Runs on backend changes too, because the ids live in public/index.php and
+  # SettingsApiHandler.php. Node built-ins only: no install, a few seconds.
+  route-manifest:
+    name: Route manifest and stable ids
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Setup Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+
+      - name: Unit tests for the generator
+        run: node --test web/scripts/route-manifest.test.mjs
+
+      - name: web/routes.json is up to date and the ids are stable
+        run: node web/scripts/route-manifest.mjs --check
+
   # WHIT-1167: no AI attribution in commits, PR titles or PR descriptions.
   # Every PR and merge group, whatever paths it touches: a docs-only PR can
   # carry a co-author trailer as easily as a code one. v0.2.29 shipped seven.
@@ -2197,6 +2223,7 @@ jobs:
       - coverage
       - static-analysis
       - history-guards
+      - route-manifest
       - no-ai-attribution
       - sdk-coverage
       - i18n-catalogue
