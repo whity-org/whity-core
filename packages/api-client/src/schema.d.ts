@@ -18291,6 +18291,8 @@ export interface components {
             pdf_pending?: {
                 reason: string;
                 fix: string | null;
+                code: string;
+                route_id: number | null;
             };
             /** @description Who signed the current version, in what capacity and when. Electronic signatures with an audit trail. */
             signatures?: components["schemas"]["DocumentSignature"][];
