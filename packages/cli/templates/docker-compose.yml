@@ -13,6 +13,15 @@ x-app: &app
   image: ghcr.io/whity-org/whity-core:${WHITY_VERSION:?WHITY_VERSION must be set}
   restart: unless-stopped
   env_file: .env
+  # READINESS CO-26: the image starts as root only to hand its writable
+  # directories to www-data, then drops to www-data (docker/production/
+  # whity-entrypoint.sh). These five capabilities are all that start needs;
+  # every other one is dropped, and nothing can gain privileges afterwards.
+  # www-data binds :80 without a capability (Docker lets an unprivileged
+  # process bind low ports in its own network namespace).
+  cap_drop: [ALL]
+  cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+  security_opt: ["no-new-privileges:true"]
   environment: &app-env
     DB_HOST: postgres
     DB_PORT: 5432

@@ -2,3 +2,6 @@
 database/baseline/*.sql linguist-generated=true
 database/baseline/manifest.json linguist-generated=true
 web/routes.json linguist-generated=true
+
+# The image's entrypoint runs under /bin/sh in Linux: LF on every checkout.
+docker/production/whity-entrypoint.sh text eol=lf
