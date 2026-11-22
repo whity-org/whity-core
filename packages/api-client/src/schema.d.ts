@@ -6310,6 +6310,26 @@ export interface paths {
         patch: operations["patch_api_v1_identity_providers_id"];
         trace?: never;
     };
+    "/api/v1/imports/kinds": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What you may import here
+         * @description Every kind of import the signed-in person may use in this workspace (contacts, items, opening stock, supplier prices, and kinds added later), each with the base of its endpoints `path`, the names of its columns in English and Arabic, the columns that must be matched and the choices it asks. The endpoints of every kind have the same shape: upload, check, run, undo and skipped.csv under `path`. A kind needing a permission you lack is left out.
+         */
+        get: operations["get_api_v1_imports_kinds"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/instance/complete-setup": {
         parameters: {
             query?: never;
@@ -19565,6 +19585,87 @@ export interface components {
             scopes?: string;
             domain?: string | null;
             enabled?: boolean;
+        };
+        ImportKind: {
+            /** @description `contacts`, `inventory.items`, `inventory.opening_stock`, `inventory.supplier_prices`, … */
+            key: string;
+            label: {
+                en: string;
+                ar: string;
+            };
+            description: {
+                en: string;
+                ar: string;
+            };
+            /** @description The base of the endpoints of the kind, such as `/api/v1/inventory/imports/items`. */
+            path: string;
+            /** @description The list page it is opened from: `contacts` or `inventory`. */
+            area: string;
+            back: {
+                href: string;
+                label: {
+                    en: string;
+                    ar: string;
+                };
+            };
+            targets: {
+                key: string;
+                label: {
+                    en: string;
+                    ar: string;
+                };
+                hint: {
+                    en: string;
+                    ar: string;
+                } | null;
+            }[];
+            /** @description Targets the matching must include. */
+            required: string[];
+            options: {
+                /** @description The field it fills in the check request. */
+                key: string;
+                /** @enum {string} */
+                type: "select" | "text";
+                label: {
+                    en: string;
+                    ar: string;
+                };
+                hint: {
+                    en: string;
+                    ar: string;
+                } | null;
+                choices: {
+                    value: (string | number) | null;
+                    label: {
+                        en: string;
+                        ar: string;
+                    };
+                }[] | null;
+                default: (string | number) | null;
+                /** @description Required unless this target is matched; null when optional. */
+                required_unless: string | null;
+                /** @enum {string} */
+                value_type: "string" | "int";
+                placeholder: string | null;
+            }[];
+            words: {
+                title: {
+                    en: string;
+                    ar: string;
+                };
+                create: {
+                    en: string;
+                    ar: string;
+                };
+                update: {
+                    en: string;
+                    ar: string;
+                };
+                run: {
+                    en: string;
+                    ar: string;
+                };
+            };
         };
         /** @description A theme file (schemas/theme/v1.json): schemaVersion, id, version and name are required. Or {theme, source} with the file under theme. */
         ImportThemeRequest: {
@@ -58949,6 +59050,76 @@ export interface operations {
             };
             /** @description Validation failed */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_imports_kinds: {
+        parameters: {
+            query?: {
+                /** @description Only the kinds of one list page: `contacts` or `inventory`. */
+                area?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The kinds */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["ImportKind"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
