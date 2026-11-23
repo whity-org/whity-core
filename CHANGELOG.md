@@ -6,6 +6,234 @@ uses tag-based releases (see the `v*` tags in the repository).
 
 ## [Unreleased]
 
+## [0.2.32] - 2026-11-22
+
+### Added
+
+- **Every version of your theme, kept.** Each time you save, add or restore one of your workspace's themes, Branding keeps that version. Versions shows them newest first, with who saved each and when. You can put any of them beside the one in use, and restore one as a new version, so nothing is lost.
+- **Batches on screen, batch labels and GS1 scanning.**
+  - An item's form now says whether it keeps batches or serial numbers, whether it goes off, and how long it keeps.
+  - The item page lists its batches with their expiry and where each is; one past its date is red and one expiring soon is amber.
+  - Inventory has a Batches tab with what is expiring, soonest first, and an "Expiring soon" count.
+  - Receiving a purchase order asks for the batch code and expiry, or one serial number per piece.
+  - Changing stock by hand names the batch stock comes into, and can name the batch it comes out of.
+  - Batch labels print from the workspace's own label sheet, with a barcode that scans back to the item, its batch and its expiry.
+  - Scanning a GS1 barcode (GS1-128, DataMatrix or QR) finds the item by its GTIN and fills in the batch, expiry and count it carries (WHIT-1235).
+- **Accounting starts: the chart of accounts and a double-entry ledger that is never edited.** Opening accounting gives a workspace its books: a chart of accounts with plain names in English and Arabic and the accountant's codes beside them (the Jordan chart is the default), seven journals, and an Accountant role for a company's outside accountant. Journal entries are drafted, then posted; a posted entry is never changed, only reversed by its mirror, and each one is chained to the one before by a hash, so `whity-cli accounting:verify-chain` shows whether anything was edited behind the books' back. Months can be closed and reopened with a reason, and the trial balance and each account's statement read from monthly balances that `whity-cli accounting:rebuild-balances` can recompute. Everything is under `/api/accounting`, in the `core.accounting` MCP toolset (agents only propose), behind the new `accounting:read`, `accounting:post`, `accounting:close` and `accounting:settings` permissions, and in the plugin SDK as `$ctx->accounting()` (SDK 1.154). Invoices, bills, payments and the sales tax return follow in the next phases (WHIT-1318).
+- **Sales invoices and credit notes in the books.** A workspace drafts invoices for its customers from items or free lines; each line takes its sales tax from the item's tax category (the Jordan pack: 16%, zero-rated and exempt; reduced rates come once the accountant confirms them), with prices that include or exclude tax. The tax codes come with the books as defaults a workspace can rename, point at another account or archive; a new rate is a new code from the day it starts, never an edited one. Preparing and filing the sales tax return comes later, after the accountant's review. Issuing gives it the next number with no gaps (`INV-2026-0001`), freezes it and posts it to the books: the customer owes the total, sales and the sales tax collected are credited, and every line keeps its tax code and base for the sales tax return. When the workspace chooses an invoice route, an invoice is approved before it is issued. A credit note (`CRN-2026-0001`) credits all or part of an issued invoice and settles what it still owes. An accepted quote turns into a draft invoice, issued invoices feed the invoices-a-month meter, and an import can no longer be undone once the books mention one of its contacts. Everything is under `/api/accounting/invoices` and `/api/accounting/tax-codes`, in the `core.accounting` MCP toolset (agents only propose), behind the new `invoices:read` and `invoices:write` permissions (the Accountant role gets both), and in the plugin SDK as `$ctx->accounting()->invoices()` and `->taxes()`, with a `WorkspaceEInvoicing` point for reporting invoices to a tax authority (JoFotara comes as an integration plugin) (SDK 1.155, WHIT-1318).
+- **Payments received, cheques and what customers owe.** A workspace records money a customer paid, by cash, bank transfer, CliQ, card, cheque or Whity Pay; it posts at once (the bank, cash, cheques to collect or the payment provider against what the customer owes, a provider's fee to bank and payment fees) and settles the invoices named, turning them partly paid or paid, while anything left stays as the customer's credit to settle later. A cheque dated later waits on cheques to collect until it is deposited; one that bounces reverses its entries, reopens the invoices it paid and posts the bank's fee. Money moves between the workspace's own accounts as a transfer, such as a payment provider's payout to the bank. Aged receivables show what each customer owes by days past due with their credit beside it, and a customer's statement reads their account from the books with a running balance. Everything is under `/api/accounting/payments`, `/transfers`, `/reports/aged-receivables` and `/customers/{id}/statement`, in the `core.accounting` MCP toolset (agents only propose), behind the new `payments:read` and `payments:write` permissions (the Accountant role gets both), and in the plugin SDK as `$ctx->accounting()->payments()`, where Whity Pay records its payments and payouts (SDK 1.156, WHIT-1318).
+- **Supplier bills, payments to suppliers and salon commission in the books.** A workspace enters its suppliers' bills with their own invoice numbers, lines for costs or things bought, and the sales tax it can reclaim from each line's tax category; posting a bill numbers it (`BIL-2026-0001`), freezes it and books the costs and the tax to reclaim against what is owed to the supplier, after the workspace's bill approval route when one is chosen. Bills are not yet matched to stock receipts; that comes with stock in the books. A supplier credit (`SCR-2026-0001`) reverses all or part of a bill. Money paid to a supplier, by cash, transfer, CliQ, card or cheque, posts at once and settles the bills named; a cheque dated later waits on cheques we wrote until it clears. Aged payables and a supplier's statement show what is owed to whom. Closing a salon's commission period now books staff commission against commission to pay, one line per person, from two new accounts the chart gains. Everything is under `/api/accounting/bills`, `/payments-made`, `/reports/aged-payables` and `/suppliers/{id}/statement`, in the `core.accounting` MCP toolset (agents only propose), behind the new `bills:read` and `bills:write` permissions (the Accountant role gets both), and in the plugin SDK through `invoices()` with `kind => purchase` and `payments()->recordMade()` (SDK 1.157, WHIT-1318).
+- **Expense claims and petty cash.** A member of staff claims back money they spent for the workspace: each line is what they paid, tax included, with the photo of the receipt. The claim becomes a bill from them, through their own contact, so it books the costs and the tax to reclaim against what the workspace owes them, after the workspace's bill approval route when one is chosen, and it is paid back as a payment made. Petty cash gets its own account: money spent from it is recorded as a bill from Cash purchases, posted and paid at once from petty cash, so its costs and reclaimable tax reach the books, and it is topped up with a transfer from the bank. Everything is under `/api/accounting/expense-claims` and `/api/accounting/petty-cash`, in the `core.accounting` MCP toolset (agents only propose), with the new `expenses:submit` permission for filing your own claims; claims carry `claimantProfileId` in the plugin SDK and fire `accounting.expense.claimed` (SDK 1.158, WHIT-1318).
+- **Stock in the books, at a moving average cost.** Each item now keeps a moving average cost in the workspace's currency: stock coming in adds its cost (a receipt's price from the order, or the average when it has none, or the item's purchase price when there was none on hand), stock going out takes the average, and an undone stock change is worth exactly what it undid. Every stock change now posts to the books in the stock journal: received goods to stock against goods received, not yet billed; waste to stock lost and wasted; found stock to stock found; opening stock against opening balances; transfers between places post nothing. The first stock change (or `whity-cli accounting:stock-opening`) brings the stock that was already there into the books once, at its current cost. Stock in the books is on by default and can be turned off; off, stock works exactly as before, and turning it on again posts only the difference. A month closed in the books refuses stock changes dated in it, saying the month is closed in the books and who can reopen it, so stock and books share one lock date. Stock with no known cost posts nothing and waits in the Inbox for the people who set accounting up, until someone gives it a cost, which then posts it. A supplier's bill for goods already received can use goods received, not yet billed until bills are matched to receipts. Under `/api/accounting/stock`, in the `core.accounting` MCP toolset, and in the plugin SDK as the `WorkspaceAccountingExport` point, where an outside accounting system can take the stock instead (SDK 1.159, WHIT-1318).
+- **One import screen for everything you import.** Contacts, items with their variants, opening stock and supplier prices now share one screen, opened from Contacts, from Inventory › Import and from Settings › Import with a choice of what to import. Each kind describes itself through the new `GET /api/imports/kinds` (its columns in English and Arabic, which must be matched, and the choices it asks, such as the place for opening stock), so kinds added later appear on the screen without changing it.
+- **Security readiness for the pen test and ISO 27001.** `docs/security/READINESS.md` lists every gap against OWASP ASVS 4.0 Level 2 and ISO 27001:2022 Annex A.8 across whity-core, whity-id, whity-plugins and whity-builder, with severity, fix and estimate, the fix plan, and the policies and records the audit will ask for. The threat model is refreshed for Whity ID SSO, plugin signing and frames, MCP approvals, usage meters, chat and the public pages (WHIT-1335).
+- **Quotes have their screens and print.** Operations › Sales lists every quote with its customer, total and state. A new quote takes a customer, how long it is valid and its lines, either items or lines of your own words. A quote's page sends it (by email or as a link you copy), records the customer's answer, makes a new revision or link, withdraws it, and turns an accepted quote into what the workspace can make of it. Quotes print in English or Arabic from the workspace's own template, in its document theme; the copy that goes out carries a QR to accept or decline online (`POST /api/sales/quotes/{id}/print`, and `document_id` on send and new link).
+- **Customers accept a quote online.** The link in the quote email and the QR on the printed quote open a page in the workspace's brand, with no sign-in. It shows the quote's lines, totals, terms and how long it is valid. The customer accepts by typing their name, or declines with a reason if they want to give one. An answered, expired, withdrawn or replaced quote, a link that opens nothing, and too many tries each get plain words that say what to do next.
+- **The web app lists its routes.** `GET /web-build/routes.json` gives every
+  path the web image serves, with its area (sign-in, signed-in, editor or
+  public), the menu and settings ids it sits under, and the version that added
+  it. A product that runs Whity next to its own app on one origin can read
+  which paths are Whity's. Menu and settings ids are now promised to stay the
+  same across minor releases, and from the next release the notes list the
+  routes each release adds and removes (#2386).
+- **Hide pages you don't want.** An operator can remove menu items and
+  Settings pages from the whole installation by their stable ids, with the
+  `navigation.hidden_ids` setting (Settings › General › Pages) or the
+  `WHITY_HIDDEN_NAV_IDS` environment variable. A hidden page leaves the
+  sidebar, the phone menu, the command palette, the Settings area and its
+  search, and its address answers "not found". Permissions are unchanged
+  (#2386).
+- **Choose where people land.** The `navigation.home_path` setting
+  (Settings › General › Pages) or `WHITY_HOME_PATH` picks the page people
+  land on after signing in and the page every home link opens; it was
+  always the dashboard. The sidebar logo is now a link home. An optional
+  "back to your product" link (`navigation.back_to_product_url` and
+  `_label`, or `WHITY_BACK_TO_PRODUCT_URL` and `_LABEL`) sits at the top
+  of the sidebar and the phone's More page, for when Whity runs beside
+  another app (#2386).
+- **Run Whity beside another app on one origin.** A tested guide
+  (docs/wiki/Same-Origin-Setup.md) and example (`ops/same-origin/`: Caddyfile,
+  compose file, smoke test) send `/api`, `/mcp` and MCP discovery straight
+  to the backend, Whity's paths to the web app and everything else to your
+  app. The installed app's service worker now leaves other apps' pages
+  alone, and `WHITY_PWA_SCOPE` narrows it to a prefix (#2386).
+- **A compatibility promise for products built on Whity.** One page
+  (docs/wiki/Downstream-Compatibility.md) lists what stays the same across
+  minor releases: the route manifest format, menu and settings ids, the
+  variables and settings added for running beside another app, and the
+  theming keys. It says that removals are announced in the release notes,
+  and what an instance can theme today: name, logos, main colour, theme,
+  shape, density and a font pair from the built-in list (#2386).
+- **My workspaces and @handles decided (HD.1–HD.9, MW.1–MW.7).** The owner accepted every recommendation in section 36; owners will be able to delete their own workspaces after an export, a typed handle and a 14-day wait (WHIT-1354).
+- **Spec for My workspaces and @handles (section 36, proposed).** One personal page to manage every workspace you own or belong to (rename, handle, co-owners, hand over, leave, export, delete with a waiting period), and workspace slugs becoming @handles unique on each installation. Waiting for the owner's answers before any building (WHIT-1354).
+- **Workspace handles.** A workspace's address name is now its @handle, unique on the installation: Latin letters, numbers and dashes, 3 to 30 characters, never one of Whity's own page or system words. Only an owner changes it, once every 30 days, and the old handle keeps working for 90 days, so links already shared don't break. Arabic workspace names now get a suggested Latin handle instead of being refused. Operators can keep extra handles from use (Handles nobody may take), and `whity-cli handles:check` shows what the upgrade does to each workspace's handle before it runs. Plugins hear about a change through `tenant.handle_changed` (SDK 1.160) (WHIT-1363, design section 36).
+
+### Changed
+
+- **A release is one dispatch, tagged in about 25 minutes instead of 56.** **Release — prepare** now opens `release/X.Y.Z` straight to `main` with auto-merge armed (merge commit), which also freezes the release at the develop commit it was cut from; `release-promote.yml` and its develop → main PR are retired. `release.yml` no longer reruns PHPUnit, PHPStan, the plugin guards and the frontend suites when the release PR's own CI already passed them on the identical tree (`scripts/release-equivalence.sh`, which runs them whenever it cannot prove that), still runs the PostgreSQL migrate and seed check, builds the images with a registry layer cache and dependency layers ahead of the sources, scans them beside the smoke test instead of before it, and arms auto-merge on the back-merge PR. See docs/wiki/Package-Releases.md (WHIT-1340).
+
+### Fixed
+
+- **A plugin's permissions can be granted again.** Every permission a code
+  plugin declares is now added to the permissions list when the plugin loads,
+  including on the next start of an install already running, so a role can
+  hold it. Whity Pay's `whity_pay:manage` was missing, which hid its setup
+  screen from everyone. A plugin still cannot add a core permission, and
+  turning a plugin off leaves the rows roles may hold.
+- **The owner of an expired workspace can open it and pay, and anyone in one
+  can leave it.** Switching into or out of a workspace whose plan expired no
+  longer answers 402. Its owners are taken to
+  Billing, where the plan picker and checkout work; every other page and every
+  change stays refused until it is paid. People who can't pay see a plain page
+  that says the workspace is paused until an owner pays and names the owners
+  (WHIT-1362).
+- **The workspace switcher always says why a switch was refused**, in plain
+  words in English and Arabic, instead of failing silently (WHIT-1362).
+- **A document with no PDF says why, in English and Arabic, and "Try again"
+  works.** When a route's final document could not be made, its page says so
+  in plain words (the layout was refused, it is still being made, or it was not
+  made at issue), and "Try again" asks the route to make it again instead of
+  only reloading the page. The route page no longer blames "the template" for
+  a refused PDF (WHIT-1370).
+- **A form printout no longer fails because one part is taller than a page.**
+  A long answer, a long Yes / No checklist, a table row or a list that does not
+  fit on one page now continues on the next page under the question's
+  "continued" line, a table repeats its header row, and an image too tall for
+  a page is scaled to fit. Before, the whole PDF was refused and the document
+  had a verification code but no PDF. The Yes / No answer column also widens
+  for longer words such as "Yes · Attachment 12" instead of wrapping them onto
+  three lines (WHIT-1370).
+- **Confirming it's you by signing in again works for Whity ID accounts.** After
+  signing in again, the approval you were confirming (adding a co-owner, handing
+  over or removing an owner, accepting an offer, an agent's proposal, a password
+  or two-step reset) is open again, ready to approve. If the sign-in didn't
+  count, the dialog says why: not a new sign-in, or a different account. It no
+  longer says a code was wrong when there was no code. Accepting an offer while
+  another workspace is open now finds your new sign-in too. When signing in
+  again fails at the provider, you go back to the page you came from, not to
+  the sign-in page, and the server logs each outcome as an `[sso.reauth]` line
+  (WHIT-1371).
+- **Switching workspace refreshes the whole screen, and every other tab.**
+  After a switch the switcher, Billing, banners, menus, settings and the page
+  you are on show the new workspace straight away, with no reload; a page that
+  named one of the old workspace's records moves to its list. Other open tabs
+  follow by themselves, and so do signing out, signing in with another account
+  or workspace (including through Whity ID), a plan change, a finished payment,
+  becoming an owner and joining a workspace (WHIT-1374).
+- **The collapsed sidebar looks tidy.** In the 56px icon rail the browser's
+  scrollbar no longer takes a third of the width (the rail still scrolls by
+  wheel and keyboard, with a fade where there is more). Every icon is a 40px
+  target on one centred column with even gaps and a hairline between groups,
+  names itself in a tooltip (in Arabic too, on the page side), and the
+  workspace chip and your avatar line up with the icons (WHIT-1375).
+- **Chat: the buttons at the top show their names again.** The tooltips on the header buttons (search, pin, details, new chat, back and close) opened above the button and were cut off by the chat card. They now open below.
+- **A form keeps its own reading direction.** An English form inside the
+  Arabic interface now reads left to right (its questions, answers, options,
+  section headings, numbering and messages tied to a question), and an Arabic
+  form inside the English interface reads right to left. The page around it
+  keeps the interface's direction. This covers filling a form, its preview,
+  public form pages, a submission's answers on its route page and in
+  Responses. The language is the one actually shown, so English shown because
+  the Arabic is missing reads left to right.
+
+### Security
+
+- **The app image takes Debian's security updates when it is built.** The base image is rebuilt upstream for PHP releases, not Debian ones, so it still carried glibc 2.41-12+deb13u4 after deb13u5 fixed fifteen CVEs in it. The image now runs `apt-get upgrade` in its base stage, and the PHP pin moves to 8.4.28 (WHIT-1336).
+- **A plugin killed by the signed revocation list no longer runs at all.** The kill already turned it off at every request surface, but each worker still loaded the plugin's code and ran its constructor and anything it attached outside those surfaces. Now the web workers, the CLI and the queue worker leave a killed plugin out when they start, without loading its code, and a web worker that still holds one recycles itself within 30 seconds (WHIT-1338).
+- **The audit trail can't be changed and shows it if it was.** Deleting a workspace no longer deletes its audit history (migration 347). The database now refuses to update or delete audit rows (migration 348), and a hash chain seals every row: a job seals new rows every five minutes, and `whity-cli audit:verify` names the first row that was changed or removed. Self-hosted operators who cleared audit rows by hand can no longer do so (WHIT-1339).
+- **The client IP header is believed only from a trusted proxy.** With
+  `WHITY_TRUSTED_PROXIES` (addresses or ranges) or `WHITY_CLIENT_IP_SECRET`
+  (the web app signs the header) set, a caller who reaches the backend
+  directly can no longer pick its own IP to dodge rate limits or the sign-in
+  throttle; it is counted under its own address. Without either, nothing
+  changes (READINESS CE-4, TM-19; #2386).
+- **PHP errors no longer reach the browser.** The image sets `display_errors`
+  off, so a warning inside a request is logged instead of being printed into
+  the response with file paths (WHIT-1348, CE-20).
+- **A sign-in from a workspace's own provider stays in that workspace.** It can
+  no longer create workspaces or issue agent credentials for the person's
+  account (WHIT-1348, TM-9).
+- **An agent's tool call reaches only its own route.** Values are encoded into
+  the path, so `5/two-step-requirement` can't turn one tool into another
+  (WHIT-1348, TM-6).
+- **Adding someone to a one-to-one chat no longer shows them its history.** The
+  chat becomes a group and the newcomer reads from that point on (WHIT-1348,
+  TM-18).
+- **Public forms check for bots.** When the instance has a bot check set up,
+  the form page shows it beside the send button and the server asks for its
+  token; every form also has a hidden trap field (WHIT-1348, TM-20).
+- **Guessing the current password on the profile page is limited.** Wrong
+  guesses count against the same budget as the two-step proofs (WHIT-1348,
+  CE-6).
+- **Self-registration has its own limits:** 10 tries an hour per address and
+  3 per email (WHIT-1348, CE-8).
+- **A request without a client-IP header is counted as its peer address.** It
+  used to skip several per-IP limits (WHIT-1348, TM-19).
+- **Every settings change is on the audit trail,** with each key's old and new
+  value: sign-in policy, mail, plugins and the rest, for the instance and for
+  each workspace. The `whity-cli auth password-sign-in on|off` break-glass is
+  recorded too, as coming from the command line (WHIT-1349, CO-7).
+- **AI connections, sign-in providers and sessions are audited.** Making or
+  disconnecting an AI app (by its owner, an admin, or removing the agent),
+  adding, changing or removing a sign-in provider (never its secret), and
+  ending a session or every other session (WHIT-1349, CO-8).
+- **Your own password change, a new sign-in email and signing out are
+  audited,** not only written to the process log; the new address is named by
+  its domain only (WHIT-1349, CO-9).
+- **Logs on stderr are scrubbed.** The structured logger drops values under
+  secret-sounding keys and redacts emails, tokens and keys from every line; a
+  new `ScrubbedErrorLog` writer does the same for exception messages, and a CI
+  guard keeps bare `error_log()` calls in `src/` from growing (WHIT-1349, CO-1).
+- **In the System workspace, whoever may enable plugins may grant their
+  permissions.** Nobody holds a plugin's permission until it is granted, so
+  the "grant only what you hold" rule (#2236) made them impossible to give.
+  A System operator with `plugins:enable` may now put a plugin's own
+  permissions on a role; core permissions are still compared, and workspace
+  admins are unchanged.
+- **New passwords are at least 12 characters.** Setting or changing a password
+  asks for 12 characters (it was 8), as ASVS 2.1.1 does. Existing passwords
+  keep working: sign-in never checks the length (WHIT-1356, CE-5).
+- **A new password that was in a data breach, or is too common, is refused.**
+  Only the first five characters of the password's SHA-1 go to the Have I Been
+  Pwned range service, and the match is made on the server; a short built-in
+  list and a few-distinct-characters rule work with no internet. If the service
+  can't be reached, the built-in check alone decides. Set
+  `WHITY_BREACHED_PASSWORDS` to `offline` or `off` to change this (WHIT-1356,
+  CE-7).
+- **The web app sends a Content Security Policy in report-only mode.** Every
+  page gets a fresh nonce; only scripts carrying it (and what they load) would
+  run, plugins and forms stay on this origin, and frames are limited to the
+  app and the bot check. Browsers report what the policy would block to
+  `/csp-report`, which writes one short line per report to the web service's
+  log. Nothing is blocked yet: the policy is enforced once the reports are
+  quiet (WHIT-1357, CE-12, TM-12).
+- **Supply-chain checks can now fail a build.** The image scan fails on a HIGH
+  or CRITICAL vulnerability that has a fix (accepted ones go in `.trivyignore`
+  with a reason and an expiry), and Semgrep fails a pull request or queued
+  merge that adds an ERROR-level finding; the full scans still report
+  everything to the Security tab (WHIT-1358, CO-21).
+- **Images carry an SBOM and provenance,** and each release attaches a
+  CycloneDX SBOM of its composer and npm dependencies (WHIT-1358, CO-22).
+- **Every Dockerfile is watched for updates.** The web, render and local CI
+  images are pinned to exact versions that Dependabot can bump, and the
+  desktop template's Rust crates are watched too (WHIT-1358, CO-24).
+- **Third-party GitHub Actions are pinned to a commit,** including the Rust
+  toolchain in the desktop release job that holds the signing key; a test
+  keeps them pinned (WHIT-1358, CO-27).
+- **The print service is locked down.** Every page it prints may load only
+  `data:` and `about:` URLs, so a document can never make it reach the internal
+  network, a cloud metadata address or the internet; its image runs as an
+  unprivileged user, and the compose files drop every capability and forbid
+  privilege gain (WHIT-1359, CO-25, TM-21).
+- **Approving an AI key's proposal uses the key as it is now.** A key revoked or
+  expired since it asked can no longer run what it proposed; the proposal can
+  still be declined (WHIT-1361, TM-7).
+- **The plan's staff limit holds when people are added directly.** With
+  `seats.enforcement = block`, adding a person on Users, or giving someone a
+  role in another workspace, is refused once every seat is taken, as an
+  invitation already was; two adds at once can't both take the last seat
+  (WHIT-1361, TM-14).
+
 ## [0.2.31] - 2026-11-22
 
 ### Added
