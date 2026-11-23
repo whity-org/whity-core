@@ -1002,7 +1002,7 @@ final class ExternalBillingApiHandler
      */
     private function monthlyPrice(int $tenantId, string $planKey, string $preferredPeriod): ?float
     {
-        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'USD'));
+        $currency = $this->subscriptionCurrency();
         $statement = $this->pdo->prepare(
             'SELECT pp.unit_amount, pp.billing_period
                FROM plan_prices pp
@@ -1057,11 +1057,7 @@ final class ExternalBillingApiHandler
             return $tenantId;
         }
 
-        $currency = strtoupper($this->setting(
-            $tenantId,
-            SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'USD'
-        ));
+        $currency = $this->subscriptionCurrency();
 
         $statement = $this->pdo->prepare(
             'SELECT p.plan_key, p.name, p.description, p.is_addon,
@@ -1120,11 +1116,7 @@ final class ExternalBillingApiHandler
      */
     private function externalPriceRef(int $tenantId, string $planKey, string $interval): ?string
     {
-        $currency = strtoupper($this->setting(
-            $tenantId,
-            SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'USD'
-        ));
+        $currency = $this->subscriptionCurrency();
 
         $bridge = $this->pluginBridge();
         if ($bridge !== null) {
@@ -1209,14 +1201,22 @@ final class ExternalBillingApiHandler
         return is_string($ref) && $ref !== '' ? $ref : null;
     }
 
-    private function setting(int $tenantId, string $key, string $fallback): string
+    /**
+     * The currency workspaces are billed in for their Whity subscription: the
+     * INSTANCE's setting, never the workspace's own. A workspace's
+     * `billing.default_currency` is what it charges its own customers in (a salon
+     * in Amman invoices in JOD); the operator sets what Whity itself is sold in.
+     * Reading the workspace's value hid every plan from a JOD workspace when the
+     * payment provider takes no JOD.
+     */
+    private function subscriptionCurrency(): string
     {
-        $value = $this->settings->effective($tenantId)[$key] ?? null;
-        if (is_string($value) && $value !== '') {
-            return $value;
+        $value = $this->settings->getGlobal()[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? null;
+        if (is_string($value) && trim($value) !== '') {
+            return strtoupper(trim($value));
         }
 
-        return SettingsRegistry::defaultFor($key) ?: $fallback;
+        return strtoupper((string) (SettingsRegistry::defaultFor(SettingsRegistry::BILLING_DEFAULT_CURRENCY) ?: 'USD'));
     }
 
     /**

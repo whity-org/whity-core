@@ -553,6 +553,26 @@ final class ExternalBillingApiRealEngineTest extends TestCase
         self::assertTrue($byKey['devices'] ?? null, 'devices are an add-on');
     }
 
+    /**
+     * WHITY IS SOLD IN THE INSTANCE'S CURRENCY, NOT THE WORKSPACE'S. A
+     * workspace's own `billing.default_currency` is what it charges its
+     * customers in; reading it here hid every plan from a workspace whose
+     * currency the instance does not sell in (a JOD workspace on a USD install).
+     */
+    public function testThePlanlistUsesTheInstanceCurrencyNotTheWorkspaces(): void
+    {
+        $this->pdo->exec("INSERT INTO tenant_settings (tenant_id, setting_key, value, updated_at)
+                          VALUES (1, 'billing.default_currency', 'USD', CURRENT_TIMESTAMP)");
+
+        $response = $this->handler->plans($this->asTenant('GET', '/api/v1/billing/plans'));
+
+        self::assertSame(200, $response->getStatusCode());
+        $rows = json_decode((string) $response->getBody(), true)['data'];
+        $keys = array_column($rows, 'plan_key');
+        self::assertContains('pro', $keys, 'the instance sells in JOD, whatever the workspace bills its customers in');
+        self::assertSame(['JOD'], array_values(array_unique(array_column($rows, 'currency'))));
+    }
+
     // ── what they have paid ─────────────────────────────────────────────────
 
     /**

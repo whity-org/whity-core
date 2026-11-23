@@ -337,7 +337,7 @@ final class SubscriptionBillingRun
      */
     private function activePriceFor(int $tenantId, int $planId): ?array
     {
-        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'USD'));
+        $currency = $this->subscriptionCurrency();
 
         $statement = $this->pdo->prepare(
             'SELECT * FROM plan_prices
@@ -525,6 +525,24 @@ final class SubscriptionBillingRun
      * than constants — a white-label deployment has tenants in different tax
      * jurisdictions, invoicing under different names.
      */
+    /**
+     * The currency workspaces are billed in for their Whity subscription: the
+     * INSTANCE's setting, never the workspace's own. A workspace's
+     * `billing.default_currency` is what it charges its own customers in (a salon
+     * in Amman invoices in JOD); the operator sets what Whity itself is sold in.
+     * Reading the workspace's value hid every plan from a JOD workspace when the
+     * payment provider takes no JOD.
+     */
+    private function subscriptionCurrency(): string
+    {
+        $value = $this->settings->getGlobal()[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? null;
+        if (is_string($value) && trim($value) !== '') {
+            return strtoupper(trim($value));
+        }
+
+        return strtoupper((string) (SettingsRegistry::defaultFor(SettingsRegistry::BILLING_DEFAULT_CURRENCY) ?: 'USD'));
+    }
+
     private function setting(int $tenantId, string $key, string $fallback): string
     {
         $effective = $this->settings->effective($tenantId);
