@@ -1219,16 +1219,6 @@ final class ExternalBillingApiHandler
         return strtoupper((string) (SettingsRegistry::defaultFor(SettingsRegistry::BILLING_DEFAULT_CURRENCY) ?: 'USD'));
     }
 
-    private function setting(int $tenantId, string $key, string $fallback): string
-    {
-        $value = $this->settings->effective($tenantId)[$key] ?? null;
-        if (is_string($value) && $value !== '') {
-            return $value;
-        }
-
-        return SettingsRegistry::defaultFor($key) ?: $fallback;
-    }
-
     /**
      * The subject a `subscription.updated` event is about.
      *
