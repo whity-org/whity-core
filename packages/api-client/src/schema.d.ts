@@ -24295,6 +24295,9 @@ export interface components {
             is_per_seat?: boolean;
             is_per_device?: boolean;
             is_addon: boolean;
+            entitlements?: {
+                [key: string]: boolean | number | string;
+            };
         };
         PurchasablePlanListResponse: {
             data: components["schemas"]["PurchasablePlan"][];

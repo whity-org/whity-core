@@ -573,6 +573,29 @@ final class ExternalBillingApiRealEngineTest extends TestCase
         self::assertSame(['JOD'], array_values(array_unique(array_column($rows, 'currency'))));
     }
 
+    /**
+     * EACH PLAN SAYS WHAT IT COMES WITH, so the cards can list it: numbers as
+     * numbers (-1 unlimited), switches as booleans, and a plan with none as an
+     * empty object rather than an empty list.
+     */
+    public function testThePlanlistCarriesEachPlansEntitlementsTyped(): void
+    {
+        $this->pdo->exec("INSERT INTO plan_entitlements (plan_id, entitlement_key, value) VALUES
+                          (1, 'members.max', '25'), (1, 'customers.per_month', '-1'),
+                          (1, 'brand.remove_badge', 'true'), (1, 'note', 'ask us')");
+
+        $response = $this->handler->plans($this->asTenant('GET', '/api/v1/billing/plans'));
+
+        self::assertSame(200, $response->getStatusCode());
+        $body = (string) $response->getBody();
+        $rows = array_column(json_decode($body, true)['data'], null, 'plan_key');
+        self::assertSame(
+            ['brand.remove_badge' => true, 'customers.per_month' => -1, 'members.max' => 25, 'note' => 'ask us'],
+            $rows['pro']['entitlements']
+        );
+        self::assertStringContainsString('"entitlements":{}', $body, 'a plan with none is still an object');
+    }
+
     // ── what they have paid ─────────────────────────────────────────────────
 
     /**

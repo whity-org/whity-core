@@ -10,7 +10,8 @@ import { BILLING_PAY } from '@/lib/capabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
 import { ConfirmAction } from '@whity/ui/confirm-action';
-import { formatMoney } from '@whity/ui/money/currency';
+import { offersYearly, planCards, type BillingPeriod, type EntitlementValue } from '@/lib/billing/plan-cards';
+import { PeriodSwitch, PlanCardGrid } from './plan-card-grid';
 
 interface PlanOption {
   plan_key: string;
@@ -21,6 +22,7 @@ interface PlanOption {
   unit_amount: number;
   currency: string;
   billing_period: string;
+  entitlements?: Record<string, EntitlementValue>;
 }
 
 /**
@@ -42,6 +44,7 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
   const [target, setTarget] = useState<PlanOption | null>(null);
   // One key per opened dialog: a retry of this change is safe, a later change is new.
   const idempotencyKey = useRef('');
+  const [period, setPeriod] = useState<BillingPeriod>('month');
 
   const { data } = useFetch(async () => {
     const { data: body, response: res } = await api.GET('/api/v1/billing/plans');
@@ -52,6 +55,8 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
   const tiers = (data ?? []).filter((plan) => !plan.is_addon);
   const others = tiers.filter((plan) => !plan.is_current);
   const current = tiers.find((plan) => plan.is_current);
+  // The workspace's own plan stays in the row, marked, so the others compare against it.
+  const cards = planCards(tiers, offersYearly(tiers) ? period : 'month');
 
   if (others.length === 0) {
     return (
@@ -106,29 +111,27 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
   };
 
   return (
-    <section className="space-y-2 pt-2" data-testid="change-plan">
-      <h3 className="text-sm font-medium">{t('billing.changePlan.title', 'Change plan')}</h3>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {others.map((plan) => (
-          <li key={`${plan.plan_key}-${plan.billing_period}`} className="grid gap-2 rounded-card border border-border bg-card p-4">
-            <p className="font-medium">{plan.name}</p>
-            {plan.description && <p className="text-sm text-muted-foreground">{plan.description}</p>}
-            <p className="text-sm">
-              <bdi>{formatMoney(plan.unit_amount, plan.currency)}</bdi>{' '}
-              {plan.billing_period === 'year'
-                ? t('billing.plans.perYear', 'per year')
-                : plan.billing_period === 'half_year'
-                  ? t('billing.plans.perHalfYear', 'every 6 months')
-                  : t('billing.plans.perMonth', 'per month')}
-            </p>
-            {canPay ? (
-              <Button variant="outline" onClick={() => open(plan)} data-testid={`change-plan-${plan.plan_key}`}>
-                {t('billing.changePlan.action', 'Move to {plan}', { plan: plan.name })}
-              </Button>
-            ) : null}
-          </li>
-        ))}
-      </ul>
+    <section className="space-y-3 pt-2" data-testid="change-plan">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <h3 className="text-sm font-medium">{t('billing.changePlan.title', 'Change plan')}</h3>
+        {offersYearly(tiers) && <PeriodSwitch period={period} onChange={setPeriod} />}
+      </div>
+      <PlanCardGrid
+        cards={cards}
+        testId="change-plan-cards"
+        action={(card) =>
+          card.is_current ? null : canPay ? (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => open(card.price as PlanOption)}
+              data-testid={`change-plan-${card.plan_key}`}
+            >
+              {t('billing.changePlan.action', 'Move to {plan}', { plan: card.name })}
+            </Button>
+          ) : null
+        }
+      />
       {!canPay && (
         <p className="text-xs text-muted-foreground">
           {t('billing.changePlan.noPermission', 'Only someone who can pay for this workspace can change its plan.')}
