@@ -20,7 +20,7 @@ declare(strict_types=1);
  * goes stale, so --check fails when:
  *
  *   1. `sdk_version` is not Sdk::VERSION. Bumping the SDK means editing this file.
- *   2. A minor in the Sdk.php ledger is not named by any `since` in the matrix.
+ *   2. A minor in sdk/CHANGELOG.md is not named by any `since` in the matrix.
  *      Saying which area the new minor moved is the edit that matters; a bare
  *      version bump without it still fails.
  *   3. A `since` names a minor the ledger does not have.
@@ -35,6 +35,7 @@ $root = dirname(__DIR__);
 $dataPath = $root . '/docs/sdk-coverage/coverage.json';
 $pagePath = $root . '/docs/wiki/Plugin-SDK-Coverage.md';
 $sdkPath = $root . '/sdk/src/Sdk.php';
+$changelogPath = $root . '/sdk/CHANGELOG.md';
 $args = array_slice($argv, 1);
 $check = in_array('--check', $args, true);
 $releaseAt = array_search('--release', $args, true);
@@ -81,16 +82,15 @@ if (preg_match('/const\s+VERSION\s*=\s*\'(\d+\.\d+\.\d+)\'/', $sdkSource, $m) !=
 }
 $sdkVersion = $m[1];
 
-// Same ledger reading as scripts/ci-sdk-version-collision.php: the class
-// docblock, flattened, where each entry opens with "X.Y (".
+// Same ledger reading as scripts/ci-sdk-version-collision.php: sdk/CHANGELOG.md,
+// where each entry is a `## X.Y` heading (SDK 1.162, decision D7).
 $ledger = [];
-if (preg_match('#/\*\*(.*?)\*/#s', $sdkSource, $m) === 1) {
-    $flat = (string) preg_replace('/\s+/', ' ', (string) preg_replace('/^\s*\*\s?/m', '', $m[1]));
-    preg_match_all('/(?<![\d.])(\d+\.\d+) \(/', $flat, $mm);
+if (is_file($changelogPath)) {
+    preg_match_all('/^## (\d+\.\d+)\s*$/m', str_replace("\r\n", "\n", (string) file_get_contents($changelogPath)), $mm);
     $ledger = array_values(array_unique($mm[1]));
 }
-if ($ledger === []) {
-    failWith(['cannot read the version ledger in sdk/src/Sdk.php']);
+if (count($ledger) < 2) {
+    failWith(['cannot read the version ledger in sdk/CHANGELOG.md (each entry is a `## X.Y` heading)']);
 }
 
 $errors = [];
@@ -143,7 +143,7 @@ foreach ($data['areas'] ?? [] as $i => $a) {
             continue;
         }
         if (!in_array($since, $ledger, true)) {
-            $errors[] = "area {$id}: `since` {$since} is not an SDK minor in the Sdk.php ledger";
+            $errors[] = "area {$id}: `since` {$since} is not an SDK minor in sdk/CHANGELOG.md";
         }
         $sinceSeen[$since] = true;
     }
@@ -151,7 +151,7 @@ foreach ($data['areas'] ?? [] as $i => $a) {
 
 foreach ($ledger as $minor) {
     if (!isset($sinceSeen[$minor])) {
-        $errors[] = "SDK {$minor} is in the Sdk.php ledger but no area names it in `since`. Add what it gave plugins to the area it moved.";
+        $errors[] = "SDK {$minor} is in sdk/CHANGELOG.md but no area names it in `since`. Add what it gave plugins to the area it moved.";
     }
 }
 
@@ -233,7 +233,7 @@ function render(array $data, array $groups, array $areas): string
     }
     $out[] = '';
     $out[] = 'Areas marked **Needs a design** have gaps that could cross workspaces, skip permissions or move money, so they get a design before an SDK export. '
-        . 'Every SDK minor updates this matrix in the same pull request; CI checks it against the version ledger in `sdk/src/Sdk.php`.';
+        . 'Every SDK minor updates this matrix in the same pull request; CI checks it against the SDK changelog, `sdk/CHANGELOG.md`.';
     $out[] = '';
     $out[] = '## Summary';
     $out[] = '';
