@@ -16392,6 +16392,7 @@ export interface components {
                 has_access: boolean;
                 status?: string | null;
                 plan?: string | null;
+                plan_name?: string | null;
                 access_until?: string | null;
                 cancel_at_period_end?: boolean;
                 checkout_status?: string | null;
