@@ -9,7 +9,7 @@ import { BILLING_PAY } from '@/lib/capabilities';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
 import { navigateExternal } from '@/lib/external-navigate';
-import { offersYearly, planCards, type BillingPeriod, type EntitlementValue } from '@/lib/billing/plan-cards';
+import { localizePlanCards, offersYearly, planCards, type BillingPeriod, type EntitlementValue } from '@/lib/billing/plan-cards';
 import { PeriodSwitch, PlanCardGrid } from './plan-card-grid';
 
 /**
@@ -117,7 +117,11 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
     }
   };
 
-  const cards = planCards(plans, offersYearly(plans) ? period : 'month');
+  const cards = localizePlanCards(planCards(plans, offersYearly(plans) ? period : 'month'), t);
+  // A workspace already on a plan without a paid subscription (Free) is not
+  // locked, and choosing the plan it is on does nothing (WHIT-1398). It is
+  // offered an upgrade instead, and its own card has no button.
+  const current = kind === 'tier' ? cards.find((card) => card.is_current) : undefined;
 
   return (
     <section className="space-y-4" data-testid="available-plans">
@@ -126,7 +130,9 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
           <h2 className="text-base font-medium">
             {kind === 'addon'
               ? t('billing.plans.addons.title', 'Add-ons')
-              : t('billing.plans.title', 'Activate your workspace')}
+              : current !== undefined
+                ? t('billing.plans.upgradeTitle', 'Upgrade your workspace')
+                : t('billing.plans.title', 'Activate your workspace')}
           </h2>
           <p className="text-sm text-muted-foreground">
             {kind === 'addon'
@@ -134,10 +140,16 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
                   'billing.plans.addons.description',
                   'Bought alongside your plan. Devices are billed for each unit in service.'
                 )
-              : t(
-                  'billing.plans.description',
-                  'Choose a plan to activate this workspace. Everything else stays locked until then.'
-                )}
+              : current !== undefined
+                ? t(
+                    'billing.plans.upgradeDescription',
+                    'You are on {plan}. Choose a plan for more staff, customers and features.',
+                    { plan: current.name }
+                  )
+                : t(
+                    'billing.plans.description',
+                    'Choose a plan to activate this workspace. Everything else stays locked until then.'
+                  )}
           </p>
         </div>
         {offersYearly(plans) && <PeriodSwitch period={period} onChange={setPeriod} />}
@@ -145,7 +157,7 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
 
       <PlanCardGrid
         cards={cards}
-        action={(card) => (
+        action={(card) => card.is_current ? null : (
           <Button
             variant="outline"
             className="w-full"

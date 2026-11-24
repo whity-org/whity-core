@@ -10,7 +10,7 @@ import { BILLING_PAY } from '@/lib/capabilities';
 import { useTranslation } from '@whity/features/i18n';
 import { Button } from '@whity/ui/button';
 import { ConfirmAction } from '@whity/ui/confirm-action';
-import { offersYearly, planCards, type BillingPeriod, type EntitlementValue } from '@/lib/billing/plan-cards';
+import { offersYearly, localizePlanCards, planCards, type BillingPeriod, type EntitlementValue } from '@/lib/billing/plan-cards';
 import { PeriodSwitch, PlanCardGrid } from './plan-card-grid';
 
 interface PlanOption {
@@ -56,7 +56,7 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
   const others = tiers.filter((plan) => !plan.is_current);
   const current = tiers.find((plan) => plan.is_current);
   // The workspace's own plan stays in the row, marked, so the others compare against it.
-  const cards = planCards(tiers, offersYearly(tiers) ? period : 'month');
+  const cards = localizePlanCards(planCards(tiers, offersYearly(tiers) ? period : 'month'), t);
 
   if (others.length === 0) {
     return (
