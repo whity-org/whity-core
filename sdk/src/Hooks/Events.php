@@ -23,7 +23,10 @@ use Whity\Sdk\PluginNamespace;
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
  *
- * The full catalogue, with each event's kind, is in docs/wiki/HOOK_SYSTEM.md.
+ * Each event's kind, documented payload keys, `.async` twin and the SDK minor
+ * it arrived in are in {@see EventCatalogue} (SDK 1.164), which
+ * docs/wiki/HOOK_SYSTEM.md's tables are generated from. A new constant here
+ * needs an entry there.
  *
  * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
  * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,
