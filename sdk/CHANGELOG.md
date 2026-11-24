@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.164
+
+EVENT CATALOGUE: `Hooks\EventCatalogue` gives each of the 206 published events its kind (`observe`, `filter`, `veto`, `queued`, and `vetoable` for a filter that may also refuse), the payload keys it documents, its `.async` twin and the SDK minor it arrived in, as a `Hooks\EventInfo` (`EventCatalogue::get()`, `all()`, `names()`). The event tables in docs/wiki/HOOK_SYSTEM.md are generated from it by `php scripts/hook-catalogue.php`, and core's `EventCatalogueTest` fails when an event has no entry, an entry contradicts itself, the filters differ from the events core reads back, or the page is stale. `since` for events older than 1.164 was reconstructed from this changelog and may be later than the event really is (WHIT-1390).
+
+Purely additive: two new classes. No event is renamed.
+
 ## 1.163
 
 PLUGIN.JSON SCHEMA, PART 1 (decision D4): `plugin.json` also declares `settings`, `notifications`, `jobs` (a handler `class`, an optional cron `schedule`, `submittable`), `dashboard`, `onboarding`, `contactFields` and `themes` (theme files inside the plugin), each in the shape its PHP interface returns. `Manifest\ManifestValidator` checks them through the new `Manifest\SettingsValidator`, `Manifest\NotificationTypesValidator`, `Manifest\JobsValidator`, `Manifest\OnboardingValidator` and `Manifest\ThemeFilesValidator`, and the existing `DashboardValidator` and `ContactFieldValidator`; `resources/plugin-manifest.schema.json` describes them. `Manifest\ManifestPlugin` now implements the matching interfaces and answers each from the file, empty when the file says nothing. Core's `whity-cli plugin validate <dir>` checks a manifest offline, theme files included (WHIT-1389).

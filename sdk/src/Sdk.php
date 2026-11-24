@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.163).
+ * SDK identity (v1.164).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -24,7 +24,7 @@ namespace Whity\Sdk;
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.163.0';
+    public const VERSION = '1.164.0';
 
     /**
      * Static identity only — never instantiated.
