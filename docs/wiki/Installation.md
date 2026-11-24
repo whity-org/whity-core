@@ -4,6 +4,9 @@
 It needs only Node and Docker. The rest of this page is for working on Whity from a
 source checkout.
 
+**Something not behaving?** [Setup pitfalls](Setup-Pitfalls.md) lists the config problems
+people have hit and the fix for each.
+
 ## Requirements
 
 - PHP 8.4 (the platform target — see `Dockerfile`, pinned to `dunglas/frankenphp:1-php8.4`)
