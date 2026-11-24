@@ -76,8 +76,12 @@ final class PasswordSignIn
      * it is safe: the server needs an enabled identity provider of its own
      * (workspace 0), and the operator turning it off must already have signed
      * in with one, or they would lose their own way back in.
+     *
+     * WHIT-1350: every other platform operator (active member of workspace 0)
+     * needs a link too, or they are locked out; the refusal names them.
+     * `$allowUnlinkedOperators` skips only that check, for the CLI's `--force`.
      */
-    public static function cannotTurnOff(\PDO $pdo, ?int $operatorProfileId): ?string
+    public static function cannotTurnOff(\PDO $pdo, ?int $operatorProfileId, bool $allowUnlinkedOperators = false): ?string
     {
         $provider = $pdo->query('SELECT 1 FROM identity_providers WHERE tenant_id = 0 AND enabled = TRUE LIMIT 1');
         if ($provider === false || $provider->fetchColumn() === false) {
@@ -90,6 +94,10 @@ final class PasswordSignIn
             if ($link->fetchColumn() === false) {
                 return 'Sign in once with the identity provider before turning password sign-in off, so you keep a way in.';
             }
+        }
+
+        if (!$allowUnlinkedOperators) {
+            return OperatorSignIn::unlinkedProblem($pdo);
         }
 
         return null;

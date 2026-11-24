@@ -123,6 +123,33 @@ final class MeIdentitiesApiHandlerRealEngineTest extends TestCase
         self::assertNotNull($this->identities->findByIssuerSubject('iss-g', 'sub-other'), 'the foreign link survives');
     }
 
+    /**
+     * WHIT-1350: with password sign-in off, a password is no way in, so the
+     * last link to the server's own provider stays, even on a password account.
+     */
+    public function testWithPasswordSignInOffTheLastServerProviderLinkStays(): void
+    {
+        $settings = new \Whity\Core\Settings\SettingsService(
+            new \Whity\Core\Settings\GlobalSettingsRepository($this->pdo),
+            new \Whity\Core\Settings\TenantSettingsRepository($this->pdo),
+        );
+        $settings->setGlobal(\Whity\Core\Settings\SettingsRegistry::PASSWORD_SIGN_IN, 'false');
+        $tv = $this->createMock(TokenValidator::class);
+        $tv->method('validateAccessToken')->willReturn(['profile_id' => $this->profileId]);
+        $handler = new MeIdentitiesApiHandler($tv, $this->identities, $this->pdo, $settings);
+
+        $workspaceLink = $this->identities->link($this->profileId, 'google', 'iss-g', 'sub-ws', 'a@b.com', 42);
+        $serverLink = $this->identities->link($this->profileId, 'whity_id', 'iss-w', 'sub-w', 'a@b.com');
+
+        $refused = $handler->unlink(new Request('DELETE', '/api/me/identities/' . $serverLink, [], ''), ['id' => (string) $serverLink]);
+        self::assertSame(409, $refused->getStatusCode());
+        self::assertNotNull($this->identities->findGlobalByIssuerSubject('iss-w', 'sub-w'));
+
+        // A workspace's own provider link is not the way in to the server: it may go.
+        $removed = $handler->unlink(new Request('DELETE', '/api/me/identities/' . $workspaceLink, [], ''), ['id' => (string) $workspaceLink]);
+        self::assertSame(204, $removed->getStatusCode());
+    }
+
     public function testCannotUnlinkLastIdentityOfPasswordlessAccount(): void
     {
         // Passwordless (SSO-provisioned) profile with a single linked identity.

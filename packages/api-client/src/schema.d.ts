@@ -1825,6 +1825,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/operator-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign a platform operator in with a one-time link printed on the server */
+        post: operations["post_api_v1_auth_operator_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password/forgot": {
         parameters: {
             query?: never;
@@ -23092,6 +23109,24 @@ export interface components {
         OpenApiDocumentResponse: {
             [key: string]: unknown;
         };
+        OperatorLinkRequest: {
+            token: string;
+        };
+        OperatorLinkResponse: {
+            user: {
+                id: number;
+                email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
+                role: string;
+                tenant_id: number;
+            };
+            next: string;
+            access_token?: string;
+            refresh_token?: string;
+            token_type?: string;
+            expires_in?: number;
+        };
         OrganizationalUnit: {
             id: number;
             tenant_id: number;
@@ -36744,6 +36779,75 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_auth_operator_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Session issued in the system workspace; next is the page to open */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorLinkResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The link expired, was already used, or is not for a platform operator */
+            410: {
                 headers: {
                     [name: string]: unknown;
                 };

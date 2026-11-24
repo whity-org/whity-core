@@ -25,7 +25,7 @@ final class ReservedHandles
         'accept-invitation', 'account', 'account-recovery', 'admin', 'api', 'app-icon', 'billing',
         'boards', 'book', 'booking', 'calendar', 'chat', 'contacts', 'csp-report', 'dashboard', 'forgot-password',
         'forms', 'inventory', 'join', 'licensing', 'login', 'logout', 'mcp', 'messages', 'more',
-        'onboarding', 'ownership-offers', 'push-icon', 'quote', 'register', 'reset-password', 'sales',
+        'onboarding', 'operator-sign-in', 'ownership-offers', 'push-icon', 'quote', 'register', 'reset-password', 'sales',
         'settings', 'setup', 'status', 'tasks', 'verify', 'verify-email', 'web-build', 'welcome',
         'workspaces', 'well-known', 'openapi', 'manifest', 'robots', 'sitemap', 'favicon',
     ];

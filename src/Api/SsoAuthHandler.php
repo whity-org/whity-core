@@ -129,7 +129,84 @@ final class SsoAuthHandler
          * being offered a workspace of their own. Null refuses `form`.
          */
         private readonly ?\Whity\Core\Form\FormRepository $forms = null,
+        /**
+         * WHIT-1350: records linking an identity to a signed-in account
+         * (`/start?link=1`). Null records nothing.
+         */
+        private readonly ?\Whity\Core\Audit\AuditLoggerInterface $audit = null,
     ) {
+    }
+
+    /**
+     * The signed-in person asking to link the operator's identity provider to
+     * their own account (WHIT-1350), or null when there is no session, the
+     * feature is not wired, or the session is confined to one workspace by a
+     * workspace's own provider (that sign-in must never reach the person's
+     * global account).
+     */
+    private function linkTarget(): ?int
+    {
+        if ($this->sessions === null || $this->identities === null) {
+            return null;
+        }
+        $claims = $this->sessions->validateAccessToken();
+        $profileId = $claims['profile_id'] ?? null;
+        if (!is_int($profileId) || $profileId <= 0 || isset($claims[\Whity\Auth\TenantConfinement::CLAIM])) {
+            return null;
+        }
+
+        return $profileId;
+    }
+
+    /** Back to Settings › Security with what happened. */
+    private function linkOutcome(string $outcome): Response
+    {
+        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
+
+        return new Response(302, '', ['Location' => $base . '/settings/security?identity_link=' . rawurlencode($outcome)]);
+    }
+
+    /**
+     * Finish linking (WHIT-1350). The account is the one the session at
+     * `/start` named, carried in the signed flow cookie, and the same session
+     * must still be here. The provider's answer proves who the person is
+     * there, so the addresses need not match: that is the point, since a
+     * first sign-in links only by a matching verified address. No session is
+     * minted or changed.
+     */
+    private function completeLink(int $profileId, string $providerKey, int $tenantId, \Whity\Sdk\Auth\ExternalIdentity $identity): Response
+    {
+        if ($tenantId !== 0 || $this->identities === null || $this->linkTarget() !== $profileId) {
+            return $this->linkOutcome('failed');
+        }
+
+        $existing = $this->identities->findGlobalByIssuerSubject($identity->issuer, $identity->subject);
+        if ($existing !== null) {
+            return $this->linkOutcome((int) $existing['profile_id'] === $profileId ? 'linked' : 'taken');
+        }
+        foreach ($this->identities->findByProfileId($profileId) as $row) {
+            if ($row['provider_id'] === null && (string) $row['provider_key'] === $providerKey) {
+                // One account at this provider per person: unlink the old one first.
+                return $this->linkOutcome('already_linked');
+            }
+        }
+
+        try {
+            $id = $this->identities->link($profileId, $providerKey, $identity->issuer, $identity->subject, $identity->normalizedEmail());
+        } catch (\PDOException) {
+            // Somebody linked the same account a moment ago (unique index).
+            return $this->linkOutcome('taken');
+        }
+
+        $this->audit?->record('auth.identity.linked', [
+            'tenant_id' => 0,
+            'actor_user_id' => $profileId,
+            'target_type' => 'external_identity',
+            'target_id' => $id,
+            'metadata' => ['provider_key' => $providerKey, 'via' => 'settings'],
+        ]);
+
+        return $this->linkOutcome('linked');
     }
 
     /**
@@ -344,7 +421,18 @@ final class SsoAuthHandler
             ]);
         }
 
-        $joinSlug = $reauth === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
+        // WHIT-1350: linking the operator's provider to the signed-in account
+        // from Settings › Security. Who is asking travels only in the signed
+        // flow cookie, and the same session is checked again at the callback.
+        $linkProfileId = null;
+        if ($reauth === null && $this->query('link') === '1') {
+            $linkProfileId = $this->linkTarget();
+            if ($linkProfileId === null) {
+                return $this->linkOutcome('sign_in_first');
+            }
+        }
+
+        $joinSlug = $reauth === null && $linkProfileId === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
         $joinTenantId = null;
         if ($joinSlug !== '') {
             $joinTenantId = $this->joinTenant($request, $joinSlug);
@@ -356,7 +444,7 @@ final class SsoAuthHandler
         // #2355: sign-in started from a form's public link. The form names its
         // workspace; both travel only inside the signed flow cookie.
         $form = null;
-        $formSlug = $reauth === null && $joinTenantId === null
+        $formSlug = $reauth === null && $linkProfileId === null && $joinTenantId === null
             ? strtolower(trim((string) ($this->query('form') ?? '')))
             : '';
         if ($formSlug !== '') {
@@ -369,7 +457,7 @@ final class SsoAuthHandler
         // WHIT-1168: an invitation accepted by signing in. The token rides in
         // the signed flow cookie and is checked at the callback, where the
         // invited address must belong to the person who signed in.
-        $inviteToken = $reauth === null && $joinTenantId === null && $form === null
+        $inviteToken = $reauth === null && $linkProfileId === null && $joinTenantId === null && $form === null
             ? trim((string) ($this->query('invite') ?? ''))
             : '';
         if ($inviteToken !== '' && ($this->invitations === null || strlen($inviteToken) > 256)) {
@@ -378,8 +466,12 @@ final class SsoAuthHandler
 
         // Joining (from a sign-up page or a form) uses the operator's
         // global-trust providers only.
-        $tenantId = $joinTenantId !== null || $form !== null ? 0 : $this->resolveTenantId($request);
+        // Linking uses them too: only they speak for the person's own account.
+        $tenantId = $joinTenantId !== null || $form !== null || $linkProfileId !== null ? 0 : $this->resolveTenantId($request);
         $config = $this->providers->findEnabledByProviderKey($tenantId, $providerKey);
+        if ($config === null && $linkProfileId !== null) {
+            return $this->linkOutcome('provider_unavailable');
+        }
         if ($config === null) {
             // Not configured for this tenant → generic bounce (no enumeration).
             return $this->startRefused($joinTenantId, $joinSlug, $form, 'provider_unavailable');
@@ -425,6 +517,7 @@ final class SsoAuthHandler
             'reauth_return_to'  => $reauth['return_to'] ?? null,
             'reauth_route_id'   => $reauth['route_id'] ?? null,
             'reauth_purpose'    => $reauth['purpose'] ?? null,
+            'link_profile_id'   => $linkProfileId,
         ], self::FLOW_TTL, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, self::FLOW_TTL);
 
@@ -438,7 +531,8 @@ final class SsoAuthHandler
             $pkce['challenge'],
             // A fresh sign-in: the provider asks again even when it remembers
             // the person, and reports when they signed in.
-            $reauth !== null ? ['prompt' => 'login', 'max_age' => '0'] : [],
+            // Linking asks too, so the person picks the account they mean.
+            $reauth !== null ? ['prompt' => 'login', 'max_age' => '0'] : ($linkProfileId !== null ? ['prompt' => 'login'] : []),
         );
 
         return new Response(302, '', ['Location' => $authorizeUrl]);
@@ -566,6 +660,11 @@ final class SsoAuthHandler
         // flow cookie only; it never mints a session.
         if (isset($flow['reauth_profile_id']) && is_int($flow['reauth_profile_id'])) {
             return $this->completeReauth($flow, $providerId, $tenantId, $identity);
+        }
+
+        // WHIT-1350: linking to the signed-in account. Never mints a session.
+        if (isset($flow['link_profile_id']) && is_int($flow['link_profile_id'])) {
+            return $this->completeLink($flow['link_profile_id'], $providerKey, $tenantId, $identity);
         }
 
         // WHIT-917: a join started on a workspace's sign-up page. Read from the

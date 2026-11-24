@@ -31,6 +31,8 @@ final class MeIdentitiesApiHandler
         private readonly TokenValidator $tokenValidator,
         private readonly ExternalIdentityRepository $identities,
         private readonly PDO $db,
+        // WHIT-1350: read to keep the last provider link while password sign-in is off.
+        private readonly ?\Whity\Core\Settings\SettingsService $settings = null,
     ) {
     }
 
@@ -77,6 +79,22 @@ final class MeIdentitiesApiHandler
                 . 'ask an administrator to set one before unlinking.',
                 409
             );
+        }
+
+        // WHIT-1350: with password sign-in off, the server's own provider is
+        // the only way in; removing the last link to it locks the person out
+        // whatever password they hold.
+        if ($this->settings !== null && !\Whity\Core\Identity\PasswordSignIn::allowed($this->settings)) {
+            $global = array_filter(
+                $this->identities->findByProfileId($profileId),
+                static fn (array $r): bool => $r['provider_id'] === null,
+            );
+            if (count($global) === 1 && (int) array_values($global)[0]['id'] === $id) {
+                return Response::error(
+                    'This is your only way to sign in to this server. Link another account at the provider before removing this one.',
+                    409
+                );
+            }
         }
 
         if ($this->identities->unlink($id, $profileId) === 0) {

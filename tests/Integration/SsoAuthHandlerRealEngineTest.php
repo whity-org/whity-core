@@ -658,6 +658,99 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         ];
     }
 
+    // ── linking from Settings › Security (WHIT-1350) ─────────────────────────
+
+    private function linkHandler(): SsoAuthHandler
+    {
+        return new SsoAuthHandler(...$this->handlerArgsWithReauth() + ['audit' => new AuditLogger($this->pdo, new NullLogger())]);
+    }
+
+    /** @param array<string, mixed> $extra */
+    private function sessionCookie(array $extra = []): string
+    {
+        return $this->jwtParser->create([
+            'profile_id'       => $this->profileId,
+            'active_tenant_id' => $this->tenantId,
+            'email'            => 'alice@acme.test',
+            'role'             => 'admin',
+            'token_epoch'      => 0,
+        ] + $extra, 900, 'access');
+    }
+
+    /** A link flow whose provider account is a DIFFERENT address from the core account. */
+    private function primeLinkFlow(string $sub = 'wid-sub-1', ?int $linkProfileId = null): void
+    {
+        $this->primeFlow(sub: $sub, email: 'amro@personal.test');
+        $flow = $this->jwtParser->parse($_COOKIE['sso_flow_token']);
+        self::assertIsArray($flow);
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+            'state' => 'state-1', 'nonce' => 'nonce-1', 'code_verifier' => 'verifier-1',
+            'provider_id' => $this->providerId, 'tenant_id' => 0, 'provider_key' => 'google',
+            'link_profile_id' => $linkProfileId ?? $this->profileId,
+        ], 600, 'oidc_flow');
+        $_COOKIE['access_token'] = $this->sessionCookie();
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+    }
+
+    public function testLinkingStartsOnlyFromASessionAndAlwaysUsesTheOperatorsProvider(): void
+    {
+        $handler = $this->linkHandler();
+        $_GET = ['link' => '1'];
+        $refused = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        self::assertStringContainsString('/settings/security?identity_link=sign_in_first', $this->location($refused));
+
+        $_COOKIE = ['access_token' => $this->sessionCookie()];
+        $_GET = ['link' => '1'];
+        $res = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        self::assertStringStartsWith('https://accounts.google.com/o/oauth2/v2/auth', $this->location($res));
+        self::assertStringContainsString('prompt=login', $this->location($res));
+    }
+
+    public function testASessionConfinedByAWorkspaceProviderCannotLink(): void
+    {
+        $_COOKIE = ['access_token' => $this->sessionCookie([\Whity\Auth\TenantConfinement::CLAIM => $this->tenantId])];
+        $_GET = ['link' => '1'];
+        $res = $this->linkHandler()->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('identity_link=sign_in_first', $this->location($res));
+    }
+
+    public function testLinkingAttachesTheProviderAccountWhateverItsAddressAndIsAudited(): void
+    {
+        $this->primeLinkFlow();
+        $res = $this->linkHandler()->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('/settings/security?identity_link=linked', $this->location($res));
+        $link = (new ExternalIdentityRepository($this->pdo))->findGlobalByIssuerSubject(self::ISSUER, 'wid-sub-1');
+        self::assertNotNull($link);
+        self::assertSame($this->profileId, (int) $link['profile_id']);
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.identity.linked'"));
+        self::assertArrayNotHasKey('user', json_decode($res->getBody(), true) ?? [], 'no session is minted');
+    }
+
+    public function testAProviderAccountLinkedToSomebodyElseIsRefused(): void
+    {
+        $this->exec("INSERT INTO profiles (display_name, password_hash, two_factor_enabled, token_epoch, created_at, updated_at)
+            VALUES ('Awss Haddad', '', false, 0, NOW(), NOW())");
+        $other = (int) $this->pdo->lastInsertId();
+        (new ExternalIdentityRepository($this->pdo))->link($other, 'google', self::ISSUER, 'wid-sub-1', 'awss@acme.test');
+
+        $this->primeLinkFlow();
+        $res = $this->linkHandler()->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('identity_link=taken', $this->location($res));
+        self::assertSame(0, (int) $this->col("SELECT COUNT(*) FROM external_identities WHERE profile_id = {$this->profileId}"));
+    }
+
+    public function testTheCallbackRefusesWhenTheSessionIsNoLongerThePersonWhoStarted(): void
+    {
+        $this->primeLinkFlow(linkProfileId: $this->profileId + 999);
+        $res = $this->linkHandler()->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('identity_link=failed', $this->location($res));
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM external_identities'));
+    }
+
     // ── headless frontend (WHIT-693) ──────────────────────────────────────────
 
     public function testHeadlessFrontendReceivesTheRedirectsWhileTheCallbackStaysOnTheBackend(): void
