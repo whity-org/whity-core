@@ -1,0 +1,19 @@
+{
+  "$comment": "Signed once by whity-plugins' test signer (seed 7, Ed25519). Verified by crates/plugins/src/trust.rs and by whity-core's PluginTrust in PHP. now is the clock both sides use.",
+  "publicKey": "6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=",
+  "now": 1800000000,
+  "attestation": "{\"key\":\"6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=\",\"payload\":\"eyJmb3JtYXQiOiJ3aGl0eS5hdHRlc3RhdGlvbi8xIiwicGx1Z2luIjoiRXhhbXBsZVBsdWdpbiIsInZlcnNpb24iOiIxLjIuMyIsInNoYTI1NiI6IjZjZTBjMTdjNmE2ZTBhNWMzYThmMTVlZTFlOWYwZWYzZjFhOWMxYzBmMWE3YjRiNGM2ZDhlMGYyYTRiNmM4ZDAiLCJleHBpcmVzX2F0IjoxODMxNTM2MDAwfQ==\",\"signature\":\"Pftrkt24DH4k9suT8C44LizjPwexE3/i8xWmmAxKEwo/13tMv2C4qyPXIiT7E5KKXCSSS2FQjSknptAawN9qCw==\"}",
+  "revokedAttestation": "{\"key\":\"6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=\",\"payload\":\"eyJmb3JtYXQiOiJ3aGl0eS5hdHRlc3RhdGlvbi8xIiwicGx1Z2luIjoiUmV2b2tlZFBsdWdpbiIsInZlcnNpb24iOiIxLjAuMCIsInNoYTI1NiI6IjZjZTBjMTdjNmE2ZTBhNWMzYThmMTVlZTFlOWYwZWYzZjFhOWMxYzBmMWE3YjRiNGM2ZDhlMGYyYTRiNmM4ZDAiLCJleHBpcmVzX2F0IjoxODMxNTM2MDAwfQ==\",\"signature\":\"uBP9cng7Xye2zlhAVRVIzb3ZHvXOtp7MLlUOHwRrb0tr227/4KRrHOcklufOhjZjmYEbtYgLFdhBAS6z3GaoBw==\"}",
+  "revocations": "{\"key\":\"6kpsY+KcUgq+9VB7Ey7F+ZVHdq6+vnuSQh7qaRRG0iw=\",\"payload\":\"eyJmb3JtYXQiOiJ3aGl0eS5yZXZvY2F0aW9ucy8xIiwic2VxdWVuY2UiOjEsImlzc3VlZF9hdCI6MTc5OTk5NjQwMCwiZXhwaXJlc19hdCI6MTgwMjU5MjAwMCwicmV2b2tlZCI6W3sicGx1Z2luIjoiUmV2b2tlZFBsdWdpbiIsInZlcnNpb24iOiIxLjAuMCIsImFjdGlvbiI6ImtpbGwiLCJyZWFzb24iOiJ0ZXN0IHZlY3RvciJ9XX0=\",\"signature\":\"ewl5PITHtymaK87pkbE5DlnagjlHzjB2QnhZWfy+2nBv+qUC1qsvqSX43KHHzz85gFUzlQuSrhd9xYkWzOSZBQ==\"}",
+  "expect": {
+    "plugin": "ExamplePlugin",
+    "version": "1.2.3",
+    "sha256": "6ce0c17c6a6e0a5c3a8f15ee1e9f0ef3f1a9c1c0f1a7b4b4c6d8e0f2a4b6c8d0",
+    "reason": "verified"
+  },
+  "expectRevoked": {
+    "plugin": "RevokedPlugin",
+    "version": "1.0.0",
+    "reason": "revoked"
+  }
+}
