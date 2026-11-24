@@ -2048,6 +2048,16 @@ jobs:
           npm run typecheck
           npm test
 
+      # SDK 1.165 (D8): the plugin frontend package. Its type check is also the
+      # check that the block types match the contract generated from the PHP SDK
+      # (test/contract.test.ts); tests/Sdk/PluginSdkPackageTest keeps the
+      # generated contract itself current.
+      - name: Type check and unit tests (@whity/plugin-sdk)
+        working-directory: packages/plugin-sdk
+        run: |
+          npm run typecheck
+          npm test
+
       # The installer and updater. node:test against a scripted Docker, so
       # every failure path runs without containers.
       - name: Unit tests (@whity/cli)

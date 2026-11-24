@@ -986,11 +986,15 @@ final class BlockContract
                 'default'     => ['type' => 'string',    'required' => false],
                 'defaultFrom' => ['type' => 'contextPath', 'required' => false],
             ]],
+            // `encoding` (WC-318, declared in SDK 1.165): `base64` submits the
+            // file as a data URI instead of its text. The web renderer has read
+            // it since WC-318; the contract now says so.
             'fileInput' => ['container' => false, 'props' => [
                 'name'        => ['type' => 'inputName', 'required' => true],
                 'label'       => ['type' => 'string',    'required' => true],
                 'accept'      => ['type' => 'string',    'required' => false],
                 'required'    => ['type' => 'bool',      'required' => false],
+                'encoding'    => ['type' => 'enum',      'required' => false, 'values' => ['base64']],
             ]],
             // `swatches` (SDK 1.113): a few ready colours, `#RRGGBB`, shown
             // before the free picker, so a person picks a colour instead of
