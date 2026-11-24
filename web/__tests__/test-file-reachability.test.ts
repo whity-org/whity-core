@@ -130,6 +130,14 @@ const RUNNERS: { name: string; owns: (file: string) => boolean }[] = [
     name: 'cli node --test',
     owns: (file) => file.startsWith('packages/cli/test/'),
   },
+  {
+    // `npm test` in packages/plugin-sdk (node --test with type stripping,
+    // `test/*.test.ts`), run by the `Type check and unit tests
+    // (@whity/plugin-sdk)` step of the frontend job. contract.test.ts is
+    // checked by that step's `npm run typecheck` as well.
+    name: 'plugin-sdk node --test',
+    owns: (file) => file.startsWith('packages/plugin-sdk/test/'),
+  },
 ];
 
 describe('test-file reachability', () => {
