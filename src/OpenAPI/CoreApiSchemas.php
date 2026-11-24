@@ -6464,6 +6464,7 @@ final class CoreApiSchemas
                 'has_access' => self::bool(),
                 'status' => self::str(true),
                 'plan' => self::str(true),
+                'plan_name' => self::str(true),
                 'access_until' => self::str(true),
                 'cancel_at_period_end' => self::bool(),
                 'checkout_status' => self::str(true),
