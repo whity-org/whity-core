@@ -37,7 +37,15 @@ FROM dunglas/frankenphp:1-php8.4.28 AS base
 # 2.41-12+deb13u4 with deb13u5 already in trixie, and Trivy reported every
 # glibc CVE fixed between them against this image. With the upgrade here, a
 # rebuild clears them without waiting for upstream.
-RUN apt-get update \
+#
+# APT_REFRESH is the build date (WHIT-1391). The registry layer cache
+# (WHIT-1340) otherwise reuses this layer forever, so the upgrade above never
+# runs again: on 2026-11-24 every develop image kept krb5 1.21.3-5+deb13u1 a
+# day after deb13u2 was in trixie-security, and Trivy blocked them all. A new
+# date re-runs it (and the layers after it) once a day; builds on the same day
+# still share the cache.
+ARG APT_REFRESH=""
+RUN echo "apt refresh ${APT_REFRESH}" && apt-get update \
     && apt-get upgrade -y --no-install-recommends \
     && apt-get install -y \
     libpq-dev \
