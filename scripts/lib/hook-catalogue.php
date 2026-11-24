@@ -28,7 +28,7 @@ function whity_hook_catalogue_render(): string
         foreach ($events as $info) {
             $kind = $info->kind . ($info->vetoable && $info->kind !== \Whity\Sdk\Hooks\EventCatalogue::VETO ? ', veto' : '');
             $payload = implode(', ', array_map(static fn (string $key): string => "`{$key}`", $info->payload));
-            $notes = str_replace('|', '\|', $info->notes);
+            $notes = str_replace('|', '\|', ($info->renamedFrom !== null ? "Was `{$info->renamedFrom}`. " : '') . $info->notes);
             $out .= sprintf(
                 "| `%s` | `%s` | %s | %s | %s | %s |\n",
                 $info->name,

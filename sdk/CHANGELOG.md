@@ -10,7 +10,9 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 
 EVENT CATALOGUE: `Hooks\EventCatalogue` gives each of the 206 published events its kind (`observe`, `filter`, `veto`, `queued`, and `vetoable` for a filter that may also refuse), the payload keys it documents, its `.async` twin and the SDK minor it arrived in, as a `Hooks\EventInfo` (`EventCatalogue::get()`, `all()`, `names()`). The event tables in docs/wiki/HOOK_SYSTEM.md are generated from it by `php scripts/hook-catalogue.php`, and core's `EventCatalogueTest` fails when an event has no entry, an entry contradicts itself, the filters differ from the events core reads back, or the page is stale. `since` for events older than 1.164 was reconstructed from this changelog and may be later than the event really is (WHIT-1390).
 
-Purely additive: two new classes. No event is renamed.
+Renames wait for 2.0: no event is renamed, and `EventInfo::$renamedFrom` (an event's earlier name) is null for every event, ready for when a rename lands.
+
+Purely additive: two new classes.
 
 ## 1.163
 

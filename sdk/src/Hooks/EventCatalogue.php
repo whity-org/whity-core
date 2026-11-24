@@ -47,8 +47,8 @@ final class EventCatalogue
     public const KINDS = [self::OBSERVE, self::FILTER, self::VETO, self::QUEUED];
 
     /**
-     * name => entry. `vetoable`, `payload`, `async` and `notes` are left out when
-     * false, empty or null.
+     * name => entry. `vetoable`, `payload`, `async` and `notes` are left out
+     * when false, empty or null.
      *
      * @var array<string, array{group: string, kind: string, vetoable?: bool, payload?: list<string>, async?: string, since: string, notes?: string}>
      */
@@ -295,6 +295,7 @@ final class EventCatalogue
         $payload = $entry['payload'] ?? [];
         $async = $entry['async'] ?? null;
         $notes = $entry['notes'] ?? '';
+        $renamedFrom = self::renamedFrom()[$name] ?? null;
 
         return new EventInfo(
             $name,
@@ -306,6 +307,20 @@ final class EventCatalogue
             $base !== null && isset(self::EVENTS[$base]) ? $base : null,
             $entry['since'],
             is_string($notes) ? $notes : '',
+            $renamedFrom,
         );
+    }
+
+    /**
+     * New name => the name the event had before a rename
+     * ({@see EventInfo::$renamedFrom}). Empty: renames wait for 2.0
+     * (docs/wiki/Plugin-SDK-2.0-Plan.md), and this is where one is recorded
+     * when it comes, without changing the catalogue's format.
+     *
+     * @return array<string, string>
+     */
+    private static function renamedFrom(): array
+    {
+        return [];
     }
 }

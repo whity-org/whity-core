@@ -13,6 +13,7 @@ final class EventInfo
     /**
      * @param string $kind one of {@see EventCatalogue::KINDS}
      * @param list<string> $payload the payload keys the event documents; empty when none are documented yet
+     * @param string|null $renamedFrom the name the event had before a rename; null for every event in 1.x
      */
     public function __construct(
         public readonly string $name,
@@ -24,6 +25,7 @@ final class EventInfo
         public readonly ?string $asyncOf,
         public readonly string $since,
         public readonly string $notes,
+        public readonly ?string $renamedFrom = null,
     ) {
     }
 
@@ -34,7 +36,7 @@ final class EventInfo
     }
 
     /**
-     * @return array{name: string, group: string, kind: string, vetoable: bool, payload: list<string>, async: ?string, asyncOf: ?string, since: string, notes: string}
+     * @return array{name: string, group: string, kind: string, vetoable: bool, payload: list<string>, async: ?string, asyncOf: ?string, since: string, notes: string, renamedFrom: ?string}
      */
     public function toArray(): array
     {
@@ -48,6 +50,7 @@ final class EventInfo
             'asyncOf' => $this->asyncOf,
             'since' => $this->since,
             'notes' => $this->notes,
+            'renamedFrom' => $this->renamedFrom,
         ];
     }
 }

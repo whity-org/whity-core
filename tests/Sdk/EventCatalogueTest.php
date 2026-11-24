@@ -48,6 +48,9 @@ final class EventCatalogueTest extends TestCase
             if (preg_match('/^1\.\d+$/', $info->since) !== 1) {
                 $problems[] = "{$name}: since must be an SDK minor such as 1.164";
             }
+            if ($info->renamedFrom !== null && ($info->renamedFrom === $name || preg_match('/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$/', $info->renamedFrom) !== 1)) {
+                $problems[] = "{$name}: renamedFrom must be the event's earlier name";
+            }
             if ($info->group === '') {
                 $problems[] = "{$name}: needs a group";
             }
@@ -80,6 +83,19 @@ final class EventCatalogueTest extends TestCase
             'tenant.creating',
             'time_window.close_report',
         ], $filters);
+    }
+
+    /**
+     * Renames wait for 2.0 (owner, 24 Nov 2026), so no 1.x event carries an
+     * earlier name. When 2.0 is decided and the first rename lands, this test
+     * goes with it.
+     */
+    public function testNoEventIsRenamedIn1x(): void
+    {
+        self::assertStringStartsWith('1.', \Whity\Sdk\Sdk::VERSION);
+        $renamed = array_keys(array_filter(EventCatalogue::all(), static fn ($info): bool => $info->renamedFrom !== null));
+
+        self::assertSame([], $renamed);
     }
 
     public function testNoMinorIsNewerThanTheSdk(): void
