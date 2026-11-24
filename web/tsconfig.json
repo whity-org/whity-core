@@ -25,7 +25,9 @@
       "@whity/ui/*": ["../packages/ui/src/*"],
       "@whity/features": ["../packages/features/src/index.ts"],
       "@whity/features/*": ["../packages/features/src/*"],
-      "@whity/api-client": ["../packages/api-client/src/index.ts"]
+      "@whity/api-client": ["../packages/api-client/src/index.ts"],
+      "@whity/plugin-sdk": ["../packages/plugin-sdk/src/index.ts"],
+      "@whity/plugin-sdk/testing": ["../packages/plugin-sdk/src/testing.ts"]
     }
   },
   "include": [

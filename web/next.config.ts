@@ -122,6 +122,7 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@whity/ui",
     "@whity/api-client",
+    "@whity/plugin-sdk",
     "@tanstack/react-table",
     "@tanstack/table-core",
   ],
