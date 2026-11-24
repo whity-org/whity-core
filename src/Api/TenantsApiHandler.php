@@ -20,6 +20,10 @@ use Whity\Http\ListQuery;
 use Whity\Http\ListSpec;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Tenant\TenantProvisioner;
+use Whity\Core\Tenant\HandleException;
+use Whity\Core\Tenant\HandleRules;
+use Whity\Core\Tenant\Handles;
+use Whity\Core\Tenant\WorkspaceOwners;
 use Whity\Sdk\Hooks\HookVetoException;
 use PDO;
 
@@ -47,10 +51,43 @@ class TenantsApiHandler
     private PDO $db;
     private HookManager $hookManager;
 
-    public function __construct(PDO $db, HookManager $hookManager)
+    private Handles $handles;
+
+    public function __construct(PDO $db, HookManager $hookManager, ?Handles $handles = null)
     {
         $this->db = $db;
         $this->hookManager = $hookManager;
+        $this->handles = $handles ?? new Handles($db, null, null, $hookManager);
+    }
+
+    /**
+     * Why a handle was refused, in plain words, English and Arabic (design
+     * section 36, HD.2). The code goes with it for the web app.
+     */
+    public static function handleRefusal(string $code, ?\DateTimeImmutable $nextAllowed = null): Response
+    {
+        [$en, $ar, $status] = match ($code) {
+            HandleRules::TOO_SHORT   => ['A handle needs at least ' . HandleRules::MIN . ' characters.', 'يحتاج المعرّف إلى ' . HandleRules::MIN . ' أحرف على الأقل.', 422],
+            HandleRules::TOO_LONG    => ['A handle can have at most ' . HandleRules::MAX . ' characters.', 'يمكن أن يحتوي المعرّف على ' . HandleRules::MAX . ' حرفًا على الأكثر.', 422],
+            HandleRules::CHARACTERS  => ['Use only Latin letters (a to z), numbers and dashes.', 'استخدم الحروف اللاتينية (a إلى z) والأرقام والشرطات فقط.', 422],
+            HandleRules::START       => ['Start the handle with a letter.', 'ابدأ المعرّف بحرف.', 422],
+            HandleRules::END         => ['End the handle with a letter or a number.', 'اختم المعرّف بحرف أو رقم.', 422],
+            HandleRules::DOUBLE_DASH => ['Use one dash at a time.', 'استخدم شرطة واحدة في كل مرة.', 422],
+            HandleRules::GENERATED   => ['Handles that start with "ws-" are made by Whity. Try another.', 'المعرّفات التي تبدأ بـ "ws-" ينشئها Whity. جرّب معرّفًا آخر.', 422],
+            HandleRules::RESERVED    => ["That handle is kept for Whity's own pages. Try another.", 'هذا المعرّف محجوز لصفحات Whity. جرّب معرّفًا آخر.', 409],
+            HandleRules::TAKEN       => ['Another workspace already uses that handle.', 'مساحة عمل أخرى تستخدم هذا المعرّف.', 409],
+            HandleRules::HELD        => ['Another workspace used that handle until recently. It becomes free after 90 days.', 'استخدمت مساحة عمل أخرى هذا المعرّف مؤخرًا. يصبح متاحًا بعد 90 يومًا.', 409],
+            HandleRules::TOO_SOON    => [
+                'You can change the handle once every ' . Handles::CHANGE_EVERY_DAYS . ' days'
+                    . ($nextAllowed !== null ? ', next on ' . $nextAllowed->format('j M Y') : '') . '.',
+                'يمكنك تغيير المعرّف مرة كل ' . Handles::CHANGE_EVERY_DAYS . ' يومًا'
+                    . ($nextAllowed !== null ? '، المرة القادمة في ' . $nextAllowed->format('Y-m-d') : '') . '.',
+                409,
+            ],
+            default                  => ["That handle can't be used. Try another.", 'لا يمكن استخدام هذا المعرّف. جرّب معرّفًا آخر.', 422],
+        };
+
+        return Response::error($en, $status, ['code' => 'handle_' . $code, 'fields' => ['slug' => $en], 'fields_ar' => ['slug' => $ar]]);
     }
 
     /**
@@ -377,7 +414,23 @@ class TenantsApiHandler
             }
 
             $name = $naming['name'];
-            $slug = $body['slug'] ?? $this->generateSlug($name);
+            // The workspace's @handle (design section 36). An operator may
+            // type one; otherwise it is suggested from the name, or made.
+            $typedSlug = isset($body['slug']) && is_string($body['slug']) && trim($body['slug']) !== ''
+                ? HandleRules::normalize($body['slug'])
+                : null;
+            if ($typedSlug !== null) {
+                $problem = $this->handles->problem($typedSlug, null, true);
+                if ($problem !== null) {
+                    return self::handleRefusal($problem);
+                }
+                $slug = $typedSlug;
+            } else {
+                $slug = HandleRules::suggest($name);
+                if ($slug === '' || $this->handles->problem($slug) !== null) {
+                    $slug = HandleRules::generate();
+                }
+            }
 
             // Bound the free-text fields (VARCHAR(255)) before any DB write so an
             // over-long value is a clean 422, not a Postgres 22001 → 500.
@@ -386,11 +439,6 @@ class TenantsApiHandler
                 'slug' => [(string) $slug, InputLimits::NAME_MAX],
             ])) {
                 return $tooLong;
-            }
-
-            // Validate slug format
-            if (!preg_match('/^[a-z0-9-]+$/', $slug)) {
-                return Response::error('Slug must contain only lowercase letters, numbers, and hyphens', 400);
             }
 
             // The optional initial administrator is validated HERE, before any
@@ -411,13 +459,6 @@ class TenantsApiHandler
             $checkStmt->execute([$name]);
             if ($checkStmt->fetch()) {
                 return Response::error('Tenant name already exists', 409);
-            }
-
-            // Check if slug already exists
-            $checkSlugStmt = $this->db->prepare('SELECT id FROM tenants WHERE slug = ?');
-            $checkSlugStmt->execute([$slug]);
-            if ($checkSlugStmt->fetch()) {
-                return Response::error('Slug already exists', 409);
             }
 
             // Dispatch filter hook before creating tenant
@@ -605,18 +646,33 @@ class TenantsApiHandler
                 $params_array[] = $naming['name'];
             }
 
-            // Update slug
-            if (isset($body['slug']) && $body['slug'] !== $tenant['slug']) {
-                if (!preg_match('/^[a-z0-9-]+$/', $body['slug'])) {
-                    return Response::error('Slug must contain only lowercase letters, numbers, and hyphens', 400);
+            // The @handle (design section 36, HD.4, HD.9): owners and
+            // operators only, checked and recorded by Handles, which keeps the
+            // old one leading here for 90 days. Checked before anything is
+            // written, and changed after the rest of the update.
+            $newHandle = null;
+            $currentHandle = (string) ($tenant['slug'] ?? '');
+            if (isset($body['slug']) && is_string($body['slug'])
+                && HandleRules::normalize($body['slug']) !== $currentHandle) {
+                $operator = $this->isSystemUser();
+                $profileId = $this->callerProfileId($request);
+                if (!$operator && ($profileId === null || !(new WorkspaceOwners($this->db))->isOwner($id, $profileId))) {
+                    return Response::error("Only an owner can change the workspace's handle.", 403, [
+                        'code' => 'handle_owner_only',
+                        'fields_ar' => ['slug' => 'يمكن للمالك فقط تغيير معرّف مساحة العمل.'],
+                    ]);
                 }
-                $checkSlugStmt = $this->db->prepare('SELECT id FROM tenants WHERE slug = ? AND id != ?');
-                $checkSlugStmt->execute([$body['slug'], $id]);
-                if ($checkSlugStmt->fetch()) {
-                    return Response::error('Slug already exists', 409);
+                $newHandle = HandleRules::normalize($body['slug']);
+                $problem = $this->handles->problem($newHandle, $id, $operator);
+                if ($problem !== null) {
+                    return self::handleRefusal($problem);
                 }
-                $updates[] = 'slug = ?';
-                $params_array[] = $body['slug'];
+                if (!$operator && $currentHandle !== '' && !HandleRules::isGenerated($currentHandle)) {
+                    $next = $this->handles->nextChangeAllowedAt($id);
+                    if ($next !== null) {
+                        return self::handleRefusal(HandleRules::TOO_SOON, $next);
+                    }
+                }
             }
 
             if (!empty($updates)) {
@@ -627,6 +683,13 @@ class TenantsApiHandler
             }
             if ($naming !== null) {
                 $this->writeNaming($id, $naming['language'], $naming['others']);
+            }
+            if ($newHandle !== null) {
+                try {
+                    $this->handles->change($id, $newHandle, $this->callerProfileId($request), $this->isSystemUser());
+                } catch (HandleException $e) {
+                    return self::handleRefusal($e->reason, $this->handles->nextChangeAllowedAt($id));
+                }
             }
 
             // Dispatch synchronous hook after tenant is updated
@@ -969,21 +1032,13 @@ class TenantsApiHandler
         return $id === false ? null : (int) $id;
     }
 
-    /**
-     * Generate a URL-friendly slug from a string
-     */
-    private function generateSlug(string $text): string
+    /** The signed-in person's profile id, or null. */
+    private function callerProfileId(Request $request): ?int
     {
-        // Convert to lowercase
-        $slug = strtolower($text);
-        // Replace spaces with hyphens
-        $slug = str_replace(' ', '-', $slug);
-        // Remove special characters
-        $slug = preg_replace('/[^a-z0-9-]/', '', $slug) ?? '';
-        // Replace multiple hyphens with single hyphen
-        $slug = preg_replace('/-+/', '-', $slug) ?? '';
-        // Trim hyphens from start and end
-        $slug = trim($slug, '-');
-        return $slug;
+        $actor = $request->user;
+
+        return is_object($actor) && isset($actor->profile_id) && is_int($actor->profile_id) && $actor->profile_id > 0
+            ? $actor->profile_id
+            : null;
     }
 }

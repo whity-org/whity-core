@@ -77,6 +77,26 @@ final class ChatDiscussRealEngineTest extends TestCase
         self::assertContains('Awss Haddad joined.', $this->lines($first['id']), 'the chat says who joined');
     }
 
+    public function testSomeoneAddedToAOneToOneChatDoesNotGetItsHistory(): void
+    {
+        $amro = ChatViewer::person(self::AMRO);
+        $id = $this->chat->directWithPerson(self::A, $amro, self::AWSS);
+        $this->chat->post(self::A, $amro, $id, 'Only between the two of us');
+
+        $this->chat->addPerson(self::A, $amro, $id, self::AHMAD);
+        $this->chat->post(self::A, $amro, $id, 'Welcome, Ahmad');
+
+        $ahmad = ChatViewer::person(self::AHMAD);
+        $seen = array_map(static fn (array $m): string => (string) ($m['body'] ?? ''), $this->chat->messages(self::A, $ahmad, $id, null, null, 100));
+        self::assertNotContains('Only between the two of us', $seen, 'the newcomer was handed the 1:1 history (TM-18)');
+        self::assertContains('Welcome, Ahmad', $seen);
+        self::assertContains('Only between the two of us', $this->lines($id), 'the two original people keep it');
+
+        $listed = array_values(array_filter($this->chat->list(self::A, $ahmad), static fn (array $c): bool => (int) $c['id'] === $id));
+        self::assertNotSame('Only between the two of us', $listed[0]['last_message']['body'] ?? null);
+        self::assertLessThanOrEqual(2, $listed[0]['unread'], 'unread counted the history the newcomer cannot see');
+    }
+
     public function testAnotherWorkspaceGetsItsOwnChat(): void
     {
         $link = ['type' => 'board', 'id' => 'b-1', 'label' => 'Orders'];

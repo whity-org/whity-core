@@ -35,7 +35,7 @@ import {
 import { fieldVisibility, type FieldConditionRule } from '@/components/forms/form-conditions';
 import type { TableRow } from '@/components/forms/form-field-kinds';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
-import { localizedText } from '@whity/ui/localized-text';
+import { contentLanguage, localizedText, localizedTextLanguage, type ContentLanguage } from '@whity/ui/localized-text';
 
 export interface FormSectionSpec {
   key: string | null;
@@ -45,6 +45,26 @@ export interface FormSectionSpec {
 }
 
 export type FillableField = FormFieldSpec & { visible_when?: FieldConditionRule | null };
+
+type ShownText = Parameters<typeof localizedText>[0];
+
+/**
+ * WHIT-1379: the language a form reads in for this reader, from the texts it
+ * shows (its title, questions and section titles), each counted in the language
+ * actually shown. An English form in the Arabic interface reads left to right;
+ * an Arabic one in the English interface right to left.
+ */
+export function formContentLanguage(
+  form: { title?: ShownText; name?: ShownText },
+  fields: ReadonlyArray<{ label?: ShownText }>,
+  sections: ReadonlyArray<{ title?: ShownText }>,
+  preferArabic: boolean
+): ContentLanguage {
+  const language = preferArabic ? 'ar' : 'en';
+  const heading = localizedTextLanguage(form.title ?? null, language) !== null ? form.title : form.name;
+
+  return contentLanguage([heading, ...fields.map((field) => field.label), ...sections.map((section) => section.title)], language);
+}
 
 /** The Stepper is for 3 to 6 steps (register, 2.6); a longer form gets the compact indicator. */
 const STEPPER_STEPS_MAX = 6;

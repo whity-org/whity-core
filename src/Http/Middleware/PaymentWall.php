@@ -58,6 +58,12 @@ final class PaymentWall
      *    it to decide whether to show a "pay" button, so walling it produced a
      *    reachable billing page telling the workspace owner they did not have
      *    permission to pay. Read-only, and about the caller themselves.
+     *  - `/api/v1/auth/switch-tenant` — how a person gets INTO (or out of) a
+     *    lapsed workspace at all. It is a session call, not workspace data: the
+     *    handler re-checks the active membership in the target itself. Walled,
+     *    the owner of an expired workspace could never open it to reach
+     *    Billing, and someone sitting in one could never leave (2026-11-22,
+     *    Almolakhas Org. on app.whity.dev).
      *
      * NARROW ON PURPOSE. These are matched as PREFIXES, so `/api/v1/me` would
      * unwall notifications, emails, inbox and preferences in one stroke.
@@ -69,6 +75,7 @@ final class PaymentWall
         '/api/v1/billing',
         '/api/v1/payments',
         '/api/v1/me/capabilities',
+        '/api/v1/auth/switch-tenant',
     ];
 
     private SubscriptionService $subscriptions;

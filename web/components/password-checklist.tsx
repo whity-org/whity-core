@@ -3,13 +3,14 @@
 /**
  * The password rules, ticked as the person types (docs/design/components/
  * TplAuthReset). The rules are the ones the server enforces
- * (PasswordPolicy: 8 to 72 characters), plus the confirmation matching.
+ * (PasswordPolicy: 12 to 72 characters), plus the confirmation matching.
  */
 
 import { Icon } from '@whity/ui/icon';
 import { useTranslation } from '@whity/features/i18n';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
-const MIN = 8;
+const MIN = PASSWORD_MIN_LENGTH;
 const MAX = 72;
 
 export function passwordMeetsPolicy(password: string): boolean {

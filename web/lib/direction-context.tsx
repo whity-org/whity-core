@@ -87,8 +87,9 @@ const BLOCKING_SCRIPT = `(function(){try{` +
  * Renders the blocking anti-flash script. MUST be placed in <head>, as early as
  * the theme's equivalent, so `dir` lands before the first paint.
  */
-export function DirectionInitScript() {
-  return <script dangerouslySetInnerHTML={{ __html: BLOCKING_SCRIPT }} />;
+/** `nonce`: this request's CSP nonce (READINESS CE-12), from the root layout. */
+export function DirectionInitScript({ nonce }: { nonce?: string } = {}) {
+  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: BLOCKING_SCRIPT }} />;
 }
 
 interface DirectionContextValue {

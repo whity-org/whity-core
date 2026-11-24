@@ -86,7 +86,21 @@ updates:
   # tests/Ops/BaseImagePinTest.php now fails if the Dockerfile goes back to a
   # floating tag, because the pin and this entry are one mechanism, not two.
   - package-ecosystem: "docker"
-    directory: "/"
+    # READINESS CO-24: every Dockerfile, not only the root one. The web and
+    # render images and the local CI image are pinned to an exact version for
+    # the same reason as the root base above.
+    directories:
+      - "/"
+      - "/web"
+      - "/render-service"
+      - "/docker/ci-local"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+
+  # The desktop app template's Rust dependencies (READINESS CO-24).
+  - package-ecosystem: "cargo"
+    directory: "/templates/tauri-desktop/src-tauri"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

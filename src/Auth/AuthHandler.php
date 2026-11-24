@@ -175,6 +175,19 @@ class AuthHandler
         $this->securityMailer = $mailer;
     }
 
+    /**
+     * Counts wrong current passwords on `PATCH /me` (READINESS CE-6). The same
+     * budget as the two-step disable and regenerate proofs, and apart from the
+     * login throttle: a stolen session guessing here must not lock the owner
+     * out of signing in. Null (tests, the CLI): not counted.
+     */
+    private ?LoginThrottleService $proofThrottle = null;
+
+    public function setProofThrottle(LoginThrottleService $throttle): void
+    {
+        $this->proofThrottle = $throttle;
+    }
+
     /** Sends the confirmation link for a new address (WHIT-1246): set at boot once mail is wired. */
     private ?\Whity\Core\Identity\EmailVerificationProvider $emailVerificationProvider = null;
 
@@ -1692,9 +1705,18 @@ class AuthHandler
         $currentPassword = isset($body['current_password']) && is_string($body['current_password'])
             ? $body['current_password']
             : '';
+        $ip = ClientIp::fromRequest($request);
+        if ($this->proofThrottle?->isThrottled($profileId, $ip) === true) {
+            return Response::error('Too many attempts', 429, ['reason' => 'throttled']);
+        }
         if ($currentPassword === '' || !password_verify($currentPassword, (string) $profile['password_hash'])) {
+            if ($currentPassword !== '') {
+                $this->proofThrottle?->recordFailure($profileId, $ip);
+            }
+
             return Response::error('Current password is incorrect', 401);
         }
+        $this->proofThrottle?->clearUser($profileId);
 
         $newEmail          = (string) $profileEmail['email'];
         $pendingEmail      = null;
@@ -1829,6 +1851,18 @@ class AuthHandler
         }
 
         $this->logProfileUpdate($activeTenantId, $profileId, $emailProvided, $passwordChanged);
+        // READINESS CO-9: a person's own sign-in details changing is on the
+        // trail, not only in the process log. Never the password; the new
+        // address waits unconfirmed, so it is named by its domain only.
+        if ($passwordChanged) {
+            $this->audit('auth.password.changed', $request, $activeTenantId, $profileId);
+        }
+        if ($pendingEmail !== null) {
+            $at = strrpos($pendingEmail, '@');
+            $this->audit('auth.email.change_requested', $request, $activeTenantId, $profileId, [
+                'email_domain' => $at === false ? null : substr($pendingEmail, $at + 1),
+            ]);
+        }
 
         if ($tokenMode) {
             // Token-body mode (WC-ddcd16ad): return the fresh tokens in the body,
@@ -2643,6 +2677,7 @@ class AuthHandler
             $this->bodyRefreshToken($request),
         ];
 
+        $signedOut = null;
         foreach ($tokens as $token) {
             if ($token === null) {
                 continue;
@@ -2652,6 +2687,7 @@ class AuthHandler
             if ($claims === null) {
                 continue;
             }
+            $signedOut ??= $claims;
 
             $jti = $claims['jti'] ?? null;
             $exp = $claims['exp'] ?? null;
@@ -2659,6 +2695,16 @@ class AuthHandler
                 $this->revokeJti((string) $jti, (int) $exp);
                 $this->endSessionOf((string) $jti);
             }
+        }
+
+        // READINESS CO-9: who signed out, when there was someone to sign out.
+        if ($signedOut !== null && is_int($signedOut['profile_id'] ?? null)) {
+            $this->audit(
+                'auth.logout',
+                $request,
+                is_int($signedOut['active_tenant_id'] ?? null) ? $signedOut['active_tenant_id'] : null,
+                $signedOut['profile_id'],
+            );
         }
 
         // Clear both cookies (a no-op for token-mode clients that never set them).

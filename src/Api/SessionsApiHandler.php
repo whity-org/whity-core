@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use Whity\Auth\SessionService;
+use Whity\Core\Audit\AuditLoggerInterface;
 use Whity\Auth\TokenValidator;
 use Whity\Core\Request;
 use Whity\Core\Response;
@@ -28,6 +29,8 @@ final class SessionsApiHandler
     public function __construct(
         private readonly TokenValidator $tokenValidator,
         private readonly SessionService $sessions,
+        // READINESS CO-8: ending a session is on the trail. Null in tests.
+        private readonly ?AuditLoggerInterface $audit = null,
     ) {}
 
     /**
@@ -69,6 +72,12 @@ final class SessionsApiHandler
         if (!$this->sessions->revokeById($id, $profileId, $tenantId)) {
             return Response::error('Session not found', 404);
         }
+        $this->audit?->record('auth.session.revoked', [
+            'tenant_id'     => $tenantId,
+            'actor_user_id' => $profileId,
+            'target_type'   => 'session',
+            'target_id'     => $id,
+        ]);
 
         return new Response(204, '', ['Content-Type' => 'application/json']);
     }
@@ -92,7 +101,16 @@ final class SessionsApiHandler
             return Response::error('Unauthenticated', 401);
         }
 
-        return Response::json(['revoked' => $this->sessions->revokeAllExcept($profileId, $tenantId, $jti)], 200);
+        $revoked = $this->sessions->revokeAllExcept($profileId, $tenantId, $jti);
+        $this->audit?->record('auth.session.revoked_others', [
+            'tenant_id'     => $tenantId,
+            'actor_user_id' => $profileId,
+            'target_type'   => 'user',
+            'target_id'     => $profileId,
+            'metadata'      => ['revoked' => $revoked],
+        ]);
+
+        return Response::json(['revoked' => $revoked], 200);
     }
 
     /**

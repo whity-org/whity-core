@@ -103,6 +103,7 @@ import { api, apiFetch } from '@/lib/api/client';
 // an empty string is a date.
 import { useDateDisplay } from '@whity/features/datetime';
 import { useTranslation } from '@whity/features/i18n';
+import { useToast } from '@/lib/toast-context';
 import { Alert, AlertDescription, AlertTitle } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
@@ -138,9 +139,11 @@ export interface DocumentRecord {
   artifacts: DocumentArtifact[];
   /**
    * Sent when there is no PDF (WHIT-1001): the server's reason, and the
-   * operator's fix, which is null for everyone but operators.
+   * operator's fix, which is null for everyone but operators. WHIT-1370:
+   * `code` names the reason so it can be said in the reader's language, and
+   * `route_id` is the route whose final document this is, to ask again.
    */
-  pdf_pending?: { reason: string; fix: string | null };
+  pdf_pending?: { reason: string; fix: string | null; code?: string; route_id?: number | null };
 }
 
 /**
@@ -736,6 +739,52 @@ function ViewerFailureState({
   onRetry?: () => void;
 }) {
   const t = useTranslation('plugin');
+  const { addToast } = useToast();
+  const [asking, setAsking] = React.useState(false);
+
+  /*
+   * A route's final document with no PDF (WHIT-1370): "Try again" asks the
+   * route to make it again (the queue does it), rather than only reloading a
+   * page that would say the same thing. The server decides who may ask.
+   */
+  const routeId = failure === 'no-content' && typeof pending?.route_id === 'number' ? pending.route_id : null;
+  const askAgain = async () => {
+    if (routeId === null) return;
+    setAsking(true);
+    try {
+      const { response, error } = await api.POST('/api/v1/routes/{routeId}/final-document/retry', {
+        params: { path: { routeId } },
+      });
+      if (!response.ok) {
+        const body = error as { error?: string } | undefined;
+        addToast(body?.error ?? t('blocks.documentViewer.retryFailed', 'It could not be tried again. Try once more.'), 'error');
+        return;
+      }
+      addToast(t('blocks.documentViewer.retried', 'The PDF will be made again shortly. Check back in a minute.'), 'success');
+      onRetry?.();
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  /** The server's reason, in the reader's language when it names one we know. */
+  const pendingText = (p: NonNullable<DocumentRecord['pdf_pending']>): string => {
+    switch (p.code) {
+      case 'render_refused':
+        return t(
+          'blocks.documentViewer.pending.renderRefused',
+          'Whity could not lay out the PDF. Try again; if it happens again, tell your workspace administrator.'
+        );
+      case 'final_waiting':
+        return t('blocks.documentViewer.pending.finalWaiting', 'The PDF is being made. Check back in a minute.');
+      case 'not_made':
+        return t('blocks.documentViewer.pending.notMade', 'The PDF was not made when this document was issued. Try again.');
+      default:
+        // The renderer's own state (not set up, not reachable) and, for
+        // operators, its fix: the operator's own words for those.
+        return [p.reason + '.', p.fix].filter(Boolean).join(' ');
+    }
+  };
 
   const copy: Record<ViewerFailure, { title: string; description: string }> = {
     unavailable: {
@@ -757,7 +806,7 @@ function ViewerFailureState({
       // The server's reason, and for operators its fix. They name settings and
       // image tags, which are the operator's own words for them.
       description: pending
-        ? [pending.reason + '.', pending.fix].filter(Boolean).join(' ')
+        ? pendingText(pending)
         : t(
             'blocks.documentViewer.noContentHint',
             'The record is saved. Its PDF has not been made yet.'
@@ -779,7 +828,11 @@ function ViewerFailureState({
       title={copy[failure].title}
       description={copy[failure].description}
       action={
-        onRetry === undefined ? undefined : (
+        routeId !== null ? (
+          <Button variant="outline" size="sm" disabled={asking} onClick={() => void askAgain()}>
+            {t('blocks.documentViewer.retry', 'Try again')}
+          </Button>
+        ) : onRetry === undefined ? undefined : (
           <Button variant="outline" size="sm" onClick={onRetry}>
             {t('blocks.documentViewer.retry', 'Try again')}
           </Button>

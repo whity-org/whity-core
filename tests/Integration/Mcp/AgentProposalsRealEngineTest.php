@@ -195,6 +195,31 @@ final class AgentProposalsRealEngineTest extends TestCase
         self::assertNotNull($this->stored($id, self::TENANT)['result']);
     }
 
+    /**
+     * READINESS TM-7: a plain key's proposal runs under the key as it is at
+     * approval. Revoked since it asked: nothing runs.
+     */
+    public function testAProposalFromAKeyRevokedSinceItAskedCanNotRun(): void
+    {
+        $this->pdo->prepare("INSERT INTO mcp_tokens (jti, profile_id, tenant_id, name, principal_kind, scope, expires_at)
+                             VALUES ('jti-billing-assistant', ?, ?, 'Billing assistant', ?, ?, ?)")
+            ->execute([self::RANA, self::TENANT, AgentScopeGrant::AGENT_KIND, json_encode(['tools:call']), gmdate('Y-m-d H:i:s', time() + 86400)]);
+        $inbox = new AgentProposalsApiHandler($this->proposals, $this->toolsCall, mcpTokens: new \Whity\Mcp\Auth\McpTokenService($this->pdo, new \Whity\Auth\JwtParser('agent-proposals-test-secret-32-chars!')));
+
+        $runs = $this->ask(['name' => 'Runs while the key is live']);
+        self::assertSame(200, $inbox->approve($this->as(self::RANA), ['id' => (string) $runs])->getStatusCode());
+
+        $id = $this->ask(['name' => 'Asked before the key was revoked']);
+        $this->pdo->prepare('INSERT INTO revoked_tokens (jti, expires_at) VALUES (?, ?)')
+            ->execute(['jti-billing-assistant', gmdate('Y-m-d H:i:s', time() + 86400)]);
+
+        $response = $inbox->approve($this->as(self::RANA), ['id' => (string) $id]);
+
+        self::assertSame(409, $response->getStatusCode(), $response->getBody());
+        self::assertSame([['name' => 'Runs while the key is live']], $this->created);
+        self::assertSame('waiting', $this->stored($id, self::TENANT)['status'], 'it can still be declined');
+    }
+
     public function testApprovalCanEditTheArguments(): void
     {
         $id = $this->ask(['name' => 'Leave reqest']);

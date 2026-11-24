@@ -3,6 +3,7 @@
 import { useRef, useState } from 'react';
 import { api } from '@/lib/api/client';
 import { useToast } from '@/lib/toast-context';
+import { useOptionalAuth } from '@/lib/auth-context';
 import { useFetch } from '@/hooks/useFetch';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { BILLING_PAY } from '@/lib/capabilities';
@@ -35,6 +36,7 @@ interface PlanOption {
 export function ChangePlan({ onChanged }: { onChanged: () => void }) {
   const { addToast } = useToast();
   const { hasPermission } = useCapabilities();
+  const auth = useOptionalAuth();
   const t = useTranslation('admin');
   const canPay = hasPermission(BILLING_PAY);
   const [target, setTarget] = useState<PlanOption | null>(null);
@@ -85,6 +87,8 @@ export function ChangePlan({ onChanged }: { onChanged: () => void }) {
       'success'
     );
     onChanged();
+    // A plan that starts now changes limits and banners: refresh them here and in every tab.
+    if (takesEffect === 'now') void auth?.sessionChanged();
   };
 
   // A dearer plan is charged today and a cheaper one waits, as the server decides.

@@ -19,6 +19,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Mcp\Auth\AgentScopeGrant;
 use Whity\Mcp\Auth\McpPrincipal;
 use Whity\Mcp\Auth\McpScope;
+use Whity\Mcp\Auth\McpTokenService;
 use Whity\Mcp\JsonRpc\McpException;
 use Whity\Mcp\Tools\ToolsCallHandler;
 
@@ -65,6 +66,9 @@ final class AgentProposalsApiHandler
         private readonly ?\Closure $toolInfo = null,
         // AG.1: a Needs verifying (tier 3) proposal is a gated approval.
         private readonly ?GatedApproval $gate = null,
+        // READINESS TM-7: a proposal from a plain key runs under the key as it
+        // is now, so a key revoked or narrowed since it asked can't run it.
+        private readonly ?McpTokenService $mcpTokens = null,
     ) {
     }
 
@@ -278,6 +282,17 @@ final class AgentProposalsApiHandler
                 )),
                 ...$active['entries'],
             ];
+        } elseif ($this->mcpTokens !== null && !str_contains((string) $proposal['agent_principal_id'], ':')) {
+            // READINESS TM-7: a key not bound to a workspace agent (its id is
+            // the token's jti). Its grant and revocation are read NOW: the
+            // scope copied when it asked would let a revoked key, or a grant
+            // turned Off since, still run what it proposed. A Whity ID agent
+            // (`oauth-agent:…`) carries its scope in its own short-lived token.
+            $live = $this->mcpTokens->findActive((string) $proposal['agent_principal_id'], $profileId, $tenantId);
+            if ($live === null) {
+                return Response::error('This connection was disconnected or has expired, so nothing can run. Decline it, or connect again and ask again.', 409);
+            }
+            $scope = $live['scope'];
         }
 
         // Atomic: only the caller that moves it from waiting runs it.

@@ -420,6 +420,13 @@ export function fieldMeta(t: TranslateFn): Record<string, FieldMeta> {
         'The most workspaces one person may own, counting ones they co-own. 0 means no limit.'
       ),
     },
+    'handles.reserved': {
+      label: t('settings.meta.handles.reserved.label', 'Handles nobody may take'),
+      help: t(
+        'settings.meta.handles.reserved.help',
+        "One handle per line. Whity's own pages and words are already kept; add local brands or words you don't want used. A workspace already using one keeps it."
+      ),
+    },
     'workspaces.additional_plan': {
       label: t('settings.meta.workspaces.additional_plan.label', 'Plan for each further workspace'),
       help: t(
@@ -695,6 +702,8 @@ export function settingsSections(t: TranslateFn): readonly SectionDef[] {
         // Creating more workspaces while signed in (WHIT-1169).
         'workspaces.self_create_enabled',
         'workspaces.max_owned_per_person',
+        // Workspace @handles (WHIT-1363, design section 36).
+        'handles.reserved',
         // Each further owned workspace pays (WHIT-1203).
         'workspaces.additional_plan',
         'workspaces.additional_trial_days',

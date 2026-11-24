@@ -441,6 +441,10 @@ final class PublicFormsApiRealEngineTest extends TestCase
                 'sign_in_required', 'form_id',
                 // WHIT-932: whether the page shows "Built on Whity".
                 'built_on_whity',
+                // READINESS TM-20: the instance's bot-check provider and its
+                // PUBLIC site key (the same pair the booking page shows), or
+                // null. Never the secret.
+                'bot_check',
             ],
             array_keys($data)
         );

@@ -40,6 +40,7 @@ export type { paths, components, operations } from '@whity/api-client';
 export const SESSION_EXPIRED_EVENT = 'whity:session-expired';
 
 const REFRESH_PATH = '/api/v1/auth/refresh';
+const SWITCH_TENANT_PATH = '/api/v1/auth/switch-tenant';
 
 /** Paths whose 401 means wrong credentials, not an expired session. */
 const NO_REFRESH_PATHS = [
@@ -116,7 +117,9 @@ function appFetch(send: Transport): Transport {
     if (response.status >= 500) {
       lastErrorReference = response.headers?.get?.('X-Error-Reference') ?? lastErrorReference;
     }
-    if (response.status === 402) {
+    // A refused workspace switch is about the workspace being opened, not the
+    // one on screen: the switcher explains it, and the page stays put.
+    if (response.status === 402 && !pathOf(request.url).endsWith(SWITCH_TENANT_PATH)) {
       redirectToBilling();
     }
     return response;

@@ -18,6 +18,7 @@ import { continueSignupPlugin, rememberSignupPlugin, signupPluginFrom } from '@/
 import { templatePickerPath } from '@/lib/workspace-template';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
 import { useHomePath } from '@/lib/branding-context';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
  * Self-service registration (WC-235). Provisions a NEW workspace (tenant) with
@@ -27,7 +28,6 @@ import { useHomePath } from '@/lib/branding-context';
  * to the dashboard. Mirrors the login page's structure, components, and CSRF
  * (X-Requested-With) convention.
  */
-const PASSWORD_MIN_LENGTH = 8;
 
 export default function RegisterPage() {
   const router = useRouter();

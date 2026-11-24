@@ -48,8 +48,9 @@ const BLOCKING_SCRIPT = buildThemeInitScript();
  * in <head> (before globals.css / any styled content) so the `.dark` class
  * lands before the browser's first paint.
  */
-export function ThemeModeInitScript() {
-  return <script dangerouslySetInnerHTML={{ __html: BLOCKING_SCRIPT }} />;
+/** `nonce`: this request's CSP nonce (READINESS CE-12), from the root layout. */
+export function ThemeModeInitScript({ nonce }: { nonce?: string } = {}) {
+  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: BLOCKING_SCRIPT }} />;
 }
 
 interface ThemeModeContextValue {

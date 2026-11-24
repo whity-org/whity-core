@@ -48,6 +48,17 @@ const UNIT_WORDS = {
   question: 'question',
   divider: 'divider',
   atomic: 'block',
+  // Form printouts (FP.1-FP.12): a person reads "a question on page 11".
+  formTitle: 'form title',
+  formSection: 'section heading',
+  formQuestion: 'question',
+  notice: 'notice',
+  signatureRow: 'signature',
+  decisionLine: 'decision line',
+  decisionBlock: 'decision',
+  approvals: 'approvals list',
+  officeStrip: 'office details',
+  letterhead: 'letterhead',
 };
 
 /** One problem as a sentence a person can act on. */
