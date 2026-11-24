@@ -51,6 +51,60 @@ export function offersYearly(rows: PriceRow[]): boolean {
   return rows.some((row) => row.billing_period === 'year');
 }
 
+type Translate = (key: string, fallback: string, params?: Record<string, string | number>) => string;
+
+/**
+ * The four standard plans' names and descriptions in the reader's language
+ * (WHIT-1398). `plans.name` and `plans.description` are one English string in
+ * the database, so Arabic showed "Up to 3 staff and 200 customers a month."
+ * with its full stop at the wrong end. The standard keys get translatable
+ * labels (English defaults match the live rows); any other plan an operator
+ * adds keeps its database text.
+ *
+ * This file has no useTranslation, so the keys are declared for the catalogue:
+ *
+ * @i18n-keys admin
+ *   billing.plans.plan.free.name = Free
+ *   billing.plans.plan.free.description = Up to 3 staff and 200 customers a month.
+ *   billing.plans.plan.team.name = Team
+ *   billing.plans.plan.team.description = Up to 25 staff and 5,000 customers a month.
+ *   billing.plans.plan.business.name = Business
+ *   billing.plans.plan.business.description = Up to 100 staff and 25,000 customers a month.
+ *   billing.plans.plan.enterprise.name = Enterprise
+ *   billing.plans.plan.enterprise.description = Everything without limits, for the largest organisations.
+ */
+export function localizePlanText(t: Translate, planKey: string, name: string, description: string | null): { name: string; description: string | null } {
+  switch (planKey) {
+    case 'free':
+      return {
+        name: t('billing.plans.plan.free.name', 'Free'),
+        description: t('billing.plans.plan.free.description', 'Up to 3 staff and 200 customers a month.'),
+      };
+    case 'team':
+      return {
+        name: t('billing.plans.plan.team.name', 'Team'),
+        description: t('billing.plans.plan.team.description', 'Up to 25 staff and 5,000 customers a month.'),
+      };
+    case 'business':
+      return {
+        name: t('billing.plans.plan.business.name', 'Business'),
+        description: t('billing.plans.plan.business.description', 'Up to 100 staff and 25,000 customers a month.'),
+      };
+    case 'enterprise':
+      return {
+        name: t('billing.plans.plan.enterprise.name', 'Enterprise'),
+        description: t('billing.plans.plan.enterprise.description', 'Everything without limits, for the largest organisations.'),
+      };
+    default:
+      return { name, description };
+  }
+}
+
+/** Every card with its plan text in the reader's language. */
+export function localizePlanCards(cards: PlanCard[], t: Translate): PlanCard[] {
+  return cards.map((card) => ({ ...card, ...localizePlanText(t, card.plan_key, card.name, card.description) }));
+}
+
 export function planCards(rows: PriceRow[], period: BillingPeriod): PlanCard[] {
   const byPlan = new Map<string, PriceRow[]>();
   for (const row of rows) {

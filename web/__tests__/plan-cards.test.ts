@@ -1,4 +1,4 @@
-import { featureLines, offersYearly, planCards, yearlySaving, type PriceRow } from '@/lib/billing/plan-cards';
+import { featureLines, localizePlanText, offersYearly, planCards, yearlySaving, type PriceRow } from '@/lib/billing/plan-cards';
 
 const row = (plan_key: string, billing_period: string, unit_amount: number, extra: Partial<PriceRow> = {}): PriceRow => ({
   plan_key,
@@ -64,5 +64,19 @@ describe('plan cards', () => {
       { kind: 'limit', key: 'customers.per_month', value: 5000, unlimited: false },
       { kind: 'feature', key: 'brand.custom_domain' },
     ]);
+  });
+});
+
+describe('localizePlanText (WHIT-1398)', () => {
+  const echo = (key: string, fallback: string) => `${key}|${fallback}`;
+
+  it('gives the four standard plans translatable names and descriptions', () => {
+    const text = localizePlanText(echo, 'free', 'Free', 'Up to 2 staff and 100 customers a month.');
+    expect(text.name).toBe('billing.plans.plan.free.name|Free');
+    expect(text.description).toBe('billing.plans.plan.free.description|Up to 3 staff and 200 customers a month.');
+  });
+
+  it('keeps the database text for any other plan', () => {
+    expect(localizePlanText(echo, 'salon_pro', 'Salon Pro', null)).toEqual({ name: 'Salon Pro', description: null });
   });
 });
