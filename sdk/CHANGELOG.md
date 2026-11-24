@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.163
+
+PLUGIN.JSON SCHEMA, PART 1 (decision D4): `plugin.json` also declares `settings`, `notifications`, `jobs` (a handler `class`, an optional cron `schedule`, `submittable`), `dashboard`, `onboarding`, `contactFields` and `themes` (theme files inside the plugin), each in the shape its PHP interface returns. `Manifest\ManifestValidator` checks them through the new `Manifest\SettingsValidator`, `Manifest\NotificationTypesValidator`, `Manifest\JobsValidator`, `Manifest\OnboardingValidator` and `Manifest\ThemeFilesValidator`, and the existing `DashboardValidator` and `ContactFieldValidator`; `resources/plugin-manifest.schema.json` describes them. `Manifest\ManifestPlugin` now implements the matching interfaces and answers each from the file, empty when the file says nothing. Core's `whity-cli plugin validate <dir>` checks a manifest offline, theme files included (WHIT-1389).
+
+Purely additive: new optional manifest keys, new validators, and new interfaces on the abstract `ManifestPlugin`, whose answers are empty unless the manifest declares the part.
+
 ## 1.162
 
 THE CHANGELOG MOVES HERE (decision D7): this file replaces the version ledger that was the docblock of `Sdk`, and the 640-line assertion message in core's `SdkPackageContractTest` that repeated it. `Sdk::VERSION` and this file's top entry are checked against each other, and the entries against their order, by `scripts/ci-sdk-version-collision.php`; `scripts/sdk-coverage.php` reads its minors from here (WHIT-1388).

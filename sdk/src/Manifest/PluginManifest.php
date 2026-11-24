@@ -354,6 +354,86 @@ final class PluginManifest
         return is_array($card) ? $card : null;
     }
 
+    /**
+     * `settings`, bare key => declaration (SDK 1.163, D4).
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    public function settings(): array
+    {
+        /** @var array<string, array<string, mixed>> */
+        return $this->map('settings');
+    }
+
+    /**
+     * `notifications`, bare type => {label, emailDefault?} (SDK 1.163, D4).
+     *
+     * @return array<string, array{label: array{en: string, ar: string}, emailDefault?: bool}>
+     */
+    public function notificationTypes(): array
+    {
+        /** @var array<string, array{label: array{en: string, ar: string}, emailDefault?: bool}> */
+        return $this->map('notifications');
+    }
+
+    /**
+     * `jobs`, bare name => {class, schedule?, submittable?} (SDK 1.163, D4).
+     *
+     * @return array<string, array{class: string, schedule?: string, submittable?: bool}>
+     */
+    public function jobs(): array
+    {
+        /** @var array<string, array{class: string, schedule?: string, submittable?: bool}> */
+        return $this->map('jobs');
+    }
+
+    /**
+     * `dashboard`, or null when the manifest has none (SDK 1.163, D4).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function dashboard(): ?array
+    {
+        $dashboard = $this->data['dashboard'] ?? null;
+
+        /** @var array<string, mixed>|null */
+        return is_array($dashboard) ? $dashboard : null;
+    }
+
+    /**
+     * `onboarding`, or null when the manifest has none (SDK 1.163, D4).
+     *
+     * @return array<string, mixed>|null
+     */
+    public function onboarding(): ?array
+    {
+        $onboarding = $this->data['onboarding'] ?? null;
+
+        /** @var array<string, mixed>|null */
+        return is_array($onboarding) ? $onboarding : null;
+    }
+
+    /**
+     * `contactFields` (SDK 1.163, D4).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function contactFields(): array
+    {
+        return $this->list('contactFields');
+    }
+
+    /**
+     * `themes`: paths of theme files inside the plugin (SDK 1.163, D4).
+     *
+     * @return list<string>
+     */
+    public function themeFiles(): array
+    {
+        /** @var list<string> */
+        return $this->data['themes'] ?? [];
+    }
+
     /** @return array<string, mixed> */
     private function plugin(): array
     {

@@ -55,6 +55,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
             'core-grants' => $this->coreGrants($argv),
             'core-grant-approve' => $this->coreGrantChange($argv, true),
             'core-grant-revoke' => $this->coreGrantChange($argv, false),
+            'validate' => $this->validate($argv),
             '--help', '-h', 'help' => $this->showHelp(),
             default => $this->unknownAction($action),
         };
@@ -478,6 +479,37 @@ class PluginsCommand extends BaseCommand implements CliCommand
     }
 
     /**
+     * Check a plugin's plugin.json before it is installed (SDK 1.163, D4).
+     * Offline: no database and no running Whity.
+     *
+     * @param array<mixed> $argv
+     */
+    private function validate(array $argv): int
+    {
+        $json = in_array('--json', $argv, true);
+        $paths = array_values(array_filter($argv, static fn (mixed $a): bool => is_string($a) && !str_starts_with($a, '--')));
+        $path = is_string($paths[0] ?? null) ? $paths[0] : '.';
+
+        $result = \Whity\Core\Plugin\PluginManifestCheck::run($path);
+        if ($json) {
+            echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . "\n";
+
+            return $result['ok'] ? 0 : 1;
+        }
+        if ($result['ok']) {
+            echo "{$result['file']} is valid: {$result['name']} {$result['version']}.\n";
+
+            return 0;
+        }
+        echo "{$result['file']} has " . count($result['errors']) . " problem(s):\n";
+        foreach ($result['errors'] as $error) {
+            echo "  - {$error}\n";
+        }
+
+        return 1;
+    }
+
+    /**
      * Show help for plugins command
      */
     private function showHelp(): int
@@ -496,6 +528,7 @@ class PluginsCommand extends BaseCommand implements CliCommand
         echo "  core-grants <plugin> [--tenant <id>]  Core permissions the plugin asks for its roles, and what is approved\n";
         echo "  core-grant-approve <plugin> <role> [--tenant <id>]  Grant a role the core permissions the plugin asks for it\n";
         echo "  core-grant-revoke <plugin> <role> [--tenant <id>]  Take them back\n";
+        echo "  validate [<dir or plugin.json>] [--json]  Check a plugin's plugin.json before installing it (offline)\n";
         return 0;
     }
 

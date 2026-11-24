@@ -767,6 +767,10 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 
             return null;
         }
+        if ($declared === []) {
+            // Nothing declared: a manifest plugin without `onboarding` (SDK 1.163).
+            return null;
+        }
 
         $name = $plugin->getName();
         $permission = $declared['permission'] ?? null;
