@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.167
+
+DESKTOP HARDWARE: `Contribute\PluginDesktopCapabilitiesInterface`, optional, names the hardware a plugin uses when it runs inside Whity Desktop on the person's computer: `getDesktopCapabilities()` returns `<driver>.<operation>` strings such as `printer.list` and `printer.print`. The desktop app binds the plugin's hardware handle to exactly that list, and the person sets each capability to Off, Ask first or Allowed on their device; under Ask first the call becomes a proposal that runs on approval. On the server the declaration does nothing (whity-desktop ADR 0001, decision 3a) (WHIT-1401).
+
+Purely additive: one new optional interface. No existing interface changes.
+
 ## 1.166
 
 ONE COPY OF THE BLOCK TYPES (decision D8, step 5b): the web app takes its block and feature types and its page walker from `@whity/plugin-sdk` instead of keeping its own copies. `web/lib/plugin-features.ts` re-exports the package's types, and `web/lib/api/fetch-all-pages.ts` walks pages with the package's `walkPages`. The types the app renders plugin screens with are now the ones the compiler checks against `BlockContract`, so a plugin built with the package and the app read one contract. The desktop template keeps its copy until the package is published (WHIT-1393) (WHIT-1395).
