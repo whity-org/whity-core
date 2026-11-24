@@ -6,6 +6,14 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.165
+
+THE FRONTEND PACKAGE (decision D8): `@whity/plugin-sdk`, a workspace package at packages/plugin-sdk whose version is this SDK's (1.165.0). It holds the block contract generated from `Frontend\Blocks\BlockContract` by `php scripts/plugin-sdk-contract.php` (each block type, its child slots, its props with their kind, whether they are required and their allowed values, the tree limits and `SDK_VERSION`); the block types, moved from the web app and checked against that contract by the compiler; a typed `block()` builder; `createPluginClient()` for a plugin's own routes; `fetchAllPages()`; one `LocalizedText` with `resolveText()` and `normalizeText()`, which behave like `I18n\LocalizedText`; and test helpers. It is not published yet: npm packages go out with a release (WHIT-1392).
+
+`fileInput` declares the `encoding` prop (`base64`), which the web renderer has read since WC-318 but the contract never listed. The validator now refuses a value other than `base64`.
+
+Purely additive: one optional declared prop and a new package. No plugin used `encoding`.
+
 ## 1.164
 
 EVENT CATALOGUE: `Hooks\EventCatalogue` gives each of the 206 published events its kind (`observe`, `filter`, `veto`, `queued`, and `vetoable` for a filter that may also refuse), the payload keys it documents, its `.async` twin and the SDK minor it arrived in, as a `Hooks\EventInfo` (`EventCatalogue::get()`, `all()`, `names()`). The event tables in docs/wiki/HOOK_SYSTEM.md are generated from it by `php scripts/hook-catalogue.php`, and core's `EventCatalogueTest` fails when an event has no entry, an entry contradicts itself, the filters differ from the events core reads back, or the page is stale. `since` for events older than 1.164 was reconstructed from this changelog and may be later than the event really is (WHIT-1390).
