@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk;
 
 /**
- * SDK identity (v1.160).
+ * SDK identity (v1.161).
  *
  * {@see self::VERSION} is the version a host application evaluates plugin
  * SDK-constraints against ({@see PluginRequirementsInterface::getSdkConstraint()}).
@@ -1660,12 +1660,27 @@ namespace Whity\Sdk;
  * design section 36 §3, HD.4).
  *
  * Purely additive: one new event.)
+ *
+ * 1.161 (THE 2.0 NAMES, ADDITIVELY: every contribution point also has its 2.0 name in
+ * `Whity\Sdk\Contribute\` ({@see Contribute\PluginDashboardInterface}, {@see Contribute\PluginSettingsInterface},
+ * {@see Contribute\PluginTablesInterface} and the rest), a `class_alias` of the old name, so the two are one type and
+ * a plugin may implement either. {@see PluginMcpInterface} is {@see Contribute\PluginMcpPromptsInterface}, since it
+ * declares prompts only, and {@see Testing\TenantIsolationConformanceTestCase} is
+ * {@see Testing\WorkspaceIsolationConformanceTestCase} (D6). The old names are `@deprecated` and keep working through
+ * 2.0.x. The plugin context gives the explicit-workspace services without their workspace argument (D2):
+ * {@see Context\PluginScope::contacts()}, `timeOff()`, `away()` and `bookings()`, returning
+ * {@see Contacts\WorkspaceContacts}, {@see Calendar\WorkspaceTimeOff}, {@see Delegation\WorkspaceAway} and
+ * {@see Calendar\WorkspaceBookings}, with the service names `contacts`, `timeOff`, `away` and `bookings` for
+ * {@see Context\Service} (WHIT-1387, docs/wiki/Plugin-SDK-2.0-Plan.md).
+ *
+ * Purely additive: 42 aliases, four new interfaces and four new methods on Context\PluginScope, which only the host
+ * implements. Nothing is removed and nothing logs.)
  * Breaking changes require a new major version.
  */
 final class Sdk
 {
     /** The SDK contract version shipped by this package. */
-    public const VERSION = '1.160.0';
+    public const VERSION = '1.161.0';
 
     /**
      * Static identity only — never instantiated.

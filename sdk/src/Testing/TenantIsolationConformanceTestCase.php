@@ -42,6 +42,9 @@ use Whity\Sdk\Tenant\TenantTableRegistry;
  * set `PHPUNIT_PG_DSN` in the environment and check 3 runs against real
  * PostgreSQL — the dialect that production actually speaks — instead of SQLite.
  * See {@see RealEnginePdo} for the harness and {@see makePdo()} for the hook.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Testing\WorkspaceIsolationConformanceTestCase}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 abstract class TenantIsolationConformanceTestCase extends TestCase
 {

@@ -35,6 +35,9 @@ namespace Whity\Sdk;
  *
  * Refused entries are logged against the plugin and skipped; the plugin
  * still loads.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginMcpToolsetsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginMcpToolsetsInterface
 {

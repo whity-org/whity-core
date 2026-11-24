@@ -139,6 +139,9 @@ namespace Whity\Sdk;
  * An invalid descriptor is DROPPED by the host with a logged warning naming
  * the plugin, the descriptor id (when present) and the exact reason; the
  * plugin itself still loads — descriptors are UI metadata, never a load gate.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginFrontendInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginFrontendInterface
 {

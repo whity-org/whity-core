@@ -14,6 +14,9 @@ use Whity\Sdk\Messaging\MessageChannel;
  * through it from a background job, and meters what it sends like core's own
  * channels. A channel that throws is isolated: its messages fail and say why,
  * and every other channel keeps working.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginMessageChannelsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginMessageChannelsInterface
 {

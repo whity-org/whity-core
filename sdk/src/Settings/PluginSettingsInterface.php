@@ -130,6 +130,9 @@ namespace Whity\Sdk\Settings;
  * time instead of after shipping a readable password.
  *
  * OPTIONAL. Plugins that do not implement it are untouched.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginSettingsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginSettingsInterface
 {

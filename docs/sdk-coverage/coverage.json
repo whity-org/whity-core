@@ -1,8 +1,8 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in the Sdk.php ledger is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.160.0",
+    "sdk_version": "1.161.0",
     "core_version": "0.2.32",
-    "updated": "2026-11-22",
+    "updated": "2026-11-24",
     "ratings": {
         "full": "A plugin can read, change, react to and extend this area through a published SDK contract.",
         "partial": "Some of it is in the SDK; the rest is missing or reachable only through internal core classes.",
@@ -97,6 +97,10 @@
                 {
                     "what": "PluginContactFieldsInterface: a plugin's own fields on contacts, named under the plugin, made where it is on and archived with values kept where it is off",
                     "since": "1.119"
+                },
+                {
+                    "what": "$ctx->contacts() (Contacts\\WorkspaceContacts): the same reads and writes in the workspace the call runs in, with no workspace argument; also $ctx->timeOff(), away() and bookings(). Every contribution point also has its 2.0 name under Contribute\\",
+                    "since": "1.161"
                 }
             ],
             "missing": [

@@ -23,6 +23,9 @@ namespace Whity\Sdk;
  * call is made again next time. Make both idempotent. The version recorded is
  * {@see PluginInterface::getVersion()}; a downgrade counts as an upgrade from
  * the newer version to the older one.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginInstallLifecycleInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginInstallLifecycleInterface
 {
