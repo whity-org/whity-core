@@ -301,6 +301,9 @@ final class ExternalBillingApiHandler
             'has_access' => $snapshot->hasAccess,
             'status' => $snapshot->status,
             'plan' => $snapshot->planCode,
+            // The plan's name as the cards show it (WHIT-1397): the code is
+            // the billing service's key, which people should never read.
+            'plan_name' => $this->planName($snapshot->planCode),
             'access_until' => $snapshot->accessUntil,
             'cancel_at_period_end' => $snapshot->cancelAtPeriodEnd,
             // From the billing service when it could be reached, null otherwise
@@ -966,6 +969,20 @@ final class ExternalBillingApiHandler
             }
             throw $e;
         }
+    }
+
+    /** The name of the plan with this key, or null when there is none. */
+    private function planName(?string $planKey): ?string
+    {
+        if ($planKey === null || $planKey === '') {
+            return null;
+        }
+        $statement = $this->pdo->prepare('SELECT name FROM plans WHERE plan_key = :plan_key');
+        $statement->bindValue(':plan_key', $planKey);
+        $statement->execute();
+        $name = $statement->fetchColumn();
+
+        return is_string($name) && $name !== '' ? $name : null;
     }
 
     private function currentPlanKey(int $tenantId): ?string

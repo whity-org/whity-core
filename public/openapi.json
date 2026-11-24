@@ -107409,6 +107409,10 @@
                                 "type": "string",
                                 "nullable": true
                             },
+                            "plan_name": {
+                                "type": "string",
+                                "nullable": true
+                            },
                             "access_until": {
                                 "type": "string",
                                 "nullable": true

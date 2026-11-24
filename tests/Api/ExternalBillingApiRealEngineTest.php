@@ -418,6 +418,24 @@ final class ExternalBillingApiRealEngineTest extends TestCase
         self::assertSame(SubscriptionService::STATUS_ACTIVE, $this->statusOf(self::TENANT));
     }
 
+    /**
+     * WHIT-1397: the Billing page showed "Plan enterprise", the billing
+     * service's key. The return answer carries the name the cards show.
+     */
+    public function testTheReturnNamesThePlanAsTheCardsDo(): void
+    {
+        $this->portal->access = new AccessSnapshot('tenant-1', true, 'pro', 'active', '2026-10-12T00:00:00+00:00');
+
+        $data = $this->json($this->handler->returnFrom($this->asTenant('GET', '/api/v1/billing/return')));
+
+        self::assertSame('pro', $data['plan']);
+        self::assertSame('Pro', $data['plan_name']);
+
+        $this->portal->access = new AccessSnapshot('tenant-1', true, 'gone', 'active', '2026-10-12T00:00:00+00:00');
+        $data = $this->json($this->handler->returnFrom($this->asTenant('GET', '/api/v1/billing/return')));
+        self::assertNull($data['plan_name']);
+    }
+
     // ── sending someone to pay ──────────────────────────────────────────────
 
     public function testCheckoutReturnsADestinationAndNeverTheReference(): void
