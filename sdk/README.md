@@ -154,9 +154,10 @@ moved (a `has` entry with `since`), bump `sdk_version`, and run
 [`docs/wiki/Plugin-SDK-Coverage.md`](../docs/wiki/Plugin-SDK-Coverage.md). CI
 fails a minor the matrix does not account for.
 
-The list above is illustrative, not a changelog. The authoritative,
-version-by-version ledger is the docblock on
-[`Sdk.php`](src/Sdk.php), which every release appends to.
+The list above is illustrative, not a changelog. What every minor added is in
+[`CHANGELOG.md`](CHANGELOG.md), newest first; a pull request that changes the
+SDK adds its minor at the top (since 1.162; before, the ledger was the docblock
+on [`Sdk.php`](src/Sdk.php)).
 
 Breaking contract changes require a new major. A plugin declares the SDK range
 it supports via `getSdkConstraint()` (e.g. `'^1.1'`) and, optionally, the host

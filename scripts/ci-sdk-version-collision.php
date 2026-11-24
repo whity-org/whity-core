@@ -23,9 +23,11 @@ declare(strict_types=1);
  *
  * Three checks, none of which subsumes the others:
  *
- *   1. THE THREE PINS AGREE. sdk/src/Sdk.php states its version in three
- *      places — the header docblock ("SDK identity (vX.Y)"), the last ledger
- *      entry, and the VERSION constant — and only the constant was ever gated.
+ *   1. THE THREE PINS AGREE. The SDK states its version in three places — the
+ *      Sdk.php header docblock ("SDK identity (vX.Y)"), the newest entry in
+ *      sdk/CHANGELOG.md (`## X.Y`, the ledger since 1.162, decision D7; before
+ *      that it was the Sdk.php docblock), and the VERSION constant — and once
+ *      only the constant was gated.
  *      #872 merged with the constant at 1.30.0, a 1.30 ledger entry, and line 8
  *      still reading "SDK identity (v1.29)": the file contradicted itself in its
  *      own opening sentence. That is not carelessness, it is what partial
@@ -33,14 +35,14 @@ declare(strict_types=1);
  *      watches; the unwatched pin rots, and it rots in the ledger a plugin
  *      author reads to decide which constraint to write.
  *
- *   2. THE TWO LEDGERS RUN IN OPPOSITE DIRECTIONS, and each must run its own
- *      way. sdk/src/Sdk.php is OLDEST-FIRST (newest entry last);
- *      tests/Sdk/SdkPackageContractTest.php is NEWEST-FIRST (newest entry
- *      first). Getting one backwards reads as though one PR's feature shipped
- *      in the other's release — which is precisely how a collision gets
- *      "resolved" into a wrong but plausible file. Each ledger is therefore
- *      checked for STRICT monotonicity in its own direction, which also makes a
- *      DUPLICATE entry an error: two 1.30 entries in one ledger is the exact
+ *   2. THE LEDGER RUNS NEWEST-FIRST, strictly. sdk/CHANGELOG.md puts the
+ *      newest minor at the top. (Until 1.162 there were two ledgers running in
+ *      opposite directions, the Sdk.php docblock and an assertion message in
+ *      SdkPackageContractTest; one file replaced both.) An entry out of order
+ *      reads as though one PR's feature shipped in the other's release — which
+ *      is precisely how a collision gets "resolved" into a wrong but plausible
+ *      file. The ledger is therefore checked for STRICT monotonicity, which also
+ *      makes a DUPLICATE entry an error: two 1.30 entries in one ledger is the exact
  *      residue left behind when two branches that both claimed 1.30 get merged
  *      by hand, and it is the only trace of the collision that survives an
  *      up-to-date branch (see check 3's note on why the vertical check alone
@@ -90,8 +92,8 @@ declare(strict_types=1);
 $projectRoot = dirname(__DIR__);
 $sdkFileRelative = 'sdk/src/Sdk.php';
 $sdkFile = $projectRoot . '/' . $sdkFileRelative;
-$testFileRelative = 'tests/Sdk/SdkPackageContractTest.php';
-$testFile = $projectRoot . '/' . $testFileRelative;
+$changelogFileRelative = 'sdk/CHANGELOG.md';
+$changelogFile = $projectRoot . '/' . $changelogFileRelative;
 
 /**
  * The branch every SDK version number is unique against. `develop` is the
@@ -184,7 +186,7 @@ $minor = minorOf($version);
 $failures = [];
 
 // ---------------------------------------------------------------------------
-// 1. The three pins in Sdk.php agree
+// 1. The three pins agree: Sdk.php header, changelog, constant
 // ---------------------------------------------------------------------------
 
 // The header docblock's opening sentence: " * SDK identity (v1.34)."
@@ -204,86 +206,21 @@ if (preg_match('/SDK identity \(v(\d+\.\d+)\)/', $source, $m) !== 1) {
 }
 
 /**
- * The version numbers of the ledger entries in the Sdk.php header docblock, in
- * the order the file states them.
- *
- * An entry opens with its version followed by a parenthesised description —
- * `1.34 (CONTEXT-AWARE ...)` — chained with arrows. A bare back-reference in
- * prose ("every tree that validated under 1.33 still validates") carries no
- * opening parenthesis and so is not an entry, which is what keeps this from
- * having to understand the prose.
+ * The minors in sdk/CHANGELOG.md, in the order the file states them: each
+ * entry is a `## X.Y` heading (SDK 1.162, decision D7). A heading that is not a
+ * bare version (the file's own title, a note) is not an entry.
  *
  * @return list<string>
  */
-function sdkLedgerVersions(string $source): array
-{
-    if (preg_match('#/\*\*(.*?)\*/#s', $source, $m) !== 1) {
-        return [];
-    }
-
-    $docblock = (string) preg_replace('/^\s*\*\s?/m', '', $m[1]);
-    $flat = (string) preg_replace('/\s+/', ' ', $docblock);
-
-    preg_match_all('/(?<![\d.])(\d+\.\d+) \(/', $flat, $matches);
-
-    return $matches[1];
-}
-
-/**
- * The version numbers of the ledger entries in the assertion message that pins
- * Sdk::VERSION in the contract test, in the order the test states them.
- *
- * Located by the assertion itself rather than by method name: the ledger lives
- * in the one assertSame() whose expected value is a literal version and whose
- * actual value is Sdk::VERSION. Entries are `;`-separated and open with an
- * optional "SDK " and the version, so a semicolon inside an entry's prose
- * yields a chunk with no version and is ignored.
- *
- * @return list<string>
- */
-function testLedgerVersions(string $path): array
+function changelogVersions(string $path): array
 {
     if (!is_file($path)) {
         return [];
     }
 
-    $lines = file($path, FILE_IGNORE_NEW_LINES) ?: [];
-    $start = null;
-    foreach ($lines as $i => $line) {
-        if (preg_match('/^\'\d+\.\d+(?:\.\d+)?\',$/', trim($line)) !== 1) {
-            continue;
-        }
-        if (str_contains($lines[$i + 1] ?? '', 'Sdk::VERSION,')) {
-            $start = $i + 2;
-            break;
-        }
-    }
+    preg_match_all('/^## (\d+\.\d+)\s*$/m', str_replace("\r\n", "\n", (string) file_get_contents($path)), $matches);
 
-    if ($start === null) {
-        return [];
-    }
-
-    $message = '';
-    for ($i = $start, $count = count($lines); $i < $count; $i++) {
-        if (trim($lines[$i]) === ');') {
-            break;
-        }
-        // Every single-quoted chunk on the line, unescaped and concatenated —
-        // the message is written as a `.`-chain across many lines.
-        preg_match_all("/'((?:[^'\\\\]|\\\\.)*)'/", $lines[$i], $chunks);
-        foreach ($chunks[1] as $chunk) {
-            $message .= str_replace(["\\'", '\\\\'], ["'", '\\'], $chunk);
-        }
-    }
-
-    $versions = [];
-    foreach (explode(';', $message) as $segment) {
-        if (preg_match('/^(?:SDK )?(\d+\.\d+)\b/', trim($segment), $m) === 1) {
-            $versions[] = $m[1];
-        }
-    }
-
-    return $versions;
+    return $matches[1];
 }
 
 // ---------------------------------------------------------------------------
@@ -330,75 +267,33 @@ function monotonicityFailures(array $versions, string $direction, string $where)
     return $problems;
 }
 
-$sdkLedger = sdkLedgerVersions($source);
+$ledger = changelogVersions($changelogFile);
 
 // A one-entry ledger is not a short ledger, it is a parse that stopped working:
 // monotonicity is vacuous on a single element, so an extraction that silently
-// degraded would report OK forever. Both ledgers have carried tens of entries
-// since 1.8 and neither can shrink — the policy is additive.
-if (count($sdkLedger) < 2) {
+// degraded would report OK forever. The ledger has carried well over a hundred
+// entries since 1.0 and cannot shrink — the policy is additive.
+if (count($ledger) < 2) {
     $failures[] = sprintf(
-        '  [ledger]    found %d ledger entr(ies) in %s\'s header docblock. It is the record a plugin '
-        . 'author reads to pick a constraint, and it only grows — so this is a ledger that was '
-        . 'reformatted out from under the guard, not a short one.',
-        count($sdkLedger),
-        $sdkFileRelative
+        '  [ledger]    found %d entr(ies) in %s. It is the record a plugin author reads to pick a '
+        . 'constraint, and it only grows — so this is a file that was reformatted (or removed) out '
+        . 'from under the guard, not a short one. Each entry is a `## X.Y` heading.',
+        count($ledger),
+        $changelogFileRelative
     );
 } else {
-    // OLDEST-FIRST: the newest entry is the LAST one.
-    $failures = array_merge($failures, monotonicityFailures($sdkLedger, 'ascending', $sdkFileRelative));
+    // NEWEST-FIRST: the newest entry is the FIRST one.
+    $failures = array_merge($failures, monotonicityFailures($ledger, 'descending', $changelogFileRelative));
 
-    $newest = $sdkLedger[count($sdkLedger) - 1];
-    if ($newest !== $minor) {
-        $failures[] = sprintf(
-            '  [ledger]    %s is OLDEST-FIRST, so its last entry is the release being shipped — but '
-            . 'that entry is %s while the constant says %s. A bump with no ledger entry ships a '
-            . 'version number nothing explains.',
-            $sdkFileRelative,
-            $newest,
-            $version
-        );
-    }
-}
-
-$testLedger = testLedgerVersions($testFile);
-
-if (count($testLedger) < 2) {
-    $failures[] = sprintf(
-        '  [ledger]    found %d ledger entr(ies) in %s\'s Sdk::VERSION assertion. That assertion is '
-        . 'the pin that makes a bump a deliberate act rather than an edit; it does not shrink.',
-        count($testLedger),
-        $testFileRelative
-    );
-} else {
-    // NEWEST-FIRST: the newest entry is the FIRST one. The opposite direction
-    // from the file above, in the same repository, by design — which is exactly
-    // why it is asserted rather than assumed.
-    $failures = array_merge($failures, monotonicityFailures($testLedger, 'descending', $testFileRelative));
-
-    if ($testLedger[0] !== $minor) {
+    if ($ledger[0] !== $minor) {
         $failures[] = sprintf(
             '  [ledger]    %s is NEWEST-FIRST, so its first entry is the release being shipped — but '
-            . 'that entry is %s while the constant says %s.',
-            $testFileRelative,
-            $testLedger[0],
+            . 'that entry is %s while the constant says %s. A bump with no changelog entry ships a '
+            . 'version number nothing explains.',
+            $changelogFileRelative,
+            $ledger[0],
             $version
         );
-    }
-
-    // A version the test narrates but the SDK's own ledger never declared.
-    if (count($sdkLedger) >= 2) {
-        foreach (array_unique($testLedger) as $narrated) {
-            if (!in_array($narrated, $sdkLedger, true)) {
-                $failures[] = sprintf(
-                    '  [ledger]    %s narrates %s, which %s never declares. One of the two ledgers is '
-                    . 'describing a release that does not exist.',
-                    $testFileRelative,
-                    $narrated,
-                    $sdkFileRelative
-                );
-            }
-        }
     }
 }
 
@@ -406,14 +301,13 @@ if ($failures !== []) {
     fail(
         sprintf('the SDK version %s is not stated consistently.', $version),
         implode("\n", $failures),
-        "Sdk.php pins its version in THREE places and they must agree:\n\n"
-        . "    1. the header docblock  — \" * SDK identity (v{$minor}).\"\n"
-        . "    2. the last ledger entry in that same docblock (OLDEST-FIRST)\n"
-        . "    3. the constant         — \"public const VERSION = '{$version}';\"\n\n"
-        . "and the narrative ledger in {$testFileRelative} runs the OTHER WAY — NEWEST-FIRST, so the\n"
-        . "entry for this release goes at the TOP of that assertion message and at the BOTTOM of the\n"
-        . "docblock. Getting the two directions backwards is how one PR's feature ends up documented\n"
-        . "as another PR's release, so the directions are asserted rather than remembered.\n"
+        "The SDK pins its version in THREE places and they must agree:\n\n"
+        . "    1. the Sdk.php header docblock  — \" * SDK identity (v{$minor}).\"\n"
+        . "    2. the first entry in {$changelogFileRelative} — \"## {$minor}\" (NEWEST-FIRST)\n"
+        . "    3. the constant                 — \"public const VERSION = '{$version}';\"\n\n"
+        . "The entry for this release goes at the TOP of the changelog, above the one before it. An\n"
+        . "entry out of order is how one PR's feature ends up documented as another PR's release, so\n"
+        . "the order is asserted rather than remembered.\n"
     );
 }
 
@@ -512,14 +406,12 @@ $baseKnown = $baseVersion !== null;
 
 if ($baseKnown && $baseVersion === $version) {
     printf(
-        "OK: SDK %s is stated consistently in all three pins; %d ledger entries oldest-first in %s and "
-        . "%d newest-first in %s; version unchanged from the merge base %s, so there is nothing to "
+        "OK: SDK %s is stated consistently in all three pins; %d entries newest-first in %s; "
+        . "version unchanged from the merge base %s, so there is nothing to "
         . "compare against %s's history.\n",
         $version,
-        count($sdkLedger),
-        $sdkFileRelative,
-        count($testLedger),
-        $testFileRelative,
+        count($ledger),
+        $changelogFileRelative,
         substr($mergeBase, 0, 8),
         BASE_BRANCH
     );
@@ -596,15 +488,14 @@ if (isset($usedVersions[$version])) {
             $minor
         ),
         sprintf(
-            "Renumber this branch to the next unused minor and move BOTH ledger entries with it:\n\n"
-            . "    1. sdk/src/Sdk.php — the header \"SDK identity (vX.Y)\", the ledger entry (which goes\n"
-            . "       LAST: that docblock is OLDEST-FIRST), and the VERSION constant\n"
-            . "    2. sdk/composer.json — the `version` field\n"
-            . "    3. %s — the ledger entry, which goes FIRST: that\n"
-            . "       one is NEWEST-FIRST, the opposite direction from the docblock\n"
-            . "    4. nothing for the desktop template: it copies sdk/src at build (WHIT-1054)\n\n"
+            "Renumber this branch to the next unused minor and move its changelog entry with it:\n\n"
+            . "    1. sdk/src/Sdk.php — the header \"SDK identity (vX.Y)\" and the VERSION constant\n"
+            . "    2. %s — the `## X.Y` heading, which stays FIRST (NEWEST-FIRST)\n"
+            . "    3. sdk/composer.json — the `version` field\n"
+            . "    4. tests/Sdk/SdkPackageContractTest.php — the version it pins\n"
+            . "    5. nothing for the desktop template: it copies sdk/src at build (WHIT-1054)\n\n"
             . "Highest version on %s: %s. The lowest free minor above it is %s.\n",
-            $testFileRelative,
+            $changelogFileRelative,
             BASE_BRANCH,
             (static function (array $used): string {
                 $versions = array_keys($used);
@@ -625,12 +516,11 @@ if (isset($usedVersions[$version])) {
 }
 
 printf(
-    "OK: SDK %s is stated consistently in all three pins; %d ledger entries oldest-first, %d "
-    . "newest-first; and it is a forward, unused version — %s at the merge base %s, and %d version(s) "
+    "OK: SDK %s is stated consistently in all three pins; %d changelog entries newest-first; "
+    . "and it is a forward, unused version — %s at the merge base %s, and %d version(s) "
     . "across %d commit(s) of %s history, none of them %s.%s\n",
     $version,
-    count($sdkLedger),
-    count($testLedger),
+    count($ledger),
     $baseKnown ? $baseVersion : '(the file did not exist)',
     substr($mergeBase, 0, 8),
     count($usedVersions),
