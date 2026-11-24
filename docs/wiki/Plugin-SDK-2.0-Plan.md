@@ -1,6 +1,8 @@
-# Plugin SDK 2.0 plan (0.2.31 → public beta 0.2.40)
+# Plugin SDK 2.0 plan (0.2.31 → 2.0.0 at 0.2.40)
 
 Status: **plan**, built from the owner's decisions of 19 Nov 2026 on the [streamline proposal](Plugin-SDK-Streamline-Proposal.md) (D1–D11). Ticket WHIT-1242. The SDK lane keeps this page current: when a release ships, its row says so.
+
+**Public beta moved (owner, 24 Nov 2026, WHIT-1385):** the plan below is unchanged and SDK 2.0.0 still ships at 0.2.40. The public beta itself now comes after 0.2.50, not at 0.2.40. Where this page or the proposal says "at the beta", read it as "by 2.0.0".
 
 ## The rules this plan follows
 

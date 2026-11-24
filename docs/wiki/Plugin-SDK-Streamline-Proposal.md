@@ -1,6 +1,6 @@
-# Plugin SDK: streamline proposal (v0.2.31 → public beta v0.2.40)
+# Plugin SDK: streamline proposal (v0.2.31 → SDK 2.0 at v0.2.40)
 
-Status: **decided by the owner on 19 Nov 2026** (WHIT-1227, WHIT-1242). Every recommendation was accepted. D10 and D11 were replaced by the owner's theme and inventory decisions of the same day (§5, §7). Written 2026-11-19 against `develop` at SDK 1.121. The plan to build it is [Plugin-SDK-2.0-Plan](Plugin-SDK-2.0-Plan.md).
+Status: **decided by the owner on 19 Nov 2026** (WHIT-1227, WHIT-1242). Every recommendation was accepted. D10 and D11 were replaced by the owner's theme and inventory decisions of the same day (§5, §7). Written 2026-11-19 against `develop` at SDK 1.121. The plan to build it is [Plugin-SDK-2.0-Plan](Plugin-SDK-2.0-Plan.md). On 24 Nov 2026 the owner moved the public beta to after v0.2.50 (WHIT-1385); SDK 2.0 still ships at v0.2.40.
 The owner asked to "streamline the SDK, remove redundancies, make a better SDK that covers more and more customization" before the public beta. This document audits what the SDK is today, says what to fold together, what to fix, and what is missing, and ends with the decisions only the owner can take.
 
 Nothing here changes `docs/design/00-decision-register.md`. The SDK lane is shipping only the non-breaking items in §6 while this waits.
