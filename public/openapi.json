@@ -134421,6 +134421,22 @@
                     },
                     "is_addon": {
                         "type": "boolean"
+                    },
+                    "entitlements": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "oneOf": [
+                                {
+                                    "type": "boolean"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "string"
+                                }
+                            ]
+                        }
                     }
                 },
                 "required": [

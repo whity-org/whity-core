@@ -6367,6 +6367,11 @@ final class CoreApiSchemas
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_addon' => self::bool(),
+                // What the plan comes with: -1 is unlimited, true a feature included.
+                'entitlements' => [
+                    'type' => 'object',
+                    'additionalProperties' => ['oneOf' => [['type' => 'boolean'], ['type' => 'integer'], ['type' => 'string']]],
+                ],
             ], ['plan_key', 'name', 'unit_amount', 'currency', 'billing_period', 'is_addon']),
             'PurchasablePlanListResponse' => self::listEnvelope('PurchasablePlan'),
             // A RECEIPT, NOT AN INVOICE THIS DEPLOYMENT ISSUED. A tenant billed

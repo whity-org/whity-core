@@ -1082,9 +1082,11 @@ final class ExternalBillingApiHandler
         $statement->execute();
 
         $current = $this->currentPlanKey($tenantId);
+        $prices = $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $entitlements = $this->entitlementsByPlan(array_values(array_map(static fn (array $row): string => (string) $row['plan_key'], $prices)));
 
         $rows = [];
-        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        foreach ($prices as $row) {
             $rows[] = [
                 'plan_key' => (string) $row['plan_key'],
                 // So Change plan can mark this workspace's own without another call.
@@ -1104,10 +1106,51 @@ final class ExternalBillingApiHandler
                 // does not. Offering them in one undifferentiated list would
                 // show every tenant at least one button that answers 409.
                 'is_addon' => DbBool::of($row['is_addon'] ?? false),
+                // What the plan comes with, so each card can list it (owner
+                // 23 Nov 2026). -1 is unlimited, true is a feature included.
+                'entitlements' => (object) ($entitlements[(string) $row['plan_key']] ?? []),
             ];
         }
 
         return Response::json(['data' => $rows]);
+    }
+
+    /**
+     * Each listed plan's entitlements, typed: "true"/"false" as booleans,
+     * whole numbers as integers, anything else as the stored text.
+     *
+     * @param list<string> $planKeys
+     * @return array<string, array<string, bool|int|string>>
+     */
+    private function entitlementsByPlan(array $planKeys): array
+    {
+        $planKeys = array_values(array_unique($planKeys));
+        if ($planKeys === []) {
+            return [];
+        }
+
+        $marks = implode(', ', array_fill(0, count($planKeys), '?'));
+        $statement = $this->pdo->prepare(
+            "SELECT p.plan_key, e.entitlement_key, e.value
+               FROM plan_entitlements e
+               JOIN plans p ON p.id = e.plan_id
+              WHERE p.plan_key IN ({$marks})
+              ORDER BY e.entitlement_key ASC"
+        );
+        $statement->execute($planKeys);
+
+        $out = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $value = (string) $row['value'];
+            $out[(string) $row['plan_key']][(string) $row['entitlement_key']] = match (true) {
+                $value === 'true' => true,
+                $value === 'false' => false,
+                preg_match('/^-?\d+$/', $value) === 1 => (int) $value,
+                default => $value,
+            };
+        }
+
+        return $out;
     }
 
     /**
