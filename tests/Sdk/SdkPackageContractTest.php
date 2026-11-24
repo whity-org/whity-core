@@ -247,9 +247,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsPinnedAndItsChangelogEntryIsOnTop(): void
     {
         $this->assertSame(
-            '1.162.0',
+            '1.163.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.162 MOVES the version ledger to sdk/CHANGELOG.md (WHIT-1388). Add a new minor\'s entry there.'
+            'SDK 1.163 ADDS plugin.json schema part 1 (WHIT-1389). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
         );
 
         $changelog = (string) file_get_contents(self::SDK_DIR . '/CHANGELOG.md');
