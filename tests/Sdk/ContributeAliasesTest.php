@@ -34,7 +34,7 @@ final class ContributeAliasesTest extends TestCase
         'Whity\\Sdk\\Testing\\TenantIsolationConformanceTestCase' => 'Whity\\Sdk\\Testing\\WorkspaceIsolationConformanceTestCase',
     ];
 
-    /** @return array<string, array{string, string}> old => [old, new] */
+    /** @return array<string, array{class-string, string}> old => [old, new] */
     public static function aliases(): array
     {
         $cases = [];
@@ -57,6 +57,7 @@ final class ContributeAliasesTest extends TestCase
         self::assertSame($old, (new \ReflectionClass($new))->getName(), "{$new} is a class_alias of {$old}");
     }
 
+    /** @param class-string $old */
     #[DataProvider('aliases')]
     public function testTheOldNameIsDeprecatedInFavourOfTheNewOne(string $old, string $new): void
     {
