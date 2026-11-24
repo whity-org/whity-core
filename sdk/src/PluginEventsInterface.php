@@ -88,6 +88,9 @@ namespace Whity\Sdk;
  *         'tenant_id' => $tenantId,
  *         'title'     => $title,   // kept as audit metadata
  *     ]);
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginEventsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginEventsInterface
 {

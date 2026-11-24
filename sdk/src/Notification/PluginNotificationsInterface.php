@@ -33,6 +33,9 @@ namespace Whity\Sdk\Notification;
  * workspace's email switch applies as for core's notices. The email carries the
  * Notice's subject and body in the person's language, never its `data`, and
  * the plugin never sees an address.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginNotificationsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginNotificationsInterface
 {

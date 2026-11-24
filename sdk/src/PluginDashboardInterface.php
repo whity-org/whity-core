@@ -39,6 +39,9 @@ namespace Whity\Sdk;
  * Every visible string is `{en, ar}`. A bad point or widget is dropped with a
  * logged reason and the plugin keeps loading; {@see Manifest\DashboardValidator}
  * checks the shape so a plugin can test it.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginDashboardInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginDashboardInterface
 {

@@ -17,6 +17,9 @@ use Whity\Sdk\Documents\DocumentBlock;
  * plugin's blocks already uses is dropped with a logged reason, and the
  * plugin keeps loading. Workspace plugins declare the same shape under
  * `documents.blocks` in their manifest.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginDocumentBlocksInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginDocumentBlocksInterface
 {

@@ -32,6 +32,9 @@ namespace Whity\Sdk;
  * On a self-hosted installation a plugin installed from the Whity store also
  * needs the installation's store licence ({@see Licensing\StoreLicence}).
  * Without it the plugin is read-only everywhere.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginAccessInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginAccessInterface
 {

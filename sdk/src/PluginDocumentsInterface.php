@@ -15,6 +15,9 @@ use Whity\Sdk\Documents\TemplateSlot;
  * Declarations, read once at load. A bad slot or provider is dropped with a
  * logged reason and the plugin keeps loading. Issue through
  * {@see Documents\Documents}.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginDocumentsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginDocumentsInterface
 {

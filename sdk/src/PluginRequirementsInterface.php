@@ -29,6 +29,9 @@ namespace Whity\Sdk;
  * declaration requires instantiating the plugin, so a quarantined plugin's
  * constructor has already run. "Quarantined" means: zero capabilities
  * (routes, permissions, hooks, migrations) are registered with the host.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginRequirementsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginRequirementsInterface
 {

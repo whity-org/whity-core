@@ -68,6 +68,9 @@ namespace Whity\Sdk;
  *     {
  *         return ['catalog.sync'];
  *     }
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginJobsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginJobsInterface
 {

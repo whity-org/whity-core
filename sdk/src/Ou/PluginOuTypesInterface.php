@@ -51,6 +51,9 @@ namespace Whity\Sdk\Ou;
  *             'ward'   => ['label' => 'Ward',   'sort_order' => 40],
  *         ];
  *     }
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginOuTypesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginOuTypesInterface
 {

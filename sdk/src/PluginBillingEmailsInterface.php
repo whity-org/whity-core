@@ -14,6 +14,9 @@ use Whity\Sdk\Mail\BillingEmails;
  * Declaring is not enough: the operator grants it too, by adding the plugin
  * to the global setting `plugins.billing_email_senders`. Nothing is granted by
  * default.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginBillingEmailsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginBillingEmailsInterface
 {

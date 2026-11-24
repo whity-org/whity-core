@@ -13,6 +13,9 @@ use Whity\Sdk\Inbox\InboxSource;
  * `<plugin>:<key>` and attributes it to the plugin by its own name, never by
  * anything the plugin returns. A source that throws while being read is shown
  * as unavailable and the rest of the inbox still renders.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginInboxSourcesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginInboxSourcesInterface
 {
