@@ -247,9 +247,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsPinnedAndItsChangelogEntryIsOnTop(): void
     {
         $this->assertSame(
-            '1.165.0',
+            '1.166.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.165 ADDS the @whity/plugin-sdk workspace package (WHIT-1392). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
+            'SDK 1.166: the web app takes its block types and page walker from @whity/plugin-sdk (WHIT-1395). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
         );
 
         $changelog = (string) file_get_contents(self::SDK_DIR . '/CHANGELOG.md');

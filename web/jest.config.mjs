@@ -51,6 +51,8 @@ const customJestConfig = {
     '^@whity/features$': '<rootDir>/../packages/features/src/index.ts',
     '^@whity/features/(.*)$': '<rootDir>/../packages/features/src/$1',
     '^@whity/api-client$': '<rootDir>/../packages/api-client/src/index.ts',
+    '^@whity/plugin-sdk$': '<rootDir>/../packages/plugin-sdk/src/index.ts',
+    '^@whity/plugin-sdk/testing$': '<rootDir>/../packages/plugin-sdk/src/testing.ts',
     // Peer deps (react, radix, react-hook-form, …) are hoisted to the workspace
     // root node_modules by npm workspaces, so standard resolution walking up
     // from web/ (and from packages/ui/src) finds the single shared copy — no

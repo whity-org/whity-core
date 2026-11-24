@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in sdk/CHANGELOG.md is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.165.0",
+    "sdk_version": "1.166.0",
     "core_version": "0.2.32",
     "updated": "2026-11-24",
     "ratings": {
@@ -1451,6 +1451,10 @@
                 {
                     "what": "@whity/plugin-sdk: the block contract generated from the PHP SDK, block types checked against it, a typed block builder, a client for the plugin's own routes, fetchAllPages, LocalizedText and test helpers, in a workspace package versioned with the SDK",
                     "since": "1.165"
+                },
+                {
+                    "what": "The web app renders plugin screens with @whity/plugin-sdk's block types and walks pages with its walker, so plugins and the app read one contract",
+                    "since": "1.166"
                 },
                 {
                     "what": "Server-driven blocks",

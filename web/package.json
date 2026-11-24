@@ -27,6 +27,7 @@
     "@tabler/icons-react": "^3.52.0",
     "@whity/api-client": "file:../packages/api-client",
     "@whity/features": "file:../packages/features",
+    "@whity/plugin-sdk": "file:../packages/plugin-sdk",
     "@whity/ui": "file:../packages/ui",
     "@xyflow/react": "^12.12.1",
     "bwip-js": "^4.11.3",

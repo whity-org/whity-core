@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.166
+
+ONE COPY OF THE BLOCK TYPES (decision D8, step 5b): the web app takes its block and feature types and its page walker from `@whity/plugin-sdk` instead of keeping its own copies. `web/lib/plugin-features.ts` re-exports the package's types, and `web/lib/api/fetch-all-pages.ts` walks pages with the package's `walkPages`. The types the app renders plugin screens with are now the ones the compiler checks against `BlockContract`, so a plugin built with the package and the app read one contract. The desktop template keeps its copy until the package is published (WHIT-1393) (WHIT-1395).
+
+Purely additive: no SDK class, block or prop changes.
+
 ## 1.165
 
 THE FRONTEND PACKAGE (decision D8): `@whity/plugin-sdk`, a workspace package at packages/plugin-sdk whose version is this SDK's (1.165.0). It holds the block contract generated from `Frontend\Blocks\BlockContract` by `php scripts/plugin-sdk-contract.php` (each block type, its child slots, its props with their kind, whether they are required and their allowed values, the tree limits and `SDK_VERSION`); the block types, moved from the web app and checked against that contract by the compiler; a typed `block()` builder; `createPluginClient()` for a plugin's own routes; `fetchAllPages()`; one `LocalizedText` with `resolveText()` and `normalizeText()`, which behave like `I18n\LocalizedText`; and test helpers. It is not published yet: npm packages go out with a release (WHIT-1392).
