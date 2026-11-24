@@ -84,3 +84,7 @@ See `web/lib/demo-catalog-adapter.ts` for the real web-side implementation,
 and `packages/spa-harness` for a minimal Vite SPA proving the same
 components render with an in-memory adapter and a hash-router link adapter —
 no Next.js anywhere in the render path.
+
+## Internal entry points (deprecated for outside use)
+
+Nothing outside this package imports the root entry `@whity/features` or `@whity/features/expressions`. Import the subpath you need (`@whity/features/nav`, `@whity/features/forms`, …) instead. Both stay in `exports` until this package's next major, when they are removed (WHIT-1394).
