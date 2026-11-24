@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.168
+
+ONE ENTRY POINT FOR PLUGIN FRONTENDS (decision D8, step 5d): the `@whity/ui` subpaths that nothing outside the package imports (the `editor/*` building blocks of `editor/doc-editor`, and `agent-run-status`, `beta-warning`, `collapsible`, `color-card`, `menu-bar`, `switcher`, `time-picker`, `top-nav`), and the root entry and `/expressions` of `@whity/features`, are marked internal in each package's README and changelog. A plugin frontend takes blocks, the client and test helpers from `@whity/plugin-sdk`. The entries stay in `exports` and leave at each package's next major (WHIT-1394) (WHIT-1396).
+
+Purely additive: no SDK class, block, prop or `exports` entry changes.
+
 ## 1.167
 
 DESKTOP HARDWARE: `Contribute\PluginDesktopCapabilitiesInterface`, optional, names the hardware a plugin uses when it runs inside Whity Desktop on the person's computer: `getDesktopCapabilities()` returns `<driver>.<operation>` strings such as `printer.list` and `printer.print`. The desktop app binds the plugin's hardware handle to exactly that list, and the person sets each capability to Off, Ask first or Allowed on their device; under Ask first the call becomes a proposal that runs on approval. On the server the declaration does nothing (whity-desktop ADR 0001, decision 3a) (WHIT-1401).
