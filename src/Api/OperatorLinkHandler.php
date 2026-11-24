@@ -8,6 +8,7 @@ use PDO;
 use Whity\Auth\AuthHandler;
 use Whity\Auth\JwtParser;
 use Whity\Core\Audit\AuditLoggerInterface;
+use Whity\Core\RateLimit\ClientIp;
 use Whity\Http\JsonBody;
 use Whity\Core\Identity\OperatorSignIn;
 use Whity\Core\Request;
@@ -45,18 +46,18 @@ final class OperatorLinkHandler
     {
         $token = JsonBody::parsed($request)['token'] ?? null;
         if (!is_string($token) || $token === '') {
-            return $this->refused('invalid', null);
+            return $this->refused($request, 'invalid', null);
         }
 
         $result = OperatorSignIn::consumeLink($this->pdo, $this->jwt, $this->store, $token);
         if (isset($result['refused'])) {
-            return $this->refused($result['refused'], $result['profile_id'] ?? null);
+            return $this->refused($request, $result['refused'], $result['profile_id'] ?? null);
         }
         $profileId = $result['profile_id'];
 
         $session = $this->auth->completeFederatedLogin($profileId, $this->emailOf($profileId), $request, 0, false);
         if ($session->getStatusCode() !== 200) {
-            return $this->refused('not_operator', $profileId);
+            return $this->refused($request, 'not_operator', $profileId);
         }
 
         $this->audit->record(OperatorSignIn::AUDIT_USED, [
@@ -73,10 +74,15 @@ final class OperatorLinkHandler
         return new Response(200, (string) json_encode($data), $session->getHeaders());
     }
 
-    private function refused(string $reason, ?int $profileId): Response
+    private function refused(Request $request, string $reason, ?int $profileId): Response
     {
+        // Whoever opens a refused link is not known: a session cookie that came
+        // along belongs to someone else's sign-in, not to this link. So the row
+        // names no person, like a failed password reset, and keeps the address.
         $this->audit->record(OperatorSignIn::AUDIT_REFUSED, [
             'tenant_id' => 0,
+            'actor_user_id' => null,
+            'ip_address' => ClientIp::fromRequest($request),
             'target_type' => 'profile',
             'target_id' => $profileId,
             'metadata' => ['reason' => $reason, 'stage' => 'open'],

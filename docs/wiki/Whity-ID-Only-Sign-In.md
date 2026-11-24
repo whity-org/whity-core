@@ -75,7 +75,7 @@ whity-cli auth operator-link amro@example.com
 - **Who:** only an active member of the system workspace with no provider linked. Anyone else is refused.
 - **How long:** the link works **once**, for **15 minutes**.
 - **What it does:** opens the link's page, where the operator presses **Sign in**. They get a session in the system workspace and land on Settings › Security to link Whity ID. From then on they sign in with Whity ID.
-- **Audit:** printing the link (`auth.operator_link.issued`), using it (`auth.operator_link.used`) and every refusal (`auth.operator_link.refused`) are in the audit log.
+- **Audit:** printing the link (`auth.operator_link.issued`), using it (`auth.operator_link.used`) and every refusal (`auth.operator_link.failed`) are in the audit log.
 - **Keep it private:** anyone holding the link can use it while it is valid. Send it only to that operator, over a channel you trust. The token sits after `#` in the address, so it never reaches a server log, and it is sent only when the button is pressed, so a chat app previewing it can't use it up.
 
 Why a link from the shell, rather than keeping password sign-in for operators: running the command needs a shell on the server, which already holds every secret, so the link adds no new way in for anybody who doesn't have one. Keeping passwords for operators would leave the public sign-in form open on the most powerful accounts for as long as one of them stays unlinked.

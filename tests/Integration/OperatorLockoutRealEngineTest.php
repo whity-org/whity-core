@@ -175,6 +175,10 @@ final class OperatorLockoutRealEngineTest extends TestCase
         self::assertSame('operator_link_used', json_decode($second->getBody(), true)['details']['code']);
         self::assertSame(1, $this->audits(OperatorSignIn::AUDIT_USED));
         self::assertSame(1, $this->audits(OperatorSignIn::AUDIT_REFUSED));
+        // Whoever opened it again is not known: the row names no person, like a
+        // failed password reset, so it never lands on a signed-in bystander.
+        self::assertSame('system', (string) $this->scalar("SELECT actor_kind FROM audit_log WHERE action = '" . OperatorSignIn::AUDIT_REFUSED . "'"));
+        self::assertNull($this->scalar("SELECT actor_user_id FROM audit_log WHERE action = '" . OperatorSignIn::AUDIT_REFUSED . "'"));
     }
 
     public function testTheLinkExpiresAfterFifteenMinutes(): void

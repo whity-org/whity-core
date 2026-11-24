@@ -47,7 +47,12 @@ final class OperatorSignIn
     /** Audit actions. */
     public const AUDIT_ISSUED = 'auth.operator_link.issued';
     public const AUDIT_USED = 'auth.operator_link.used';
-    public const AUDIT_REFUSED = 'auth.operator_link.refused';
+    /**
+     * A link that was refused. Named like a failed password reset: an opening
+     * is refused before anyone is known, so the row names no person and sits
+     * with the system workspace, like every other failed sign-in.
+     */
+    public const AUDIT_REFUSED = 'auth.operator_link.failed';
 
     private const SYSTEM_TENANT_ID = 0;
 

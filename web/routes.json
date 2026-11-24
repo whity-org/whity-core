@@ -1347,6 +1347,14 @@
       "since": "0.1.0"
     },
     {
+      "path": "/operator-sign-in",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
       "path": "/ownership-offers/:id",
       "kind": "page",
       "area": "protected",
