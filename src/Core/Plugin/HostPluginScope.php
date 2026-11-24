@@ -7,6 +7,14 @@ namespace Whity\Core\Plugin;
 use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Audit\AuditTrail;
 use Whity\Sdk\Audit\PluginAudit;
+use Whity\Sdk\Calendar\Bookings;
+use Whity\Sdk\Calendar\TimeOff;
+use Whity\Sdk\Calendar\WorkspaceBookings;
+use Whity\Sdk\Calendar\WorkspaceTimeOff;
+use Whity\Sdk\Contacts\Contacts;
+use Whity\Sdk\Contacts\WorkspaceContacts;
+use Whity\Sdk\Delegation\Away;
+use Whity\Sdk\Delegation\WorkspaceAway;
 use Whity\Core\Accounting\Host\HostAccountingScope;
 use Whity\Core\Inventory\Host\HostInventoryScope;
 use Whity\Sdk\Context\AccountingScope;
@@ -195,6 +203,53 @@ final class HostPluginScope implements PluginScope
     public function errors(): ErrorReporter
     {
         return $this->pluginLog();
+    }
+
+    /** Core's contacts in this workspace (SDK 1.161, D2). */
+    public function contacts(): WorkspaceContacts
+    {
+        $this->allow(Service::CONTACTS);
+        return $this->pinned(WorkspaceContacts::class, fn (): WorkspaceContacts => new HostWorkspaceContacts($this->factory(Contacts::class), $this->workspaceId(...)));
+    }
+
+    /** Time off on core's calendar in this workspace (SDK 1.161, D2). */
+    public function timeOff(): WorkspaceTimeOff
+    {
+        $this->allow(Service::TIME_OFF);
+        return $this->pinned(WorkspaceTimeOff::class, fn (): WorkspaceTimeOff => new HostWorkspaceTimeOff($this->factory(TimeOff::class), $this->workspaceId(...)));
+    }
+
+    /** Whether a person in this workspace is away (SDK 1.161, D2). */
+    public function away(): WorkspaceAway
+    {
+        $this->allow(Service::AWAY);
+        return $this->pinned(WorkspaceAway::class, fn (): WorkspaceAway => new HostWorkspaceAway($this->factory(Away::class), $this->workspaceId(...)));
+    }
+
+    /** Settle a held booking in this workspace (SDK 1.161, D2). */
+    public function bookings(): WorkspaceBookings
+    {
+        $this->allow(Service::BOOKINGS);
+        return $this->pinned(WorkspaceBookings::class, fn (): WorkspaceBookings => new HostWorkspaceBookings($this->factory(Bookings::class), $this->workspaceId(...)));
+    }
+
+    /**
+     * One context-bound service per scope, built on first use.
+     *
+     * @template T of object
+     * @param class-string<T> $type
+     * @param \Closure(): T $build
+     * @return T
+     */
+    private function pinned(string $type, \Closure $build): object
+    {
+        if (!isset($this->stores[$type])) {
+            $this->stores[$type] = $build();
+        }
+        $service = $this->stores[$type];
+        assert($service instanceof $type);
+
+        return $service;
     }
 
     private function pluginLog(): HostPluginLog

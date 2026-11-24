@@ -29,6 +29,9 @@ namespace Whity\Sdk;
  * one click. The shape is checked by {@see Manifest\WorkspaceTemplateValidator};
  * a template that fails is dropped with a logged reason and the plugin keeps
  * loading.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginWorkspaceTemplatesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginWorkspaceTemplatesInterface
 {

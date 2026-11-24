@@ -37,6 +37,9 @@ namespace Whity\Sdk;
  *
  * A declaration that fails is dropped with a logged reason, and the plugin's
  * other fields are kept. A field's key and type never change once it's made.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginContactFieldsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginContactFieldsInterface
 {

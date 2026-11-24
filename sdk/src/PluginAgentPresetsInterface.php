@@ -19,6 +19,9 @@ namespace Whity\Sdk;
  *
  * A preset grants nothing by itself. An agent acts for the person who uses it,
  * never above their permissions, and its writes follow Ask first.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginAgentPresetsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginAgentPresetsInterface
 {

@@ -16,6 +16,9 @@ namespace Whity\Sdk;
  * plugin back on brings everything back.
  *
  * A throw is logged and doesn't undo the switch.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginWorkspaceLifecycleInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginWorkspaceLifecycleInterface
 {

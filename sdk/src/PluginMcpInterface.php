@@ -52,6 +52,9 @@ namespace Whity\Sdk;
  * logged warning. A `getMcpPrompts()` call that throws is caught, logged, and
  * treated as if the plugin contributed nothing — the plugin itself continues
  * to load normally.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginMcpPromptsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginMcpInterface
 {

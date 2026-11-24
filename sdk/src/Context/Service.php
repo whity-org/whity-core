@@ -25,6 +25,14 @@ final class Service
     /** Core's books, {@see PluginScope::accounting()} (SDK 1.154, WHIT-1318). */
     public const ACCOUNTING = 'accounting';
     public const DATABASE = 'database';
+    /** Core's contacts in this workspace, {@see PluginScope::contacts()} (SDK 1.161, D2). */
+    public const CONTACTS = 'contacts';
+    /** Time off on core's calendar, {@see PluginScope::timeOff()} (SDK 1.161, D2). */
+    public const TIME_OFF = 'timeOff';
+    /** Whether a person is away, {@see PluginScope::away()} (SDK 1.161, D2). */
+    public const AWAY = 'away';
+    /** Settle a held booking, {@see PluginScope::bookings()} (SDK 1.161, D2). */
+    public const BOOKINGS = 'bookings';
 
     private function __construct()
     {
@@ -36,6 +44,7 @@ final class Service
         return [
             self::SETTINGS, self::SECRETS, self::FILES, self::DOCUMENTS, self::NOTIFY, self::JOBS,
             self::AUDIT, self::HTTP, self::THEMES, self::INVENTORY, self::ACCOUNTING, self::DATABASE,
+            self::CONTACTS, self::TIME_OFF, self::AWAY, self::BOOKINGS,
         ];
     }
 }
