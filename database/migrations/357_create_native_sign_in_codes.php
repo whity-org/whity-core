@@ -18,7 +18,9 @@ use Whity\Database\Database;
  * the PKCE S256 challenge the app sent at `/start`; the exchange must bring
  * the matching verifier. `provider_tenant_id` and `tenant_trust` carry the
  * trust tier of the provider that signed the person in, so the session is
- * confined exactly as a browser sign-in through the same provider would be.
+ * confined exactly as a browser sign-in through the same provider would be;
+ * both the person and the provider's workspace cascade, since a code for a
+ * deleted account or workspace must not outlive it.
  *
  * `expires_at` is Unix seconds, compared in PHP, so the rule reads the same on
  * Postgres and SQLite. Install-wide table (no tenant_id), like `plugin_installs`.
@@ -35,7 +37,7 @@ final class CreateNativeSignInCodes
                 profile_id         INTEGER      NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
                 email              VARCHAR(255) NOT NULL,
                 provider_id        INTEGER      NOT NULL,
-                provider_tenant_id INTEGER      NOT NULL,
+                provider_tenant_id INTEGER      NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
                 tenant_trust       BOOLEAN      NOT NULL DEFAULT FALSE,
                 code_challenge     VARCHAR(128) NOT NULL,
                 expires_at         BIGINT       NOT NULL,
