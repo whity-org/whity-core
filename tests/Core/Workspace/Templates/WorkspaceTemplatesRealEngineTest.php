@@ -196,6 +196,35 @@ PHP);
         self::assertSame(404, $this->handler('en')->apply($request, ['key' => 'nowhere'])->getStatusCode());
     }
 
+    public function testThePreviewSavesNothingAndApplyingRecordsTheVersion(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/preview', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+
+        $response = $this->handler('en')->preview($request, ['key' => 'bakery']);
+
+        self::assertSame(200, $response->getStatusCode());
+        $plan = json_decode($response->getBody(), true)['data'];
+        self::assertSame(2, $plan['version']);
+        self::assertNull($plan['appliedVersion']);
+        self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'add'], $plan['items']);
+        self::assertSame(0, $this->rows('workspace_template_runs'), 'A preview makes no run');
+        self::assertSame(0, $this->rows('workspace_template_parts'));
+        self::assertSame([], $this->list('en')['chosen']);
+        self::assertSame(404, $this->handler('en')->preview($request, ['key' => 'nowhere'])->getStatusCode());
+
+        self::assertSame(200, $this->handler('en')->apply($request, ['key' => 'bakery'])->getStatusCode());
+        $runs = new TemplateRuns($this->pdo);
+        $run = $runs->find(self::BAKERY, 'bakery');
+        self::assertNotNull($run);
+        self::assertSame(['template:bakery' => 2], $runs->parts(self::BAKERY, $run['id']));
+
+        $again = json_decode($this->handler('en')->preview($request, ['key' => 'bakery'])->getBody(), true)['data'];
+        self::assertSame(2, $again['appliedVersion']);
+        self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'done'], $again['items'], 'Made by the last run: not made again');
+    }
+
     public function testAChosenTemplatesSetupJoinsTheOnboardingsAndTheDashboard(): void
     {
         TenantContext::setTenantId(self::BAKERY);
@@ -313,6 +342,14 @@ PHP);
         self::assertStringContainsString('With Whity for Counters', $offer);
         self::assertStringContainsString('مع Whity للكاونترات', $offer);
         self::assertStringNotContainsString('WsCounter', $offer);
+    }
+
+    private function rows(string $table): int
+    {
+        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM ' . $table . ' WHERE tenant_id = ?');
+        $stmt->execute([self::BAKERY]);
+
+        return (int) $stmt->fetchColumn();
     }
 
     /** @return array<string, mixed> */

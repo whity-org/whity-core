@@ -73,6 +73,7 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 | `Agents\Agents` | The workspace's agents and their activity. | current | 1.75 |
 | `Mcp\McpConnections` | The workspace's MCP connections. | current | 1.79 |
 | `Setup\WorkspaceSetup` | Call core routes as the acting person during a guided setup. | current | 1.108 |
+| `Templates\TemplateLedger` | What applying workspace templates made, read and written by `Templates\TemplateEngine`; core keeps it in the database, `Templates\MemoryLedger` in memory for a dry run or a template's tests ([Plugin-Workspace-Templates](Plugin-Workspace-Templates.md)). | current | 1.169 |
 | `Messaging\CustomerMessages` | Send a customer a message through the workspace's channels. | argument | 1.99 |
 | `Mail\WorkspaceEmails`, `Mail\BillingEmails` | Send a workspace-branded email; billing emails for a billing plugin. | argument | 1.100, 1.102 |
 | `Rbac\PermissionResolver`, `Rbac\ResourceScope` | Ask the same permission question the host's middleware answers, and what a person reaches. | argument | 1.22, 1.74 |

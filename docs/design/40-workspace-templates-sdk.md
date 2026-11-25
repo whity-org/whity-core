@@ -49,7 +49,7 @@ Every item below is additive: new optional interfaces, new optional manifest key
   - At most 3 levels; a loop or a missing parent drops the child with a logged reason. The parent must be on in the workspace, so the child's plugin lists the parent's in `getPluginDependencies()`.
   - The parent is not listed twice: a child marked `"hidesParent": true` hides the parent's card where the child is offered (for example a "Clinic" plugin replaced by a more specific one). Default: both show.
 - **Extensions** (a plugin adds pieces to another plugin's template): new optional interface `Contribute\PluginWorkspaceTemplateExtensionsInterface::getWorkspaceTemplateExtensions()`, also declarable in `plugin.json`. An extension is `{key, version, target, setsUp, services, roles, forms, documents, pipelines, examples, setup.steps}`: **only additive parts**, no `settings`, `calendar`, `offer`, `theme` or `remove`. It applies with its target when its plugin is on in the workspace, and is recorded as its own part (§2.4), so it upgrades on its own. A future paid vertical plugin (for example Clinics) adds its own pieces to the Clinic template this way, instead of editing it.
-- Keys an extension adds are namespaced by core as `{extension key}.{item key}`, so two extensions never collide with each other or with the template.
+- Keys an extension adds keep the extension's own key. When the template, or an extension composed earlier, already has an item with that key, the extension's item is left out and the catalogue notes why, so an extension can never replace what the template defines. (Built this way in WHIT-1413; the design first said core would prefix them with the extension's key, which would have made the same item a different one each time an extension was renamed.)
 
 ### 2.3 Test and preview
 
@@ -168,7 +168,7 @@ No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand as
 ## 7. Build order (each its own PR; numbers from the orchestrator)
 
 1. **SDK: engine, ledger, dry run, test helper** (SDK 1.169, migration 358, WHIT-1409, PR #2470). Core's `TemplateApplier` becomes a thin wrapper over `TemplateEngine`; behaviour unchanged; preview API.
-2. **SDK: manifest v2** (SDK minor B, one migration for the item fingerprint): `extends`, `remove`, `hidesParent`, `changes`, extensions interface, composer, `plugin.json` keys, schema, builder. Update offers on the list API and dashboard point; per-item "Use the template's version" (`POST /api/workspace/templates/{key}/items/{part}/{itemKey}/adopt`).
+2. **SDK: manifest v2** (SDK minor B, one migration for the item fingerprint): `extends`, `remove`, `hidesParent`, `changes`, extensions interface, composer, `plugin.json` keys, schema, builder. Update offers on the list API; per-item "Use the template's version" (`POST /api/workspace/templates/{key}/items/{part}/{itemKey}/adopt`). The dashboard setup point (WT.2) ships in the web PR with the screen it opens, so nothing visible lands half-built.
 3. **SDK: pipelines** (SDK minor C; review routes in Flows, Q1): manifest key, `WorkspaceSetup::ROUTES` additions, engine part.
 4. **Web:** preview panel in the picker, update point, "See what's new" with Use the template's version per item (after the brand ask).
 5. **Core: the move's one-time switch-on** (§5) and Settings › Plugins label.

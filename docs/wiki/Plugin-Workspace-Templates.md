@@ -69,6 +69,42 @@ Core draws each step and works out whether it is done from what the workspace ho
 
 `DELETE /api/workspace/templates/examples` cancels the example bookings and archives the example contacts still there, as the caller. Nothing the workspace made itself is touched.
 
+## Preview: what applying would do (SDK 1.169)
+
+`POST /api/workspace/templates/{key}/preview` takes the same body as apply and runs the same engine as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed, and a write the caller may not make is answered as the real route would. It answers `version` (on offer), `appliedVersion` (this workspace's last, or null), and `items`: each part's items with what would happen:
+
+| `action` | Means |
+|---|---|
+| `add` | Would be made |
+| `keep` | Already in the workspace (same name or key); left as it is |
+| `done` | An earlier run made it; not made again, even if the person has since deleted it |
+| `left` | A service with `ticked: false`, left for the guided setup |
+| `skip` | Cannot be done; `reason` says why |
+
+Apply answers the same `items` for what it did. Each run records the version of every part it applied (`workspace_template_parts`, migration 358).
+
+## Testing a template (SDK 1.169)
+
+The engine core runs is in the SDK (`Whity\Sdk\Templates\TemplateEngine`), so a template's tests run the real thing without core or a database. Extend `Whity\Sdk\Testing\WorkspaceTemplateTestCase` (needs `phpunit/phpunit` in `require-dev`):
+
+```php
+use Whity\Sdk\Testing\WorkspaceTemplateTestCase;
+
+final class ClinicTemplateTest extends WorkspaceTemplateTestCase
+{
+    public function testTheTemplate(): void
+    {
+        $clinic = json_decode((string) file_get_contents(__DIR__ . '/../templates/clinic.json'), true);
+
+        $this->assertTemplateValid($clinic);   // core's check
+        $this->assertIdempotent($clinic);      // a second apply makes nothing
+        $this->assertUpgradeKeepsData($previousVersion, $clinic); // nothing deleted, overwritten or brought back
+    }
+}
+```
+
+`applyTemplate($manifest, $workspace, $ledger, examples: true)` applies it to a `Testing\FakeWorkspace`, a workspace in memory that answers the routes a template uses as core does (same-name services are one, role names and form keys are unique, settings remember which were chosen). Give it `permissions: [...]` to apply as someone who holds less, or `refuse('POST /api/roles')` to refuse a route. Its rows are public arrays (`services`, `roles`, `forms`, `documents`, `contacts`, `bookings`), so a test can act as the person between two applies.
+
 ## The theme
 
 A template that names a `theme` shows "Use its look: <theme name>" when it is chosen, on by default. Core sets it only while the workspace still has the installation's theme, so a theme someone already chose stays, and the person can change it any time in Branding, for free. The card's `theme` is null when no theme by that id is installed in the workspace, and then nothing is offered (30-themes §14.6, TH.23).
