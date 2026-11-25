@@ -215,6 +215,7 @@ final class CoreTables
         'meetings' => '130_create_convening.php',
         'memberships' => '030_create_memberships.php',
         'migration_rollbacks' => '004_create_deployment_tables.php',
+        'native_sign_in_codes' => '357_create_native_sign_in_codes.php',
         'notification_deliveries' => '070_create_notifications.php',
         'notification_templates' => '072_create_notification_templates.php',
         'notifications' => '070_create_notifications.php',
