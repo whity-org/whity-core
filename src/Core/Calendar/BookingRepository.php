@@ -45,17 +45,24 @@ final class BookingRepository
     {
     }
 
-    /** @param array<string, mixed> $v */
+    /**
+     * `overlap_ok`: staff chose Book anyway over a busy person, so the
+     * database lets this booking's person overlap (migration 360; a room never).
+     *
+     * @param array<string, mixed> $v
+     */
     public function insert(int $tenantId, array $v): int
     {
+        // A literal, not a bound PHP bool: PDO sends false as '' to PostgreSQL.
+        $overlapOk = ($v['overlap_ok'] ?? false) === true ? 'TRUE' : 'FALSE';
         $stmt = $this->db->prepare(
             'INSERT INTO calendar_bookings (tenant_id, service_id, profile_id, customer_profile_id, customer_name,
                     customer_email, customer_phone, customer_note, starts_at, ends_at, blocks_from, blocks_until,
                     status, hold_expires_at, source, price_minor, currency, reminder_due_at, created_by_profile_id,
-                    room_id, contact_id, created_at, updated_at)
+                    room_id, contact_id, overlap_ok, created_at, updated_at)
              VALUES (:tenant_id, :service_id, :profile_id, :customer_profile_id, :customer_name, :customer_email,
                     :customer_phone, :customer_note, :starts_at, :ends_at, :blocks_from, :blocks_until, :status,
-                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :contact_id, :now, :now)
+                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :contact_id, ' . $overlapOk . ', :now, :now)
              RETURNING id'
         );
         $stmt->execute([
@@ -295,12 +302,14 @@ final class BookingRepository
         return array_values($counts);
     }
 
-    public function move(int $tenantId, int $id, int $profileId, DateTimeImmutable $start, DateTimeImmutable $end, Interval $block, ?DateTimeImmutable $reminderDue): void
+    /** `$overlapOk`: moved with Book anyway over a busy person (see {@see self::insert()}). */
+    public function move(int $tenantId, int $id, int $profileId, DateTimeImmutable $start, DateTimeImmutable $end, Interval $block, ?DateTimeImmutable $reminderDue, bool $overlapOk = false): void
     {
         $this->db->prepare(
             'UPDATE calendar_bookings
                 SET profile_id = :profile_id, starts_at = :starts_at, ends_at = :ends_at, blocks_from = :blocks_from,
                     blocks_until = :blocks_until, reminder_due_at = :reminder_due_at, reminder_sent_at = NULL,
+                    overlap_ok = ' . ($overlapOk ? 'TRUE' : 'FALSE') . ',
                     ics_sequence = ics_sequence + 1, updated_at = :now
               WHERE tenant_id = :tenant_id AND id = :id'
         )->execute([

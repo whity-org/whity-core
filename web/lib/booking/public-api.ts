@@ -55,7 +55,9 @@ export class PublicBookingError extends Error {
   constructor(
     message: string,
     public readonly status: number,
-    public readonly field: string | null = null
+    public readonly field: string | null = null,
+    /** The server's `details.code`, such as `already_sent` (AP.17). */
+    public readonly code: string | null = null
   ) {
     super(message);
     this.name = 'PublicBookingError';
@@ -81,16 +83,18 @@ export function icsUrl(token: string): string {
 async function failure(res: Response): Promise<PublicBookingError> {
   let message = '';
   let field: string | null = null;
+  let code: string | null = null;
   try {
     const body = (await res.json()) as { error?: unknown; details?: Record<string, unknown> };
     if (typeof body.error === 'string') message = body.error;
     const details = body.details ?? {};
     if (typeof details.field === 'string') field = details.field;
     else if (details.bot_token !== undefined) field = 'bot_token';
+    if (typeof details.code === 'string') code = details.code;
   } catch {
     // No body to read: the status says enough.
   }
-  return new PublicBookingError(message || `HTTP ${res.status}`, res.status, field);
+  return new PublicBookingError(message || `HTTP ${res.status}`, res.status, field, code);
 }
 
 async function send<T>(url: string, init?: RequestInit): Promise<T> {
@@ -135,6 +139,8 @@ export interface BookingDraft {
   several?: ServicePick[] | null;
   /** With `several` and nobody chosen: one person who does them all. */
   samePerson?: boolean;
+  /** AP.17: one new key for each press of Book, so a request sent twice books once. */
+  idempotencyKey?: string | null;
 }
 
 /** One service of a booking of several, and who does it (null: anyone). */
@@ -167,6 +173,7 @@ export function bookingRequestBody(draft: BookingDraft): PublicBookingRequest {
   if (draft.phone.trim() !== '') body.phone = draft.phone.trim();
   if (draft.note.trim() !== '') body.note = draft.note.trim();
   if (draft.botToken) body.bot_token = draft.botToken;
+  if (draft.idempotencyKey) body.idempotency_key = draft.idempotencyKey;
   return body;
 }
 
@@ -195,6 +202,15 @@ function readPayment(value: unknown): BookingPayment | null {
     label: typeof p.label === 'string' ? p.label : null,
     hold_expires_at: typeof p.hold_expires_at === 'string' ? p.hold_expires_at : null,
   };
+}
+
+/** A key for one press of Book: 8 to 64 letters, digits and dashes (AP.17). */
+export function newIdempotencyKey(): string {
+  try {
+    return globalThis.crypto.randomUUID();
+  } catch {
+    return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+  }
 }
 
 export const publicBookingApi = {

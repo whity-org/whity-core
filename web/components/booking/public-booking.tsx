@@ -40,6 +40,7 @@ import {
   bookingRequestBody,
   descriptionOf,
   icsUrl,
+  newIdempotencyKey,
   publicBookingApi,
   type BookedResult,
   type FreeTime,
@@ -410,6 +411,7 @@ function BookingForm({
         elapsedMs: nowMs() - opened,
         botToken,
         several,
+        idempotencyKey: newIdempotencyKey(),
       });
       const booked = await publicBookingApi.book(workspace, body);
       onBooked(booked);
@@ -423,7 +425,7 @@ function BookingForm({
         onClosed();
         return;
       }
-      if (error instanceof PublicBookingError && error.status === 409) {
+      if (error instanceof PublicBookingError && error.status === 409 && error.code !== 'already_sent') {
         setSlot(null);
         setReloadKey((k) => k + 1);
       }

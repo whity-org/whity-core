@@ -77,7 +77,9 @@ export function useBookingWords(): BookingWords {
       }
       switch (error.status) {
         case 409:
-          return t('error.taken', 'Someone has just booked that time. Pick another free time; your details are kept.');
+          return error.code === 'already_sent'
+            ? t('error.alreadySent', 'We already have this booking. Check your email for the details.')
+            : t('error.taken', 'Someone has just booked that time. Pick another free time; your details are kept.');
         case 429:
           return t('error.tooMany', 'Too many tries from this connection. Wait a few minutes and try again.');
         case 503:
