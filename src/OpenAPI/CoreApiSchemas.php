@@ -11184,6 +11184,7 @@ final class CoreApiSchemas
                 'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
                 'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
                 'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
+                'idempotency_key' => self::str() + ['minLength' => 8, 'maxLength' => 64, 'pattern' => '^[A-Za-z0-9_-]{8,64}$', 'description' => 'One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17).'],
             ], ['starts_at', 'name', 'email', 'elapsed_ms']),
             'PublicBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
@@ -20033,7 +20034,7 @@ final class CoreApiSchemas
                 'responses' => [
                     201 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
                     404 => self::errorResponse('This booking page is not available'),
-                    409 => self::errorResponse('That time was just taken'),
+                    409 => self::errorResponse('That time was just taken, or this booking was already sent (`already_sent`)'),
                     422 => self::errorResponse('Missing details, outside the booking window, or refused as spam'),
                     503 => self::errorResponse('The bot check could not be reached'),
                 ] + $limits,
@@ -21103,6 +21104,18 @@ final class CoreApiSchemas
                     404 => self::errorResponse('There is no such template'),
                 ] + self::authErrors(),
             ]),
+            // WHIT-1409 (SDK 1.169).
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/preview', 'settings:write', [
+                'summary' => 'Preview what applying a workspace template would do',
+                'description' => 'Runs the same engine as apply with the same body, as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed. Each item says add, keep (already there), done (an earlier run made it, so it is not made again), left (not ticked) or skip and why.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'request' => 'ApplyWorkspaceTemplateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What applying would make, keep and skip', 'PreviewWorkspaceTemplateResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
                 'summary' => 'Remove the example contacts and bookings a template added',
                 'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
@@ -21321,7 +21334,24 @@ final class CoreApiSchemas
                     'template' => self::str(),
                     'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part were made'],
                     'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                    'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateItem'), 'description' => 'Each item of the template and what happened to it (SDK 1.169)'],
                 ], ['template', 'made', 'skipped']),
+            ], ['data']),
+            'WorkspaceTemplateItem' => self::object([
+                'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents or examples'],
+                'key' => self::str() + ['description' => 'The template\'s key for the item'],
+                'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason'],
+                'reason' => self::str(),
+            ], ['part', 'key', 'action']),
+            'PreviewWorkspaceTemplateResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'version' => self::int() + ['description' => 'The version on offer'],
+                    'appliedVersion' => self::int() + ['nullable' => true, 'description' => 'The version this workspace applied last, or null when it never applied it'],
+                    'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part would be made'],
+                    'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                    'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateItem')],
+                ], ['template', 'version', 'appliedVersion', 'made', 'skipped', 'items']),
             ], ['data']),
             'WorkspaceTemplateSetupStatusResponse' => self::object([
                 'data' => self::object([

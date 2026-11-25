@@ -14719,6 +14719,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/templates/{key}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview what applying a workspace template would do
+         * @description Runs the same engine as apply with the same body, as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed. Each item says add, keep (already there), done (an earlier run made it, so it is not made again), left (not ticked) or skip and why.
+         */
+        post: operations["post_api_v1_workspace_templates_key_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspace/templates/{key}/setup/current/{kind}": {
         parameters: {
             query?: never;
@@ -16250,6 +16270,8 @@ export interface components {
                     key: string;
                     reason: string;
                 }[];
+                /** @description Each item of the template and what happened to it (SDK 1.169) */
+                items?: components["schemas"]["WorkspaceTemplateItem"][];
             };
         };
         ApprovalStatusResponse: {
@@ -23840,6 +23862,25 @@ export interface components {
         PluginUploadResponse: {
             data: components["schemas"]["PluginEntry"];
         };
+        PreviewWorkspaceTemplateResponse: {
+            data: {
+                template: string;
+                /** @description The version on offer */
+                version: number;
+                /** @description The version this workspace applied last, or null when it never applied it */
+                appliedVersion: number | null;
+                /** @description How many of each part would be made */
+                made: {
+                    [key: string]: number;
+                };
+                skipped: {
+                    part: string;
+                    key: string;
+                    reason: string;
+                }[];
+                items: components["schemas"]["WorkspaceTemplateItem"][];
+            };
+        };
         ProfileRelationsResponse: {
             data: {
                 personId: number | null;
@@ -23994,6 +24035,8 @@ export interface components {
             elapsed_ms: number;
             /** @description The bot-check token, when the page shows one. */
             bot_token?: string;
+            /** @description One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17). */
+            idempotency_key?: string;
         };
         /** @description The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in. */
         PublicBookingVisitor: {
@@ -27302,6 +27345,18 @@ export interface components {
             /** @description The theme the template suggests, when this workspace has it (SDK 1.131) */
             theme?: components["schemas"]["WorkspaceTemplateTheme"] | null;
             chosen: boolean;
+        };
+        WorkspaceTemplateItem: {
+            /** @description settings, theme, calendar, services, roles, forms, documents or examples */
+            part: string;
+            /** @description The template's key for the item */
+            key: string;
+            /**
+             * @description add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason
+             * @enum {string}
+             */
+            action: "add" | "keep" | "done" | "left" | "skip";
+            reason?: string;
         };
         WorkspaceTemplateListResponse: {
             data: {
@@ -87352,7 +87407,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description That time was just taken */
+            /** @description That time was just taken, or this booking was already sent (`already_sent`) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -105606,6 +105661,87 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplyWorkspaceTemplateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The template's key (bakery) */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyWorkspaceTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description What applying would make, keep and skip */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewWorkspaceTemplateResponse"];
                 };
             };
             /** @description Invalid request body */

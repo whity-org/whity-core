@@ -131,6 +131,8 @@ final class TenantOwnedTables
         'calendar_booking_services' => '302_create_calendar_booking_services.php',
         // WHIT-1334: the walk-in queue at the front desk (design section 35).
         'calendar_walkins' => '338_create_calendar_walkins.php',
+        // WHIT-1412: what each live booking holds, kept by triggers (design section 39, AP.11).
+        'calendar_holds' => '360_create_calendar_holds.php',
         'calendar_commission_rates' => '340_create_calendar_commission_rates.php',
         'calendar_commission_closes' => '342_create_calendar_commission_closes.php',
         'calendar_commission_close_lines' => '342_create_calendar_commission_closes.php',
@@ -280,6 +282,8 @@ final class TenantOwnedTables
         // it made, examples marked (migration 305).
         'workspace_template_runs' => '305_create_workspace_templates.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
+        // WHIT-1409: the version of each part a template run applied (migration 358).
+        'workspace_template_parts' => '358_create_workspace_template_parts.php',
         // WHIT-1225: themes a workspace imported or installed from the store
         // (migration 323). Every query binds tenant_id.
         'themes' => '323_create_themes.php',

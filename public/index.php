@@ -3025,7 +3025,18 @@ $templateRuns = new \Whity\Core\Workspace\Templates\TemplateRuns($db->getPdo());
 $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
     new \Whity\Core\Workspace\Templates\TemplateCatalogue($pluginLoader),
     $templateRuns,
-    static fn (): \Whity\Core\Workspace\Templates\TemplateApplier => new \Whity\Core\Workspace\Templates\TemplateApplier($hostWorkspaceSetup->forTemplates(), $templateRuns, static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)),
+    // WHIT-1409 (SDK 1.169): the preview asks the same gates for each write it only records.
+    static function () use ($hostWorkspaceSetup, $templateRuns, $roleChecker): \Whity\Core\Workspace\Templates\TemplateApplier {
+        $templateSetup = $hostWorkspaceSetup->forTemplates();
+
+        return new \Whity\Core\Workspace\Templates\TemplateApplier(
+            $templateSetup,
+            $templateRuns,
+            static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+            null,
+            static fn (string $method, string $path): bool => $templateSetup->permits($method, $path),
+        );
+    },
     $codePluginActivation,
     $auditLogger,
     static fn (): string => $serverLabels->languageCode(),
@@ -3055,6 +3066,8 @@ $workspaceTemplatesHandler->useThemes(static fn (int $tenantId, string $id): ?ar
 $workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+// WHIT-1409 (SDK 1.169): what applying would do, changing nothing.
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/preview', [$workspaceTemplatesHandler, 'preview'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // WHIT-1195: a chosen template's guided setup, as the caller.
 $router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', [$workspaceTemplatesHandler, 'setupStatus'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);

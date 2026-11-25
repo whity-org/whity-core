@@ -113,6 +113,39 @@ final class HostWorkspaceSetup implements WorkspaceSetup
     }
 
     /**
+     * Would {@see self::call()} let the person in scope through to this route,
+     * without calling it: the same three gates. The preview of a template
+     * (WHIT-1409) asks this for each write it only records.
+     */
+    public function permits(string $method, string $path): bool
+    {
+        $method = strtoupper($method);
+        $tenantId = TenantContext::getTenantId();
+        $profileId = AuditContext::getActorUserId();
+        if ($tenantId === null || $tenantId === self::SYSTEM_TENANT_ID || $profileId === null) {
+            return false;
+        }
+        $clean = '/' . ltrim((string) parse_url($path, PHP_URL_PATH), '/');
+        if (!self::allowed($method, $clean, $this->extraRoutes)) {
+            return false;
+        }
+        $matched = $this->router->match(new Request($method, $this->router->versionedPath($clean)));
+        if ($matched === null) {
+            return false;
+        }
+        $permission = $matched['requiredPermission'] ?? null;
+        $role = $matched['requiredRole'] ?? null;
+        if (is_string($permission) && $permission !== '') {
+            return $this->roles->hasPermissionForProfile($profileId, $permission, $tenantId);
+        }
+        if (is_string($role) && $role !== '') {
+            return $this->roles->hasRoleForProfile($profileId, $role, $tenantId);
+        }
+
+        return true;
+    }
+
+    /**
      * Is METHOD + path one of {@see WorkspaceSetup::ROUTES} (or the extra
      * routes given), with `{name}` matching one id?
      *

@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Whity\Core\Workspace\Templates;
 
 use PDO;
+use Whity\Sdk\Templates\TemplateLedger;
 
 /**
  * Which templates a workspace applied and what each one made (migration 305,
- * WHIT-1194). Every query binds the tenant.
+ * WHIT-1194), and the version of each part a run applied (migration 358,
+ * WHIT-1409). The SDK's template engine reads and writes it as its
+ * {@see TemplateLedger}. Every query binds the tenant.
  */
-final class TemplateRuns
+final class TemplateRuns implements TemplateLedger
 {
     public function __construct(private readonly PDO $db)
     {
@@ -167,5 +170,27 @@ final class TemplateRuns
     {
         $stmt = $this->db->prepare('UPDATE workspace_template_items SET removed_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?');
         $stmt->execute([$itemId, $tenantId]);
+    }
+
+    public function recordPart(int $tenantId, int $runId, string $partKey, ?string $pluginName, int $version): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO workspace_template_parts (tenant_id, run_id, part_key, plugin_name, version)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT (run_id, part_key) DO UPDATE SET version = EXCLUDED.version, plugin_name = EXCLUDED.plugin_name, applied_at = CURRENT_TIMESTAMP'
+        );
+        $stmt->execute([$tenantId, $runId, $partKey, $pluginName, $version]);
+    }
+
+    public function parts(int $tenantId, int $runId): array
+    {
+        $stmt = $this->db->prepare('SELECT part_key, version FROM workspace_template_parts WHERE tenant_id = ? AND run_id = ? ORDER BY id');
+        $stmt->execute([$tenantId, $runId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(string) $row['part_key']] = (int) $row['version'];
+        }
+
+        return $out;
     }
 }
