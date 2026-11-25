@@ -81,7 +81,7 @@ Every item below is additive: new optional interfaces, new optional manifest key
 | SDK type | Kind |
 |---|---|
 | `Contribute\PluginWorkspaceTemplateExtensionsInterface` | new optional interface |
-| `Templates\TemplateEngine`, `Templates\TemplateLedger`, `Templates\DryRunWorkspaceSetup`, `Templates\TemplatePlan`, `Templates\TemplateComposer` | new classes and interface; only core implements the ledger |
+| `Templates\TemplateEngine`, `Templates\TemplateLedger`, `Templates\MemoryLedger`, `Templates\DryRunWorkspaceSetup`, `Templates\TemplateMoney` (1.169, PR #2470); `Templates\TemplateComposer` (B) | new classes and interface; core implements the ledger in the database, `MemoryLedger` in memory |
 | `Templates\WorkspaceTemplate` (builder) | new class |
 | `Testing\WorkspaceTemplateTestCase`, `Testing\FakeWorkspace` | new test helpers |
 | `Manifest\WorkspaceTemplateValidator` | new optional keys (`pipelines`, `extends`, `remove`, `hidesParent`, `changes`) and a new `extensionErrors()`; existing manifests stay valid. Older hosts refuse a manifest with a new key, so a plugin using one requires that SDK minor (as `theme` did in 1.131) |
@@ -152,7 +152,7 @@ A pipeline is a review route in Flows (document route templates, section 23) mad
 - **No gap and no double.** For each template, one release does both: the new plugin is published with the key, and `workspace-templates` drops it in the same store release. If both are installed for a moment, the loader keeps the first to offer a key, and the two manifests are identical, so nothing differs.
 - **On everywhere the package was.** Each new plugin is installed with "Every workspace" access, as the package is. For a disk install, the move PR adds a one-time step to core: when a plugin first offers a template key that a workspace has a run for, it is turned on in that workspace if `WorkspaceTemplates` was on there. (A migration cannot do it, because the plugin is not installed when migrations run.)
 - **Themes:** the theme ids do not change, so `branding_theme` keeps pointing at the same theme, now shipped by the template's plugin. A workspace using a template theme keeps it even if the template plugin is later turned off there, as today's rule for plugin themes already says (TH.13).
-- **Ledger and versions:** the first read of an old run writes its `workspace_template_parts` row from the run's `version`, so the first update offer compares like with like.
+- **Ledger and versions:** migration 358 gives every existing run its `template:{key}` part at the run's `version`, so the first update offer compares like with like.
 
 ## 6. What people see that changes (register rows, proposed)
 
@@ -167,7 +167,7 @@ No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand as
 
 ## 7. Build order (each its own PR; numbers from the orchestrator)
 
-1. **SDK: engine, ledger, dry run, test helper** (core, SDK minor A, migration X for `workspace_template_parts`). Core's `TemplateApplier` becomes a thin wrapper over `TemplateEngine`; behaviour unchanged; preview API.
+1. **SDK: engine, ledger, dry run, test helper** (SDK 1.169, migration 358, WHIT-1409, PR #2470). Core's `TemplateApplier` becomes a thin wrapper over `TemplateEngine`; behaviour unchanged; preview API.
 2. **SDK: manifest v2** (SDK minor B): `extends`, `remove`, `hidesParent`, `changes`, extensions interface, composer, `plugin.json` keys, schema, builder. Update offers on the list API and dashboard point.
 3. **SDK: pipelines** (SDK minor C, after owner question 1): manifest key, `WorkspaceSetup::ROUTES` additions, engine part.
 4. **Web:** preview panel in the picker, update point and "See what's new" (after the brand ask).
