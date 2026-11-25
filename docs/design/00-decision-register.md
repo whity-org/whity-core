@@ -1112,5 +1112,16 @@ The owner, 22 November 2026: "as a normal user they need a manage workspaces/org
 | MW.6 | Deleting | Any owner, after an export or a ticked "I don't need a copy", the typed handle and an identity check; 14 days Closing (owners only, read-only, Keep the workspace); then purged with a tombstone row; renewal off at once, cancelled at the end, no refund; backups age out within 30 days; Whity's invoices and the audit log stay |
 | MW.7 | Switcher | Manage workspaces as the last item; @handle under each name; Closing shown and only owners may enter |
 
+## Workspace templates as plugins (decided 25 November 2026)
+
+The owner, 25 November 2026: "we need from you to also help us create a better SDK for the templates feature" and "remove all baked in templates to their plugins please". Specified in section 40 (`40-workspace-templates-sdk.md`, WHIT-1407) and answered the same day: pipelines "Review routes now (Recommended)"; updates that change something the workspace has "Offer per item" (not the recommendation, which was to keep the workspace's copy and only say so); every other question "Accept all (Recommended)".
+
+| # | Decision | Proposed |
+| --- | --- | --- |
+| WT.1 | See before applying | Choosing a template card opens "What this adds" from a dry run: each part with Add, Already there, or Can't add and why, in plain words. Apply is the one filled button |
+| WT.2 | Updates are offered | When a template a workspace uses gets a new version, a setup point on the dashboard and a line on Settings › Workspace say so, never automatic; "See what's new" opens the same preview: what will be added, and each item that changed in the template with **Use the template's version** for that item alone. Apply update adds only the new pieces |
+| WT.3 | Updates keep the person's work | An update never deletes and never brings back what the person deleted; their edits are kept unless they choose Use the template's version on that item, which changes only what the template sets on it and deletes nothing |
+| WT.4 | One plugin per template | Each template is its own free plugin carrying its theme, listed on its own in Settings › Plugins ("Clinic template") and on in every workspace; Start blank stays in core; the shared `workspace-templates` package is retired once empty. Templates can build on each other (a Dental template on Clinic is an SDK example only), other plugins can add pieces to a template, and a template's pipelines are review routes in Flows (Taskaat boards later) |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.

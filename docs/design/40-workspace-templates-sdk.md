@@ -1,6 +1,6 @@
-# 39. Workspace templates SDK, and one plugin per template
+# 40. Workspace templates SDK, and one plugin per template
 
-Status: **proposal**, waiting on the owner's answers in §9. Nothing here is built yet.
+Status: **decided 25 Nov 2026** (owner's answers in §9; register rows WT.1-WT.4). Built in steps, §7.
 
 Owner, 25 Nov 2026: "we need from you to also help us create a better SDK for the templates feature" and "remove all baked in templates to their plugins please". The SDK stays on 1.x and only adds (owner, 24 Nov).
 
@@ -71,7 +71,7 @@ Every item below is additive: new optional interfaces, new optional manifest key
 - **Upgrading** is `POST /api/workspace/templates/{key}/apply` again (the preview first, §2.3). The rules that make it safe:
   1. **Never deletes.** An item dropped from a newer manifest stays in the workspace and in the ledger.
   2. **Never brings back.** An item the template made and the person later deleted or archived is not made again. (Today this already holds for services, roles, forms and documents through the ledger; examples follow the same rule.)
-  3. **Never overwrites.** Settings only while still at the default; booking rules only the first time; an item already there by key or name is kept as the workspace has it. A changed item in a newer manifest (a new price, a new form field) is **not** pushed into the workspace's copy; the preview lists it as "changed in the template, yours kept".
+  3. **Never overwrites on its own.** Settings only while still at the default; booking rules only the first time; an item already there by key or name is kept as the workspace has it. A changed item in a newer manifest (a new price, a new form field) is **not** pushed into the workspace's copy by the update. The preview lists it as "Changed in the template" with **Use the template's version** for that item (owner, 25 Nov, Q3). Choosing it changes only what the template sets on that item, through core's routes as the person: a service's names, duration and price in the workspace's currency; a form's labels and help, adding the template's fields that are missing (the person's own fields stay); a role's missing permissions the person holds (none removed); a document is offered as a new copy beside theirs. Nothing is deleted. Core knows an item changed because each item records a fingerprint of the manifest entry it was made from.
   4. **Examples are not added by an upgrade** unless the person asks, and never after "Remove examples".
   5. **Idempotent.** Applying the same versions twice makes nothing the second time.
 - **Adopt** (applying to a workspace that is already running) is the same apply, unchanged from today.
@@ -125,7 +125,7 @@ As §2.2. The composed manifest is checked again after merging, so a child canno
 
 ### 3.3 Pipelines
 
-A pipeline is a review route in Flows (document route templates, section 23) made for one of the template's forms or documents. Each stage names a role from the template (`role`) or a permission (`permission`); people are never named. Applying makes the route template through `POST /api/document-route-templates` and `PUT .../{id}/graph` as the person, and attaches it to the form. The person needs `route_templates:write`, or the pipeline is skipped with the reason. **Owner question 1 asks whether this is what "pipelines" means.**
+A pipeline is a review route in Flows (document route templates, section 23) made for one of the template's forms or documents. Each stage names a role from the template (`role`) or a permission (`permission`); people are never named. Applying makes the route template through `POST /api/document-route-templates` and `PUT .../{id}/graph` as the person, and attaches it to the form. The person needs `route_templates:write`, or the pipeline is skipped with the reason. **Owner, 25 Nov (Q1): "Review routes now"**; Taskaat boards come later, through Taskaat (T.3).
 
 ## 4. Where templates live: one plugin per template
 
@@ -154,13 +154,13 @@ A pipeline is a review route in Flows (document route templates, section 23) mad
 - **Themes:** the theme ids do not change, so `branding_theme` keeps pointing at the same theme, now shipped by the template's plugin. A workspace using a template theme keeps it even if the template plugin is later turned off there, as today's rule for plugin themes already says (TH.13).
 - **Ledger and versions:** migration 358 gives every existing run its `template:{key}` part at the run's `version`, so the first update offer compares like with like.
 
-## 6. What people see that changes (register rows, proposed)
+## 6. What people see that changes (register rows WT.1-WT.4, decided 25 Nov 2026)
 
-| Id | Decision (proposed) |
+| Id | Decision |
 |---|---|
 | WT.1 | **See what a template adds before applying it.** Choosing a card opens "What this adds" from the dry run: each part with Add, Already there, or Can't add and why, in plain words. Apply is the one filled button. |
-| WT.2 | **Template updates are offered, never automatic.** When a template a workspace uses gets new pieces, a setup point on the dashboard and a line on Settings › Workspace say so; "See what's new" opens the same preview, listing what will be added and what changed in the template but stays as you have it. |
-| WT.3 | **An update never deletes, overwrites or brings back.** What was removed from the template stays in the workspace; what the person deleted is not made again; their edits are kept. |
+| WT.2 | **Template updates are offered, never automatic.** When a template a workspace uses gets a new version, a setup point on the dashboard and a line on Settings › Workspace say so; "See what's new" opens the same preview: what will be added, and each item that changed in the template with **Use the template's version** for that item alone. Apply update adds only the new pieces. |
+| WT.3 | **An update never deletes or brings back, and overwrites only what the person picks.** What was removed from the template stays in the workspace; what the person deleted is not made again; their edits are kept unless they choose Use the template's version on that item, which changes only what the template sets on it and deletes nothing. |
 | WT.4 | **One plugin per template.** Each template is its own free plugin carrying its theme; Start blank stays in core. Settings › Plugins lists them as "Clinic template" and so on. |
 
 No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand ask covers the preview panel and the update point.
@@ -168,11 +168,11 @@ No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand as
 ## 7. Build order (each its own PR; numbers from the orchestrator)
 
 1. **SDK: engine, ledger, dry run, test helper** (SDK 1.169, migration 358, WHIT-1409, PR #2470). Core's `TemplateApplier` becomes a thin wrapper over `TemplateEngine`; behaviour unchanged; preview API.
-2. **SDK: manifest v2** (SDK minor B): `extends`, `remove`, `hidesParent`, `changes`, extensions interface, composer, `plugin.json` keys, schema, builder. Update offers on the list API and dashboard point.
-3. **SDK: pipelines** (SDK minor C, after owner question 1): manifest key, `WorkspaceSetup::ROUTES` additions, engine part.
-4. **Web:** preview panel in the picker, update point and "See what's new" (after the brand ask).
+2. **SDK: manifest v2** (SDK minor B, one migration for the item fingerprint): `extends`, `remove`, `hidesParent`, `changes`, extensions interface, composer, `plugin.json` keys, schema, builder. Update offers on the list API and dashboard point; per-item "Use the template's version" (`POST /api/workspace/templates/{key}/items/{part}/{itemKey}/adopt`).
+3. **SDK: pipelines** (SDK minor C; review routes in Flows, Q1): manifest key, `WorkspaceSetup::ROUTES` additions, engine part.
+4. **Web:** preview panel in the picker, update point, "See what's new" with Use the template's version per item (after the brand ask).
 5. **Core: the move's one-time switch-on** (§5) and Settings › Plugins label.
-6. **whity-plugins, one PR per batch:** Clinic and Salon first (the two with real users), then Coffee house, Study house, Meeting rooms, then Bakery and Car dealership. Each new plugin uses `WorkspaceTemplateTestCase`; each batch bumps `workspace-templates` to drop the moved keys. A `dental` example extending `clinic` ships in the SDK's test fixtures, not the store, unless the owner wants it (question 4).
+6. **whity-plugins, one PR per batch:** Clinic and Salon first (the two with real users), then Coffee house, Study house, Meeting rooms, then Bakery and Car dealership. Each new plugin uses `WorkspaceTemplateTestCase`; each batch bumps `workspace-templates` to drop the moved keys. A `dental` example extending `clinic` ships in the SDK's test fixtures only, not the store (Q4).
 7. **Check on a local stack:** an old workspace on `workspace-templates` 0.3.0 moves to the new plugins without losing its run, theme or examples; an update to a new version adds only what is new.
 
 ## 8. Risks
@@ -181,7 +181,9 @@ No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand as
 - The engine moving into the SDK means its money parsing must not use core's `Currency`; the SDK gets a small `Templates\Money` reading the currency's decimals from the same table core uses (`CU.1`), checked by a test that both agree.
 - Two plugins offering one key: unchanged rule (first wins), and the loader now logs it.
 
-## 9. Questions for the owner (with recommendations)
+## 9. Questions for the owner, and the answers (25 Nov 2026)
+
+Relayed by the orchestrator on 25 Nov 2026. Q1: "Review routes now (Recommended)". Q3: "Offer per item" (not the recommendation; §2.4 rule 3, WT.2 and WT.3 follow it). Q2, Q4, Q5, Q6 and Q7: "Accept all (Recommended)".
 
 1. **"Pipelines": which thing?** a) review routes in Flows for a template's forms and documents (recommended: it is core, free, and has a builder); b) Taskaat boards and task statuses (T.3 says Taskaat owns them, so a template would ask Taskaat to make a board); c) a sales pipeline of stages for leads (core has none today). Recommended **a**, with **b** later through Taskaat.
 2. **Plugin names and look in Settings › Plugins:** "Clinic template" per plugin (recommended), or one "Templates" group listing them?
@@ -190,3 +192,13 @@ No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand as
 5. **Turning the new plugins on:** each new template plugin on in every workspace by default, like the package (recommended), or on only where the workspace used that template, with the others available to turn on?
 6. **Old package:** retire `workspace-templates` after the last template moves (recommended), or keep it as an empty package one more release?
 7. **Register rows WT.1-WT.4** in §6: accept as written?
+
+| Q | Answer |
+|---|---|
+| 1 | Review routes in Flows now; Taskaat boards later |
+| 2 | Each template its own plugin in Settings › Plugins ("Clinic template") |
+| 3 | **Offer "Use the template's version" per changed item**; never automatic, never deleting |
+| 4 | Dental is an SDK test example only |
+| 5 | Template plugins on in every workspace |
+| 6 | Retire `workspace-templates` once empty, with a README note |
+| 7 | WT.1-WT.4 accepted, WT.2 and WT.3 adjusted for Q3 |
