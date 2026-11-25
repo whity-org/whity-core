@@ -35,7 +35,7 @@ final class MyCoursesTenantConformanceTest extends TenantIsolationConformanceTes
     /** @return list<string> */
     protected function handlerSourceDirectories(): array
     {
-        return [self::PLUGIN_DIR];
+        return [self::PLUGIN_DIR . '/Api'];
     }
 
     /** @return list<MigrationInterface> */

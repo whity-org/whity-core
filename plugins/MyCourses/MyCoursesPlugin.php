@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace MyCourses;
 
+use MyCourses\Api\Enrolments;
 use MyCourses\Migrations\CreateMyCoursesEnrolmentsTable;
 use MyCourses\Migrations\GrantMyCoursesPermissionsToAdmin;
 use PDO;
@@ -223,8 +224,7 @@ final class MyCoursesPlugin implements PluginInterface, PluginRequirementsInterf
             return Response::error('Not found', 404);
         }
         $done = min((int) $row['lessons'], (int) $row['lessons_done'] + 1);
-        $this->pdo()->prepare('UPDATE mycourses_enrolments SET lessons_done = :done WHERE id = :id AND tenant_id = :tenant')
-            ->execute([':done' => $done, ':id' => (int) $row['id'], ':tenant' => (int) $row['tenant_id']]);
+        $this->enrolments()->setDone((int) $row['tenant_id'], (int) $row['id'], $done);
 
         return Response::json(['data' => $this->present(['lessons_done' => $done] + $row)]);
     }
@@ -271,10 +271,7 @@ final class MyCoursesPlugin implements PluginInterface, PluginRequirementsInterf
         if ($tenant === null) {
             return Response::error('Open a workspace first', 404);
         }
-        $stmt = $this->pdo()->prepare('SELECT * FROM mycourses_enrolments WHERE tenant_id = :tenant ORDER BY id');
-        $stmt->execute([':tenant' => $tenant]);
-
-        return Response::json(['data' => array_map([$this, 'present'], $stmt->fetchAll(PDO::FETCH_ASSOC))]);
+        return Response::json(['data' => array_map([$this, 'present'], $this->enrolments()->all($tenant))]);
     }
 
     /** @param array<string, string> $params */
@@ -288,8 +285,7 @@ final class MyCoursesPlugin implements PluginInterface, PluginRequirementsInterf
         if ($tenant === null || $contactId <= 0 || $course === '' || mb_strlen($course) > 200) {
             return Response::error('Choose a contact and name the course', 422);
         }
-        $this->pdo()->prepare('INSERT INTO mycourses_enrolments (tenant_id, contact_id, course, lessons, lessons_done) VALUES (:tenant, :contact, :course, :lessons, 0)')
-            ->execute([':tenant' => $tenant, ':contact' => $contactId, ':course' => $course, ':lessons' => $lessons]);
+        $this->enrolments()->enrol($tenant, $contactId, $course, $lessons);
 
         return Response::json(['data' => ['enrolled' => true]], 201);
     }
@@ -303,14 +299,7 @@ final class MyCoursesPlugin implements PluginInterface, PluginRequirementsInterf
      */
     private function ofContacts(CustomerCall $call): array
     {
-        if ($call->contactIds === []) {
-            return [];
-        }
-        $in = implode(', ', array_fill(0, count($call->contactIds), '?'));
-        $stmt = $this->pdo()->prepare("SELECT * FROM mycourses_enrolments WHERE tenant_id = ? AND contact_id IN ($in) ORDER BY id");
-        $stmt->execute([$call->workspaceId, ...$call->contactIds]);
-
-        return array_values($stmt->fetchAll(PDO::FETCH_ASSOC));
+        return $this->enrolments()->ofContacts($call->workspaceId, $call->contactIds);
     }
 
     /** @return array<string, mixed>|null One of the customer's own enrolments; null for anyone else's. */
@@ -346,6 +335,11 @@ final class MyCoursesPlugin implements PluginInterface, PluginRequirementsInterf
             'done' => $done,
             'next' => $done < $lessons ? (string) $row['course'] . ': lesson ' . ($done + 1) : (string) $row['course'] . ': finished',
         ];
+    }
+
+    private function enrolments(): Enrolments
+    {
+        return new Enrolments($this->pdo());
     }
 
     private function pdo(): PDO

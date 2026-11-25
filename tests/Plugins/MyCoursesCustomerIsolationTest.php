@@ -10,6 +10,7 @@ use PDO;
 use Whity\Sdk\Testing\CustomerIsolationTestCase;
 
 require_once dirname(__DIR__, 2) . '/plugins/MyCourses/Migrations/CreateMyCoursesEnrolmentsTable.php';
+require_once dirname(__DIR__, 2) . '/plugins/MyCourses/Api/Enrolments.php';
 require_once dirname(__DIR__, 2) . '/plugins/MyCourses/MyCoursesPlugin.php';
 
 /**
