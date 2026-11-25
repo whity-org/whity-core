@@ -11,6 +11,7 @@ use DemoCatalog\Migrations\CreateDemoCatalogItemNotesTable;
 use DemoCatalog\Migrations\CreateDemoCatalogItemsTable;
 use DemoCatalog\Migrations\GrantDemoCatalogPermissionsToAdmin;
 use DemoCatalog\Migrations\RetireDemoCatalogChangeSeqTable;
+use Whity\Sdk\Contribute\PluginSyncResourcesInterface;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
@@ -58,6 +59,7 @@ final class DemoCatalogPlugin implements
     PluginFrontendInterface,
     PluginResourceTypesInterface,
     PluginTablesInterface,
+    PluginSyncResourcesInterface,
     PluginDataTypesInterface,
     PluginSettingsInterface,
     PluginEntitlementsInterface
@@ -146,6 +148,18 @@ final class DemoCatalogPlugin implements
     public function getPluginDependencies(): array
     {
         return [];
+    }
+
+    /**
+     * The items are the sync resource (SDK 1.173): Whity Desktop keeps them on
+     * the person's computer too and relays changes both ways through the
+     * SyncController behind this path.
+     *
+     * @return list<string>
+     */
+    public function getSyncResources(): array
+    {
+        return ['/api/demo-catalog/items'];
     }
 
     /**
