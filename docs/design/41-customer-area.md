@@ -1,6 +1,6 @@
 # 41 · The customer area: a signed-in place for a workspace's customers
 
-**Status: waiting for the owner's answers (section 16). Nothing here is built (WHIT-1414).** The proposed register rows are CA.1–CA.24 (section 14). They are in `00-decision-register.md` under "Customer area (proposed 25 November 2026)" and become decided when the owner answers.
+**Status: decided by the owner on 25 November 2026 (WHIT-1414): "Accept all (Recommended)", every question in section 16 as recommended.** The register rows are CA.1–CA.24 (section "Customer area"). Building starts with milestone CA1 (section 15).
 
 The owner, 25 November 2026, after reading the LMS gap list (WHIT-1411, `docs/wiki/Plugin-SDK-LMS-Gaps.md`): "for lms student facing pages is very big point for whity and can be generalized for lot's of applications".
 
@@ -247,7 +247,7 @@ A new settings page (`settings:write`), following section 21 and PW.8 on a phone
 - **Rate limits** on the customer API per person, like the public routes.
 - **Audit:** joining, leaving, linking a contact and inviting are audited. Reading one's own records is not.
 
-## 14. Proposed register rows
+## 14. Register rows
 
 | # | Decision | Proposed |
 | --- | --- | --- |
@@ -293,7 +293,7 @@ Done for this piece of work means CA1–CA3 merged, and the area works for a cus
 
 ## 16. Questions for the owner
 
-Each has a recommendation.
+Each has a recommendation. **Answered 25 November 2026: "Accept all (Recommended)"**, so every recommendation below is the decision.
 
 1. **The address.** **Recommended:** under the workspace page, `/@handle/home`, `/@handle/bills`… (CA.1). The alternative is a separate prefix such as `/c/{handle}/…`. Putting it under `/@handle` means one address to share for everything, which is the point of HD.5.
 2. **On by default?** **Recommended:** on for every workspace, with Sign in on `/@handle`. A workspace with no customer data shows customers an almost empty area, but turning it on later is a step most won't find. The alternative is off until an admin turns it on.

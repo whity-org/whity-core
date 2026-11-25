@@ -13,7 +13,7 @@ The brand is being rebuilt one stage at a time. A stage is locked before the nex
 8. Files and templates: locked 28 Oct 2026
 9. Final guideline: locked 28 Oct 2026
 
-Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026) · Appointments you can rely on (decided 25 Nov 2026)
+Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026) · Appointments you can rely on (decided 25 Nov 2026) · Customer area (decided 25 Nov 2026)
 
 ## Stage 1 · Logo (locked 28 Oct 2026)
 
@@ -1149,11 +1149,11 @@ The owner, 25 November 2026: "we want FTA rates and better appointment system, s
 | AP.30 | Phone and Arabic | Under 640px the desk is the List with 48px rows, Check in on the row and the rest in a sheet, Add walk-in on its plane, 17px text. Every string has Arabic; Western digits for times, rates and amounts; ranges written "من 10:00 إلى 10:30". Messages are in the customer's language |
 | AP.31 | Screens without cards | The desk, reports, waitlist, visit record and plans are built as core screens from `TplCalendarStaff`, `TplCalendarWeek` and the Pw cards until the brand team's cards arrive (Q14) |
 
-## Customer area (proposed 25 November 2026, waiting for the owner)
+## Customer area (decided 25 November 2026)
 
-The owner, 25 November 2026: "for lms student facing pages is very big point for whity and can be generalized for lot's of applications". Specified in section 41 (`41-customer-area.md`, WHIT-1414): a signed-in place in the workspace's brand where a customer sees their bookings, bills and messages, and plugins add tabs through `Contribute\PluginCustomerScreensInterface`. **Proposed, not decided:** these rows wait for the owner's answers to section 41 §16.
+The owner, 25 November 2026: "for lms student facing pages is very big point for whity and can be generalized for lot's of applications". Specified in section 41 (`41-customer-area.md`, WHIT-1414): a signed-in place in the workspace's brand where a customer sees their bookings, bills and messages, and plugins add tabs through `Contribute\PluginCustomerScreensInterface`. Answered the same day: **"Accept all (Recommended)"**, so every question in section 41 §16 stands as recommended.
 
-| # | Decision | Proposed |
+| # | Decision | Choice |
 | --- | --- | --- |
 | CA.1 | Address | `/@handle` is the front door; a signed-in customer goes to Home, everyone else sees the workspace page with Sign in; tabs at `/@handle/home`, `/bookings`, `/bills`, `/messages`, `/account`, plugin screens at `/@handle/x/{id}`; the handle never decides access |
 | CA.2 | Brand | The workspace's logo, name and main colour on every screen, from the public-page brand; "Built on Whity" only at the foot of Account, removable for free |
