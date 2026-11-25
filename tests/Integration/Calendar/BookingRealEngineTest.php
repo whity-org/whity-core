@@ -517,18 +517,30 @@ final class BookingRealEngineTest extends TestCase
         foreach ($jobs as $job) {
             $messaging->deliver(1, (int) $job['message_id']);
         }
-        self::assertSame([['whatsapp', '+962 79 123 4567', 'Reminder: Cake tasting on Mon 16 Nov, 10:00 with p11.']], $sent, 'only the channel that is on');
+        self::assertCount(1, $sent, 'only the channel that is on');
+        self::assertSame(['whatsapp', '+962 79 123 4567'], [$sent[0][0], $sent[0][1]]);
+        self::assertStringStartsWith('Reminder: Cake tasting on Mon 16 Nov, 10:00 with p11.', $sent[0][2]);
+        self::assertSame(
+            [['email', 'sent'], ['acme:whatsapp', 'sent']],
+            array_map(static fn (array $r): array => [$r['channel'], $r['outcome']], $this->service->bookingOrFail(1, (int) $booking['id'])['reminders']),
+            'each channel\'s outcome is kept (WHIT-1417)',
+        );
         $conversations = $this->scalar("SELECT COUNT(*) FROM conversations WHERE tenant_id = 1 AND channel = 'acme:whatsapp'");
         self::assertSame(1, (int) $conversations, 'it lands in the customer\'s conversation');
     }
 
     public function testNoPhoneNoTextReminderAndTheEmailOneStillGoes(): void
     {
-        $this->service->setTextReminders(new \Whity\Core\Calendar\BookingTextReminders(static fn () => throw new \LogicException('not asked without a phone'), $this->settings));
+        // Text channels may fail to resolve at all: the email still goes.
+        $this->service->setTextReminders(new \Whity\Core\Calendar\BookingTextReminders(static fn () => throw new \LogicException('messages are not wired'), $this->settings));
 
         $booking = $this->service->book(1, $this->request('2026-11-16T10:00:00+03:00', 11));
         $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE id = " . (int) $booking['id']);
         self::assertSame('sent', $this->service->sendReminder(1, (int) $booking['id'], (string) $booking['starts_at']));
+        self::assertSame(
+            [['email', 'sent']],
+            array_map(static fn (array $r): array => [$r['channel'], $r['outcome']], $this->service->bookingOrFail(1, (int) $booking['id'])['reminders']),
+        );
     }
 
     /**

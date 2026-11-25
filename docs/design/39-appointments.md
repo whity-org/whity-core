@@ -170,18 +170,19 @@ A new table, `calendar_holds`, holds one row for each thing a booking takes (AP.
 | `booking_id` | A booking with several services has one row for each part and for each thing that part takes. |
 | `holder_kind` | `person` or `resource` |
 | `holder_id` | The profile id, or the `calendar_resources.id` |
-| `during` | `tsrange(blocks_from, blocks_until, '[)')`, buffers included |
+| `holds_from`, `holds_until` | The booking's `blocks_from` and `blocks_until`, buffers included |
 | `exclusive` | false only for a person on a **Book anyway** booking, or for a booking that already overlapped before the guard |
 | `expires_at` | Set on payment holds |
 
 On Postgres, with the `btree_gist` extension:
 
 ```sql
-EXCLUDE USING gist (tenant_id WITH =, holder_kind WITH =, holder_id WITH =, during WITH &&)
-  WHERE (exclusive)
+EXCLUDE USING gist (tenant_id WITH =, holder_kind WITH =, holder_id WITH =,
+                    tsrange(holds_from, holds_until, '[)') WITH &&, booking_id WITH <>)
+  WHERE (exclusive) DEFERRABLE INITIALLY DEFERRED
 ```
 
-- **Written in the same transaction** as the booking, by the same service, under the same row locks, which stay. The locks keep error messages friendly ("Dr Ahmad is busy"). The constraint guarantees that no exclusive pair can overlap, whoever writes.
+- **Written by triggers** on `calendar_bookings` and `calendar_booking_services`, in the same transaction as the booking, so every writer writes them. The service's row locks stay and keep error messages friendly ("Dr Ahmad is busy"); it checks the constraint before it commits. The constraint guarantees that no exclusive pair can overlap, whoever writes (as built in M1, WHIT-1412).
 - **A refused insert** (SQLSTATE `23P01`) is turned into the existing 409 (`person_busy` or `room_taken`), so callers see no new error.
 - **Cancel, expire and move** delete or rewrite the rows. Before inserting, the writer deletes rows whose `expires_at` has passed for the same holders (G2). The hold-expiry job also removes them.
 - **Book anyway** stays for people only (CV.9): the person's row is `exclusive = false`. Resources are always exclusive. Book anyway never passes a taken room, chair or piece of equipment.
@@ -194,9 +195,9 @@ EXCLUDE USING gist (tenant_id WITH =, holder_kind WITH =, holder_id WITH =, duri
 
 ### 5.2 Reminders always go out (G3, G4)
 
-- **The sweep.** A scheduled job runs every 5 minutes. It takes confirmed bookings whose reminder is due, still unsent, and whose start is still ahead, and sends their reminders through the same claimed send (`markReminded`), so a reminder already sent is never sent twice. The delayed job stays as the fast path, and the sweep is the guarantee.
-- **Two reminders.** By default 24 hours and 2 hours before (`calendar.reminders` = `24h,2h`; the version 3.1 value). Each reminder goes by email, which is free, and by WhatsApp or SMS when connected, which are paid integrations. Each send is kept in `calendar_booking_reminders` with the channel, the outcome (sent, failed, no address) and the time. The desk sees "Reminder sent 09:00 by WhatsApp", or "Reminder failed: no phone".
-- **Answering.** The reminder carries **I'm coming** and **I can't come** (links to the manage page, not actions inside the email, EM.1). I'm coming sets `confirmed_by_customer_at`. I can't come cancels, counted as early or late by the window, and offers the time to the waitlist (§8).
+- **The sweep.** A scheduled job runs every 5 minutes. It takes confirmed bookings whose reminder is due, still unsent, and whose start is still ahead, and queues their reminder jobs at once. The send claims the reminder by moving `reminder_due_at` on to the next reminder in the same statement, so a reminder already sent is never sent twice. The delayed job stays as the fast path, and the sweep is the guarantee.
+- **Two reminders.** By default 24 hours and 2 hours before (`calendar.reminders` = `24,2`, hours before, up to three; the version 3.1 value). A workspace that had chosen its own `calendar.reminder_hours_before` keeps that one reminder. Each reminder goes by email, which is free, and by WhatsApp or SMS when connected, which are paid integrations. Each send is kept in `calendar_booking_reminders` with the channel, the outcome (sent, failed, no address) and the time. The desk sees "Reminder sent 09:00 by WhatsApp", or "Reminder failed: no phone".
+- **Answering.** The reminder carries **I'm coming** and **I can't come** (links to the manage page, not actions inside the email, EM.1). Opening a link never answers: the page makes I'm coming its main button, or opens the cancel dialog, and the customer presses. Each reminder carries a fresh link, so the latest message always has one that works. I'm coming sets `confirmed_by_customer_at`, which the desk sees. I can't come cancels; counting it as early or late is M3 and offering the time to the waitlist is M8 (§8).
 
 ### 5.3 Time zones (G7)
 

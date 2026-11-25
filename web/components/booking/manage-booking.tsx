@@ -14,6 +14,10 @@
  *
  * A link that is unknown, expired (it ends when the booking starts) or not a
  * link we send at all reads the same: plain words, nothing to do.
+ *
+ * WHIT-1417 (AP.15): the reminder links here with `?answer=coming` or
+ * `?answer=cancel`. Opening a link never answers: `coming` makes "I'm coming"
+ * the main button, `cancel` opens the cancel dialog, and the customer presses.
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -54,6 +58,13 @@ export function replaceManageUrl(token: string): void {
   window.history.replaceState(window.history.state, '', `/booking/${token}`);
 }
 
+/** What the reminder's link asks for, from `?answer=`. */
+function answerAsked(): 'coming' | 'cancel' | null {
+  if (typeof window === 'undefined') return null;
+  const answer = new URLSearchParams(window.location.search).get('answer');
+  return answer === 'coming' || answer === 'cancel' ? answer : null;
+}
+
 export function ManageBookingScreen({ token: initialToken }: { token: string }) {
   const t = useTranslation('booking');
   const words = useBookingWords();
@@ -68,6 +79,9 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   const [takeProblem, setTakeProblem] = useState<string | null>(null);
   // WHIT-1014: the workspace's brand, from the first answer (later answers leave it out).
   const [brand, setBrand] = useState<PublicBooking['brand']>(null);
+  const [asked] = useState(answerAsked);
+  const [answering, setAnswering] = useState(false);
+  const [answerProblem, setAnswerProblem] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isManageToken(initialToken)) return;
@@ -79,6 +93,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
         setBooking(found);
         setBrand(found.brand ?? null);
         setPhase('ready');
+        if (asked === 'cancel' && found.status === 'confirmed') setCancelling(true);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
@@ -89,7 +104,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
     return () => {
       cancelled = true;
     };
-  }, [initialToken, attempt]);
+  }, [initialToken, attempt, asked]);
 
   if (phase === 'loading') {
     return (
@@ -153,6 +168,22 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
   const open = booking.status === 'confirmed' || booking.status === 'pending_payment' || booking.status === 'requested';
   const requested = booking.status === 'requested';
   const suggested = requested && booking.suggested === true;
+  // WHIT-1417: the reminder's I'm coming, until they have said so.
+  const askComing = asked === 'coming' && booking.status === 'confirmed' && booking.coming !== true;
+
+  const sayComing = async () => {
+    setAnswering(true);
+    setAnswerProblem(null);
+    try {
+      const answered = await publicBookingApi.coming(token);
+      setBooking((current) => ({ ...answered, workspace: answered.workspace ?? current?.workspace, time_zone: answered.time_zone ?? current?.time_zone }));
+      setNotice(t('manage.comingThanks', 'Thank you. {workspace} knows you’re coming.', { workspace: workspaceName || t('manage.theBusiness', 'The business') }));
+    } catch (error) {
+      setAnswerProblem(words.errorText(error, t('manage.comingError', 'Your answer didn’t reach us. Try again.')));
+    } finally {
+      setAnswering(false);
+    }
+  };
 
   // Design 3.3: take the time the business suggested. The link changes, like a move.
   const takeSuggestion = async () => {
@@ -221,6 +252,16 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
           {mode === 'view' ? (
             <>
               <BookingFacts booking={booking} timeZone={timeZone} />
+              {booking.status === 'confirmed' && booking.coming === true && notice === null && (
+                <p className="text-sm text-muted-foreground" data-testid="manage-coming-said">
+                  {t('manage.comingSaid', 'You told us you’re coming.')}
+                </p>
+              )}
+              {answerProblem && (
+                <Alert variant="destructive" data-testid="manage-coming-problem">
+                  <AlertDescription className="text-sm">{answerProblem}</AlertDescription>
+                </Alert>
+              )}
               {takeProblem && (
                 <Alert variant="destructive" data-testid="manage-take-problem">
                   <AlertDescription className="text-sm">{takeProblem}</AlertDescription>
@@ -233,8 +274,19 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
                       {t('manage.take', 'Take this time')}
                     </Button>
                   )}
-                  {/* The main button, unless a suggested time is waiting to be taken. */}
-                  <Button asChild size={suggested ? 'default' : 'lg'} variant={suggested ? 'outline' : 'default'} data-testid="manage-ics">
+                  {askComing && (
+                    <Button size="lg" onClick={() => void sayComing()} loading={answering} data-testid="manage-coming">
+                      <Icon name="check" />
+                      {t('manage.coming', 'I’m coming')}
+                    </Button>
+                  )}
+                  {/* The main button, unless a suggested time is waiting to be taken or the reminder asks. */}
+                  <Button
+                    asChild
+                    size={suggested || askComing ? 'default' : 'lg'}
+                    variant={suggested || askComing ? 'outline' : 'default'}
+                    data-testid="manage-ics"
+                  >
                     <a href={icsUrl(token)} download="booking.ics">
                       <Icon name="calendar" />
                       {t('action.addToMyCalendar', 'Add to my calendar')}
@@ -254,7 +306,7 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
                     </Button>
                     <Button variant="outline" onClick={() => setCancelling(true)} data-testid="manage-cancel">
                       <Icon name="close" />
-                      {t('manage.cancel.action', 'Cancel it')}
+                      {askComing ? t('manage.cantCome', 'I can’t come') : t('manage.cancel.action', 'Cancel it')}
                     </Button>
                   </div>
                 </div>

@@ -160,7 +160,9 @@ final class CalendarApiHandler
                 'min_notice_minutes' => SettingsRegistry::CALENDAR_MIN_NOTICE_MINUTES,
                 'max_advance_days' => SettingsRegistry::CALENDAR_MAX_ADVANCE_DAYS,
                 'slot_step_minutes' => SettingsRegistry::CALENDAR_SLOT_STEP_MINUTES,
-                'reminder_hours_before' => SettingsRegistry::CALENDAR_REMINDER_HOURS_BEFORE,
+                // WHIT-1417: one reminder, from older clients; `reminders` is the list.
+                'reminder_hours_before' => SettingsRegistry::CALENDAR_REMINDERS,
+                'reminders' => SettingsRegistry::CALENDAR_REMINDERS,
                 'payment_hold_minutes' => SettingsRegistry::CALENDAR_PAYMENT_HOLD_MINUTES,
                 'week_start' => SettingsRegistry::CALENDAR_WEEK_START,
                 'weekend_days' => SettingsRegistry::CALENDAR_WEEKEND_DAYS,
@@ -174,6 +176,9 @@ final class CalendarApiHandler
                     continue;
                 }
                 $raw = $body[$field];
+                if ($field === 'reminder_hours_before' && is_int($raw)) {
+                    $raw = $raw > 0 ? (string) $raw : '';
+                }
                 $value = match (true) {
                     is_bool($raw) => $raw ? 'true' : 'false',
                     is_int($raw) => (string) $raw,

@@ -295,6 +295,40 @@ function BookingFacts({
       testId: 'booking-checked-in',
     });
   }
+  if (booking.confirmed_by_customer_at) {
+    rows.push({
+      label: t('booking.fact.coming', 'Coming'),
+      value: t('booking.fact.comingValue', 'The customer said they’re coming ({time})', { time: dates.time(booking.confirmed_by_customer_at) ?? '—' }),
+      testId: 'booking-coming',
+    });
+  }
+  if (booking.reminders && booking.reminders.length > 0) {
+    // WHIT-1417 (AP.14): every reminder sent, newest first, one line per channel.
+    const channel = (full: string) => {
+      // A plugin's channel is "plugin:whatsapp"; the desk shows the channel.
+      const key = full.includes(':') ? full.slice(full.indexOf(':') + 1) : full;
+      return key === 'email' ? t('reminder.channel.email', 'email') : key === 'whatsapp' ? 'WhatsApp' : key === 'sms' ? 'SMS' : key;
+    };
+    rows.push({
+      label: t('booking.fact.reminders', 'Reminders'),
+      value: (
+        <ul className="space-y-1">
+          {[...booking.reminders].reverse().map((r, i) => (
+            <li key={i} className={r.outcome === 'sent' ? undefined : 'text-destructive'}>
+              {r.outcome === 'sent'
+                ? t('reminder.sent', 'Reminder sent {time} by {channel}', { time: dates.time(r.sent_at ?? '') ?? '—', channel: channel(r.channel) })
+                : r.outcome === 'no_address'
+                ? r.channel === 'email'
+                  ? t('reminder.noEmail', 'Reminder failed: no email')
+                  : t('reminder.noPhone', 'Reminder failed: no phone ({channel})', { channel: channel(r.channel) })
+                : t('reminder.failed', 'Reminder failed on {channel} at {time}', { channel: channel(r.channel), time: dates.time(r.sent_at ?? '') ?? '—' })}
+            </li>
+          ))}
+        </ul>
+      ),
+      testId: 'booking-reminders',
+    });
+  }
   if (booking.status === 'requested' && booking.suggested_at) {
     rows.push({ label: t('booking.fact.suggested', 'Suggested'), value: t('request.suggested', 'You suggested this time. Waiting for the customer.') });
   }

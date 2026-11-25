@@ -34,7 +34,7 @@ use Whity\Core\Settings\SettingsService;
  * A booking with no email address gets nothing. Delivery failures are logged
  * and never thrown.
  */
-final class EmailBookingMessenger implements BookingMessenger
+final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDelivery
 {
     private const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
     private const AR_DAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
@@ -77,6 +77,11 @@ final class EmailBookingMessenger implements BookingMessenger
         $this->send($tenantId, $booking, 'reminder');
     }
 
+    public function remindReported(int $tenantId, array $booking): string
+    {
+        return $this->send($tenantId, $booking, 'reminder');
+    }
+
     public function awaitingPayment(int $tenantId, array $booking): void
     {
         $this->send($tenantId, $booking, 'held');
@@ -116,13 +121,16 @@ final class EmailBookingMessenger implements BookingMessenger
         ];
     }
 
-    /** @param array<string, mixed> $booking */
-    private function send(int $tenantId, array $booking, string $kind): void
+    /**
+     * @param array<string, mixed> $booking
+     * @return string a {@see BookingRepository} REMINDER_* outcome
+     */
+    private function send(int $tenantId, array $booking, string $kind): string
     {
         try {
             $message = $this->message($tenantId, $booking, $kind);
             if ($message === null) {
-                return;
+                return BookingRepository::REMINDER_NO_ADDRESS;
             }
             $attachments = $message['ics'] !== null && $message['method'] !== null
                 ? [new MailAttachment('booking.ics', 'text/calendar; charset=utf-8; method=' . $message['method'], $message['ics'])]
@@ -134,8 +142,12 @@ final class EmailBookingMessenger implements BookingMessenger
                 $message['content'],
                 new EmailOptions(attachments: $attachments, replyTo: $message['replyTo']),
             );
+
+            return BookingRepository::REMINDER_SENT;
         } catch (\Throwable $e) {
             $this->logger?->warning('[calendar] could not send a booking email', ['kind' => $kind, 'booking' => $booking['id'] ?? null, 'error' => $e->getMessage()]);
+
+            return BookingRepository::REMINDER_FAILED;
         }
     }
 
@@ -252,16 +264,35 @@ final class EmailBookingMessenger implements BookingMessenger
                 $day = $this->day($start, $calendar);
                 $subject = sprintf($t['reminder.subject.' . $day], $serviceName, $place);
                 $directions = $address !== null ? 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address) : null;
+                if ($manage !== null) {
+                    // WHIT-1417 (AP.15): I'm coming and I can't come, as links
+                    // to the customer's page, which asks before it changes
+                    // anything (EM.1: no actions inside the email).
+                    $content = new EmailContent(
+                        heading: $t['reminder.heading.' . $day],
+                        paragraphs: [$t['reminder.ask']],
+                        ctaLabel: $t['reminder.coming'],
+                        ctaUrl: $manage . '?answer=coming',
+                        preheader: $when . ($staff !== '' ? sprintf($t['pre.with'], $staff) : '') . $t['pre.end'],
+                        rows: $rows,
+                        notice: $footer,
+                        language: $arabic ? 'ar' : 'en',
+                        rowStyles: [0 => 'strong'],
+                        linkLine: ['before' => $t['reminder.line.before'], 'label' => $t['reminder.cantCome'], 'url' => $manage . '?answer=cancel', 'after' => $t['reminder.line.after']],
+                        smallNote: $directions !== null ? sprintf($t['reminder.address'], $address) : null,
+                    );
+                    break;
+                }
+                // No link to the customer's page: directions, when there's an address.
                 $content = new EmailContent(
                     heading: $t['reminder.heading.' . $day],
-                    ctaLabel: $directions !== null ? $t['reminder.cta'] : ($manage !== null ? $t['line.move'] : null),
-                    ctaUrl: $directions ?? $manage,
+                    ctaLabel: $directions !== null ? $t['reminder.cta'] : null,
+                    ctaUrl: $directions,
                     preheader: $when . ($staff !== '' ? sprintf($t['pre.with'], $staff) : '') . $t['pre.end'],
                     rows: $rows,
                     notice: $footer,
                     language: $arabic ? 'ar' : 'en',
                     rowStyles: [0 => 'strong'],
-                    linkLine: $directions !== null && $manage !== null ? ['before' => $t['reminder.line.before'], 'label' => $t['line.move'], 'url' => $manage, 'after' => $t['reminder.line.after']] : null,
                 );
                 break;
 
@@ -475,6 +506,10 @@ final class EmailBookingMessenger implements BookingMessenger
         'reminder.cta' => 'Get directions',
         'reminder.line.before' => "Can't make it? ",
         'reminder.line.after' => ' so someone else can have the time.',
+        'reminder.ask' => 'Are you coming? Let us know with one tap.',
+        'reminder.coming' => 'I\'m coming',
+        'reminder.cantCome' => 'Tell us you can\'t come',
+        'reminder.address' => 'The address: %s',
         'held.heading' => 'Held for you: %s',
         'held.lead' => 'Your time is held while you pay. It is confirmed once the payment goes through.',
         'held.until' => 'If the payment is not finished by %s, the time is let go.',
@@ -529,6 +564,10 @@ final class EmailBookingMessenger implements BookingMessenger
         'reminder.cta' => 'الاتجاهات',
         'reminder.line.before' => 'لن تستطيع الحضور؟ ',
         'reminder.line.after' => ' ليستفيد غيرك من الوقت.',
+        'reminder.ask' => 'هل ستحضر؟ أخبرنا بلمسة واحدة.',
+        'reminder.coming' => 'سأحضر',
+        'reminder.cantCome' => 'أخبرنا أنك لن تحضر',
+        'reminder.address' => 'العنوان: %s',
         'held.heading' => 'محجوز لك: %s',
         'held.lead' => 'موعدك محجوز ريثما تدفع، ويتأكد عند إتمام الدفع.',
         'held.until' => 'إذا لم يكتمل الدفع حتى الساعة %s يُلغى الحجز.',

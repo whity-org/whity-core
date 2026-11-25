@@ -22,6 +22,7 @@ final class CalendarSettings
         public readonly int $minNoticeMinutes,
         public readonly int $maxAdvanceDays,
         public readonly int $slotStepMinutes,
+        /** The first reminder's hours before (the largest), 0 when there are none; kept for the API. */
         public readonly int $reminderHoursBefore,
         public readonly int $paymentHoldMinutes,
         public readonly int $weekStart,
@@ -32,7 +33,34 @@ final class CalendarSettings
         public readonly bool $multiServiceBooking = false,
         /** WHIT-1334: the walk-in queue at the front desk is on. */
         public readonly bool $walkinsEnabled = false,
+        /**
+         * WHIT-1417 (AP.15): every reminder, as hours before the start,
+         * largest first; empty = no reminders.
+         *
+         * @var list<int>
+         */
+        public readonly array $reminderHours = [24],
     ) {
+    }
+
+    /**
+     * `calendar.reminders` as hours, largest first; anything unreadable is
+     * left out.
+     *
+     * @return list<int>
+     */
+    public static function reminderHours(string $csv): array
+    {
+        $hours = [];
+        foreach (explode(',', $csv) as $part) {
+            $part = trim($part);
+            if (preg_match('/^\d+$/', $part) === 1 && (int) $part >= 1 && (int) $part <= 168) {
+                $hours[(int) $part] = (int) $part;
+            }
+        }
+        krsort($hours);
+
+        return array_values(array_slice($hours, 0, 3, true));
     }
 
     /** @param array<string, string> $effective */
@@ -48,13 +76,15 @@ final class CalendarSettings
             ? (int) $effective[$key]
             : $default;
 
+        $reminderHours = self::reminderHours($effective[SettingsRegistry::CALENDAR_REMINDERS] ?? '24,2');
+
         return new self(
             $zone,
             ($effective[SettingsRegistry::CALENDAR_BOOKING_PAGE_ENABLED] ?? 'false') === 'true',
             $int(SettingsRegistry::CALENDAR_MIN_NOTICE_MINUTES, 120),
             max(1, $int(SettingsRegistry::CALENDAR_MAX_ADVANCE_DAYS, 60)),
             max(5, $int(SettingsRegistry::CALENDAR_SLOT_STEP_MINUTES, 15)),
-            $int(SettingsRegistry::CALENDAR_REMINDER_HOURS_BEFORE, 24),
+            $reminderHours[0] ?? 0,
             max(1, $int(SettingsRegistry::CALENDAR_PAYMENT_HOLD_MINUTES, 15)),
             self::weekday($effective[SettingsRegistry::CALENDAR_WEEK_START] ?? 'saturday') ?? 6,
             self::weekdays($effective[SettingsRegistry::CALENDAR_WEEKEND_DAYS] ?? 'friday,saturday'),
@@ -62,6 +92,7 @@ final class CalendarSettings
             ($effective[SettingsRegistry::CALENDAR_INSTANT_BOOKING] ?? 'true') !== 'false',
             ($effective[SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING] ?? 'false') === 'true',
             ($effective[SettingsRegistry::CALENDAR_WALKINS_ENABLED] ?? 'false') === 'true',
+            $reminderHours,
         );
     }
 
@@ -99,6 +130,7 @@ final class CalendarSettings
             'max_advance_days' => $this->maxAdvanceDays,
             'slot_step_minutes' => $this->slotStepMinutes,
             'reminder_hours_before' => $this->reminderHoursBefore,
+            'reminders' => $this->reminderHours,
             'payment_hold_minutes' => $this->paymentHoldMinutes,
             'week_start' => self::WEEKDAYS[$this->weekStart - 1],
             'weekend_days' => array_map(static fn (int $d): string => self::WEEKDAYS[$d - 1], $this->weekendDays),

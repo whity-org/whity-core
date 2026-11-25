@@ -11473,6 +11473,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/bookings/{token}/coming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The customer says they are coming (public, WHIT-1417); pressing it again changes nothing */
+        post: operations["post_api_v1_public_bookings_token_coming"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/bookings/{token}/ics": {
         parameters: {
             query?: never;
@@ -16587,7 +16604,12 @@ export interface components {
             checked_in_at?: string | null;
             /** @description When staff suggested this time for a request. */
             suggested_at?: string | null;
+            /** @description When the last reminder went. */
             reminder_sent_at?: string | null;
+            /** @description When the customer pressed I'm coming (WHIT-1417). */
+            confirmed_by_customer_at?: string | null;
+            /** @description Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14). */
+            reminders?: components["schemas"]["CalendarBookingReminder"][];
             /** @description In lists: the room's name, language code => text. */
             room_name?: {
                 [key: string]: string;
@@ -16660,6 +16682,18 @@ export interface components {
             book_anyway?: boolean;
             /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
             within_hours?: boolean;
+        };
+        CalendarBookingReminder: {
+            /** @description Which reminder: this many hours before the start. */
+            hours_before: number;
+            /** @description `email`, or the text channel's key (such as `whatsapp`). */
+            channel: string;
+            /**
+             * @description `no_address`: the booking has no email, or no phone for a text channel.
+             * @enum {string}
+             */
+            outcome: "sent" | "failed" | "no_address";
+            sent_at: string | null;
         };
         CalendarBookingServiceChoice: {
             service_id: number;
@@ -16925,8 +16959,10 @@ export interface components {
             min_notice_minutes: number;
             max_advance_days: number;
             slot_step_minutes: number;
-            /** @description 0 means no reminder. */
+            /** @description The first reminder's hours before; 0 means none. Kept for older clients: `reminders` lists them all. */
             reminder_hours_before: number;
+            /** @description Every reminder, as hours before the start, largest first; empty means none (WHIT-1417). */
+            reminders?: number[];
             payment_hold_minutes: number;
             week_start: string;
             weekend_days: string[];
@@ -16947,8 +16983,10 @@ export interface components {
             max_advance_days?: number;
             /** @description Free times are offered every this many minutes. */
             slot_step_minutes?: number;
-            /** @description Send one reminder this many hours before; 0 sends none. */
+            /** @description Older clients: one reminder this many hours before; 0 sends none. Replaces `reminders`. */
             reminder_hours_before?: number;
+            /** @description Up to three reminders, as hours before the start, all different; empty sends none (WHIT-1417). */
+            reminders?: number[];
             /** @description How long a payment step holds a slot. */
             payment_hold_minutes?: number;
             /**
@@ -23904,6 +23942,8 @@ export interface components {
             status: "pending_payment" | "requested" | "confirmed" | "cancelled" | "expired";
             /** @description The business suggested this time for the request; the customer can take it. */
             suggested?: boolean;
+            /** @description The customer already said they are coming (WHIT-1417). */
+            coming?: boolean;
             starts_at: string;
             ends_at: string;
             service: {
@@ -87685,6 +87725,76 @@ export interface operations {
             };
             /** @description Already cancelled */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_bookings_token_coming: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's email. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Noted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBooking"];
+                    };
+                };
+            };
+            /** @description This link is invalid or has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The booking is not confirmed */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
