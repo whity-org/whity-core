@@ -32488,6 +32488,248 @@
                 }
             }
         },
+        "/api/v1/customer-area/{handle}/x/{screen}": {
+            "get": {
+                "operationId": "get_api_v1_customer_area_handle_x_screen",
+                "summary": "One plugin screen for customers (SDK 1.174)",
+                "tags": [
+                    "customer-area"
+                ],
+                "description": "Only a screen whose permission the customer holds. Its blocks and embed call the plugin customer routes with the token from the route below.",
+                "parameters": [
+                    {
+                        "name": "handle",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "screen",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "handle",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The workspace's @handle."
+                    },
+                    {
+                        "name": "screen",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The screen",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAreaScreen"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not signed in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not here, not yours, or the area is off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/customer-area/{handle}/x/{screen}/token": {
+            "post": {
+                "operationId": "post_api_v1_customer_area_handle_x_screen_token",
+                "summary": "A five-minute token for a plugin screen (SDK 1.174)",
+                "tags": [
+                    "customer-area"
+                ],
+                "description": "Bound to this workspace and marked for customers: it opens only the routes of that plugin declared customer, sent as a Bearer header. Takes no body.",
+                "parameters": [
+                    {
+                        "name": "handle",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "screen",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "handle",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The workspace's @handle."
+                    },
+                    {
+                        "name": "screen",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The token",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "token": {
+                                                    "type": "string"
+                                                },
+                                                "expires_in": {
+                                                    "type": "integer"
+                                                }
+                                            },
+                                            "required": [
+                                                "token",
+                                                "expires_in"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Not signed in",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not here, not yours, or the area is off",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many requests",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/data-types": {
             "get": {
                 "operationId": "get_api_v1_data_types",
@@ -116339,14 +116581,22 @@
                             "properties": {
                                 "id": {
                                     "type": "string",
-                                    "enum": [
-                                        "bookings",
-                                        "bills",
-                                        "messages"
-                                    ]
+                                    "description": "`bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.174)."
                                 },
                                 "count": {
                                     "type": "integer"
+                                },
+                                "label": {
+                                    "description": "A plugin tab label: a string or {en, ar}."
+                                },
+                                "icon": {
+                                    "type": "string",
+                                    "nullable": true
+                                },
+                                "count_path": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The count route of a plugin tab, called with the screen token; it answers {\"count\": n}."
                                 }
                             },
                             "required": [
@@ -116631,6 +116881,39 @@
             "CustomerAreaHome": {
                 "type": "object",
                 "properties": {
+                    "cards": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "description": "A string or {en, ar}."
+                                },
+                                "blocks": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object"
+                                    }
+                                },
+                                "api_paths": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "label",
+                                "blocks",
+                                "api_paths"
+                            ]
+                        },
+                        "description": "Home cards from plugins (placement home, SDK 1.174)."
+                    },
                     "waiting": {
                         "type": "array",
                         "items": {
@@ -116666,6 +116949,7 @@
                     }
                 },
                 "required": [
+                    "cards",
                     "waiting",
                     "time_zone",
                     "next_booking",
@@ -116938,6 +117222,80 @@
                     "number",
                     "currency",
                     "total_minor"
+                ]
+            },
+            "CustomerAreaScreen": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string"
+                    },
+                    "label": {
+                        "description": "A string or {en, ar}."
+                    },
+                    "placement": {
+                        "type": "string",
+                        "enum": [
+                            "tab",
+                            "home",
+                            "page"
+                        ]
+                    },
+                    "screen": {
+                        "type": "string",
+                        "enum": [
+                            "blocks",
+                            "embed"
+                        ]
+                    },
+                    "icon": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "api_paths": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "The plugin customer routes this screen token opens, as path patterns."
+                    },
+                    "blocks": {
+                        "type": "array",
+                        "items": {
+                            "type": "object"
+                        }
+                    },
+                    "embed": {
+                        "type": "object",
+                        "properties": {
+                            "path": {
+                                "type": "string"
+                            },
+                            "fullScreen": {
+                                "type": "boolean"
+                            }
+                        },
+                        "required": [
+                            "path"
+                        ]
+                    },
+                    "count": {
+                        "type": "object",
+                        "properties": {
+                            "apiPath": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "apiPath"
+                        ]
+                    }
+                },
+                "required": [
+                    "id",
+                    "label",
+                    "placement",
+                    "screen"
                 ]
             },
             "CustomerAreaSettings": {

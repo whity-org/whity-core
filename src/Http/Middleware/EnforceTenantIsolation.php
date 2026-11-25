@@ -398,6 +398,8 @@ class EnforceTenantIsolation
         '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/bills/quotes/[0-9]{1,18}(/(accept|decline))?$#',
         '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/bills/(invoices|receipts)/[0-9]{1,18}$#',
         '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/messages/[0-9]{1,18}$#',
+        // SDK 1.174 (WHIT-1424): a plugin's screen for customers, and its token.
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/x/[a-z][a-z0-9-]{0,63}(/token)?$#',
 
         // Messages web chat (ADR 0016 §5). A visitor has no session; the workspace
         // is the slug, checked against the host, and web chat must be on.

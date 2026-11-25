@@ -137,8 +137,18 @@ interface PluginInterface
      *   before your handler runs. It is on top of the deployment's own limits,
      *   never instead of them. Any other value is ignored with a logged warning
      *   and the route registers without its own limit.
+     * - 'customer' (bool, optional, SDK 1.174, WHIT-1424): the route serves a
+     *   workspace's CUSTOMERS in their customer area (design section 41). The
+     *   area calls a plugin only with a short-lived customer token, and that
+     *   token opens ONLY routes declaring `'customer' => true`; every other
+     *   route answers 404 to it. Needs a requiredPermission (one you list in
+     *   {@see Contribute\PluginCustomerPermissionsInterface}), and cannot be
+     *   public or a service route; a declaration breaking that is NOT
+     *   registered, with a logged reason. Read the caller from
+     *   {@see Http\CustomerCall::from()} and answer only their own records.
+     *   Staff may call it with their session as usual (no CustomerCall then).
      *
-     * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>, service?: string, rateLimit?: int}>
+     * @return array<array{method: string, path: string, handler: callable, requiredRole?: ?string, requiredPermission?: ?string, schema?: array<string, mixed>, service?: string, rateLimit?: int, customer?: bool}>
      */
     public function getRoutes(): array;
 

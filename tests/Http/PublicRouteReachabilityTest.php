@@ -52,6 +52,8 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'a customer opening their bills' => ['/api/v1/customer-area/example-bakery/bills'];
         yield 'a customer moving a booking' => ['/api/v1/customer-area/example-bakery/bookings/12/move'];
         yield 'a customer reading a conversation' => ['/api/v1/customer-area/example-bakery/messages/7'];
+        yield 'a customer opening a plugin screen' => ['/api/v1/customer-area/example-bakery/x/courses'];
+        yield 'a plugin screen asking for its token' => ['/api/v1/customer-area/example-bakery/x/courses/token'];
         yield 'a customer declining a quote' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/decline'];
     }
 
@@ -99,6 +101,7 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'the operator plan catalogue' => ['/api/v1/plans'];
         yield 'the operator promotion catalogue' => ['/api/v1/promotions'];
         yield 'anything else under a customer area' => ['/api/v1/customer-area/example-bakery/admin'];
+        yield 'deeper than a plugin screen token' => ['/api/v1/customer-area/example-bakery/x/courses/token/again'];
         yield 'deeper than a customer area booking' => ['/api/v1/customer-area/example-bakery/bookings/12/move/again'];
         yield 'the customer area settings' => ['/api/v1/settings/customer-area'];
         yield 'anything else under a quote link' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/revise'];

@@ -11,7 +11,7 @@ import { OutcomeIcon, type OutcomeTone } from '@/components/auth/public-outcome'
 import { Button } from '@whity/ui/button';
 import { Card, CardContent } from '@whity/ui/card';
 import type { IconName } from '@whity/ui/icon';
-import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 
 export type Load<T> = { kind: 'loading' } | { kind: 'gone' } | { kind: 'busy' } | { kind: 'failed' } | { kind: 'ready'; data: T };
 
@@ -99,8 +99,7 @@ export function serverText(error: unknown): string | null {
 
 /** A `{en, ar}` name in the reader's language, falling back to the other. */
 export function useLocalized(): (text: Record<string, string> | null | undefined) => string {
-  const { currentLanguage } = useCurrentLanguage();
-  const lang = String(currentLanguage ?? 'en').slice(0, 2);
+  const lang = String(useLanguageCode() ?? 'en').slice(0, 2);
   return (text) => {
     if (!text) return '';
     return text[lang] || text.en || Object.values(text).find((v) => v !== '') || '';

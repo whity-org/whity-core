@@ -6762,7 +6762,19 @@ $customerAreaHandler = new \Whity\Api\CustomerAreaApiHandler(
     $messagingService,
     new DatabaseSharedStore($db->getPdo()),
     $auditLogger,
+    // SDK 1.174 (WHIT-1424): the plugins' screens for customers, who may see
+    // one, and the customer token that opens only customer routes.
+    static fn (): array => $pluginLoader->getCustomerScreens(),
+    static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+    $jwtParser,
 );
+// Who a customer is on a plugin's customer route (SDK 1.174, CA.18).
+\Whity\Core\Plugin\PluginCustomerRoutes::useResolver(
+    static fn (int $profileId, int $tenantId): bool => $roleChecker->isCustomerOnly($profileId, $tenantId),
+    static fn (int $tenantId, int $profileId): array => (new \Whity\Core\CustomerArea\CustomerRecords($db->getPdo()))->contactIds($tenantId, $profileId),
+);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/x/{screen:[a-z][a-z0-9-]{0,63}}',       [$customerAreaHandler, 'screen'],            null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/x/{screen:[a-z][a-z0-9-]{0,63}}/token', [$customerAreaHandler, 'screenToken'],       null);
 $router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}',                                        [$customerAreaHandler, 'area'],              null);
 $router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/join',                               [$customerAreaHandler, 'join'],              null);
 $router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/home',                               [$customerAreaHandler, 'home'],              null);

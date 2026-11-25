@@ -89,6 +89,11 @@ final class CustomerAreaApiHandler
         private readonly MessagingService $messaging,
         private readonly SharedStoreInterface $store,
         private readonly ?AuditLogger $audit = null,
+        /** @var (\Closure(): list<array<string, mixed>>)|null the plugins' customer screens (SDK 1.174) */
+        private readonly ?\Closure $pluginScreens = null,
+        /** @var (\Closure(int, string, int): bool)|null whether a profile holds a permission in a workspace */
+        private readonly ?\Closure $hasPermission = null,
+        private readonly ?\Whity\Auth\JwtParser $jwt = null,
     ) {
     }
 
@@ -128,7 +133,15 @@ final class CustomerAreaApiHandler
                 ];
                 if ($me['state'] === 'customer') {
                     $this->link($tenantId, $me['profile_id']);
-                    $data['tabs'] = $this->tabs($tenantId, $me['profile_id'], $effective, $calendar->bookingPageEnabled, $chatOn);
+                    $pluginTabs = array_map(static fn (array $sc): array => [
+                        'id' => 'x:' . $sc['id'],
+                        'count' => 0,
+                        'label' => $sc['label'],
+                        'icon' => $sc['icon'],
+                        'count_path' => $sc['count']['apiPath'] ?? null,
+                    ], $this->visibleScreens($tenantId, $me['profile_id'], 'tab'));
+                    // Home, then the plugins' tabs by their order, then the core tabs (CA.13).
+                    $data['tabs'] = array_merge($pluginTabs, $this->tabs($tenantId, $me['profile_id'], $effective, $calendar->bookingPageEnabled, $chatOn));
                 }
             }
 
@@ -190,7 +203,15 @@ final class CustomerAreaApiHandler
                 $latest = ['id' => (int) $c['id'], 'last_message_at' => (string) $c['last_message_at'], 'message' => $last];
             }
 
+            $cards = array_map(static fn (array $sc): array => [
+                'id' => $sc['id'],
+                'label' => $sc['label'],
+                'blocks' => $sc['blocks'] ?? [],
+                'api_paths' => \Whity\Core\Plugin\PluginCustomerRoutes::pathsOf((string) $sc['namespace']),
+            ], $this->visibleScreens($tenantId, $me['profile_id'], 'home'));
+
             return Response::json(['data' => [
+                'cards' => $cards,
                 'waiting' => array_slice($waiting, 0, 10),
                 'time_zone' => $this->booking->settingsFor($tenantId)->zone->getName(),
                 'next_booking' => $upcoming[0] ?? null,
@@ -439,6 +460,63 @@ final class CustomerAreaApiHandler
             );
 
             return Response::json(['data' => $message !== null ? MessagesPresenter::customerMessage($message) : null], 201);
+        });
+    }
+
+    // ---- Plugin screens (SDK 1.174, CA.17) ----
+
+    /**
+     * One plugin screen the customer may see: its blocks or embed page.
+     *
+     * @param array<string, string> $params
+     */
+    public function screen(Request $request, array $params): Response
+    {
+        return $this->member($request, $params, function (array $ws, array $me) use ($params): Response {
+            $screen = $this->findScreen($ws['id'], $me['profile_id'], (string) ($params['screen'] ?? ''));
+            if ($screen === null) {
+                return Response::error(self::NOT_FOUND, 404);
+            }
+            $out = [
+                'id' => $screen['id'],
+                'label' => $screen['label'],
+                'placement' => $screen['placement'],
+                'screen' => $screen['screen'],
+                'icon' => $screen['icon'],
+                // Where the screen's token goes: the plugin's customer routes only.
+                'api_paths' => \Whity\Core\Plugin\PluginCustomerRoutes::pathsOf((string) $screen['namespace']),
+            ];
+            if ($screen['screen'] === 'blocks') {
+                $out['blocks'] = $screen['blocks'] ?? [];
+            } else {
+                $out['embed'] = $screen['embed'] ?? [];
+            }
+            if (isset($screen['count'])) {
+                $out['count'] = $screen['count'];
+            }
+
+            return Response::json(['data' => $out]);
+        });
+    }
+
+    /**
+     * A five-minute token for one plugin screen (CA.18): bound to this
+     * workspace and marked for customers, it opens only that plugin's routes
+     * declared `'customer' => true`. Never sent to the plugin's frame.
+     *
+     * @param array<string, string> $params
+     */
+    public function screenToken(Request $request, array $params): Response
+    {
+        return $this->member($request, $params, function (array $ws, array $me) use ($params): Response {
+            $screen = $this->findScreen($ws['id'], $me['profile_id'], (string) ($params['screen'] ?? ''));
+            $claims = ($this->claims)();
+            if ($screen === null || $this->jwt === null || !is_array($claims)) {
+                return Response::error(self::NOT_FOUND, 404);
+            }
+            $issued = \Whity\Core\Plugin\PluginFrameTokens::issueForCustomer($this->jwt, $claims, (string) $screen['id'], (string) $screen['namespace'], $ws['id']);
+
+            return Response::json(['data' => ['token' => $issued['token'], 'expires_in' => $issued['expiresIn']]]);
         });
     }
 
@@ -737,6 +815,41 @@ final class CustomerAreaApiHandler
         }
 
         return $tabs;
+    }
+
+    /**
+     * The plugin screens of one placement the person may see here, by order.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function visibleScreens(int $tenantId, int $profileId, ?string $placement): array
+    {
+        if ($this->pluginScreens === null || $this->hasPermission === null) {
+            return [];
+        }
+        $out = array_values(array_filter(
+            ($this->pluginScreens)(),
+            fn (array $sc): bool => ($placement === null || $sc['placement'] === $placement)
+                && ($this->hasPermission)($profileId, (string) $sc['requiredPermission'], $tenantId)
+        ));
+        usort($out, static fn (array $a, array $b): int => [(int) $a['order'], (string) $a['id']] <=> [(int) $b['order'], (string) $b['id']]);
+
+        return $out;
+    }
+
+    /** @return array<string, mixed>|null */
+    private function findScreen(int $tenantId, int $profileId, string $id): ?array
+    {
+        if ($id === '' || preg_match('/^[a-z][a-z0-9-]*$/', $id) !== 1) {
+            return null;
+        }
+        foreach ($this->visibleScreens($tenantId, $profileId, null) as $screen) {
+            if ($screen['id'] === $id) {
+                return $screen;
+            }
+        }
+
+        return null;
     }
 
     /** Link contacts on a verified address, and say so in the audit log (CA.9). */

@@ -159,6 +159,37 @@ export async function apiFetch(url: string, init: RequestInit = {}): Promise<Res
   return requestWith(globalTransport, url, init);
 }
 
+/**
+ * A token that stands in for the session on some paths (SDK 1.174,
+ * WHIT-1424): while a customer area screen is open, its plugin's customer
+ * routes are called with the screen's customer token instead of the cookie.
+ * Each registration answers only the paths it `matches`.
+ */
+export interface ScopedAuthorization {
+  matches(path: string): boolean;
+  /** The token; `fresh` asks for a new one after a 401. */
+  token(fresh: boolean): Promise<string | null>;
+}
+
+const scopedAuthorizations = new Set<ScopedAuthorization>();
+
+/** Use `auth` for its paths until the returned function is called. */
+export function addScopedAuthorization(auth: ScopedAuthorization): () => void {
+  scopedAuthorizations.add(auth);
+  return () => {
+    scopedAuthorizations.delete(auth);
+  };
+}
+
+function scopedFor(url: string): ScopedAuthorization | null {
+  if (scopedAuthorizations.size === 0) return null;
+  const path = pathOf(new URL(url, base()).href);
+  for (const auth of scopedAuthorizations) {
+    if (auth.matches(path)) return auth;
+  }
+  return null;
+}
+
 /** {@link apiFetch} over an injected transport (tests). */
 export async function requestWith(
   transport: Transport,
@@ -166,6 +197,19 @@ export async function requestWith(
   init: RequestInit = {}
 ): Promise<Response> {
   const send = appFetch(transport);
+  const scoped = scopedFor(url);
+  if (scoped !== null) {
+    // The screen's token, never the cookie; one retry with a fresh token.
+    const sendScoped = async (fresh: boolean): Promise<Response> => {
+      const headers = new Headers(init.headers);
+      headers.set('X-Requested-With', 'XMLHttpRequest');
+      const token = await scoped.token(fresh);
+      if (token !== null) headers.set('Authorization', `Bearer ${token}`);
+      return send(new Request(new URL(url, base()), { ...init, headers, credentials: 'omit' }));
+    };
+    const answered = await sendScoped(false);
+    return answered.status === 401 ? sendScoped(true) : answered;
+  }
   const build = (): Request => {
     const headers = new Headers(init.headers);
     if (!headers.has('X-Requested-With')) {

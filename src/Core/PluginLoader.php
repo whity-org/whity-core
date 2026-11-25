@@ -1162,6 +1162,162 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     private array $dashboards = [];
 
     /**
+     * Each plugin's screens for the workspace's customers (SDK 1.174,
+     * WHIT-1424), validated: id, label, placement, screen, permission, icon,
+     * order, and blocks, embed or count.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $customerScreens = [];
+
+    /**
+     * The customer screens of every plugin that is running and on for the
+     * current workspace (SDK 1.174, WHIT-1424), each with its plugin's name
+     * and route namespace. Who may see one is the caller's to check.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getCustomerScreens(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $screens = $this->customerScreens[$pluginKey] ?? [];
+            if ($screens === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            foreach ($screens as $screen) {
+                $out[] = $screen + ['plugin' => $info['plugin']->getName(), 'namespace' => (string) $info['namespacePrefix']];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Validate a plugin's customer screens (SDK 1.174). Each is first checked
+     * exactly like a staff screen of kind blocks or embed (id, label,
+     * permission, blocks and their routes), then:
+     *  - `placement` is tab, home or page (home: blocks only);
+     *  - the permission is customer-grade and the plugin's own;
+     *  - every route it touches (any `/api/` path in its blocks, the embed
+     *    page, `count.apiPath`) is one of the plugin's customer routes.
+     * A screen breaking a rule is dropped alone, with a logged reason.
+     *
+     * @param array<string, ?string> $registeredGetRoutes
+     * @param array<string, ?string> $registeredWriteRoutes
+     * @param array<string, true> $customerRoutePaths
+     * @return list<array<string, mixed>>
+     */
+    private function collectCustomerScreens(
+        PluginInterface $plugin,
+        string $pluginKey,
+        array $registeredGetRoutes,
+        array $registeredWriteRoutes,
+        array $customerRoutePaths
+    ): array {
+        if (!$plugin instanceof \Whity\Sdk\Contribute\PluginCustomerScreensInterface) {
+            return [];
+        }
+        try {
+            $declared = $plugin->getCustomerScreens();
+            $ownPermissions = $plugin->getPermissions();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'customer screen declaration');
+
+            return [];
+        }
+
+        $drop = function (mixed $id, string $why) use ($pluginKey): void {
+            $this->logWarning("Plugin {$pluginKey} customer screen " . (is_string($id) ? "'{$id}'" : '(no id)') . ": {$why}; it was dropped.");
+        };
+        $bare = static fn (string $path): string => rtrim((string) preg_replace('#^/api/v[0-9]+/#', '/api/', $path), '/');
+        $customerPaths = [];
+        foreach (array_keys($customerRoutePaths) as $declaredPath) {
+            $customerPaths[$bare((string) $declaredPath)] = true;
+        }
+        $isCustomerPath = static fn (string $path): bool => isset($customerPaths[$bare($path)]);
+
+        $out = [];
+        foreach ($declared as $descriptor) {
+            if (!is_array($descriptor)) { // @phpstan-ignore function.alreadyNarrowedType (plugin-supplied value; the SDK type is PHPDoc only)
+                $drop(null, 'a screen must be an array');
+                continue;
+            }
+            $id = $descriptor['id'] ?? null;
+            $placement = $descriptor['placement'] ?? 'tab';
+            if (!in_array($placement, ['tab', 'home', 'page'], true)) {
+                $drop($id, 'placement must be tab, home or page');
+                continue;
+            }
+            $kind = $descriptor['screen'] ?? null;
+            if (!in_array($kind, ['blocks', 'embed'], true)) {
+                $drop($id, 'screen must be blocks or embed (crud, action and custom are staff screens)');
+                continue;
+            }
+            if ($placement === 'home' && $kind !== 'blocks') {
+                $drop($id, 'a Home card is blocks only');
+                continue;
+            }
+            $permission = $descriptor['requiredPermission'] ?? null;
+            if (!is_string($permission) || !\Whity\Core\Identity\CustomerGradePermissions::isCustomerGrade($permission)) {
+                $drop($id, "requiredPermission must be one of the plugin's customer permissions (PluginCustomerPermissionsInterface)");
+                continue;
+            }
+            $count = $descriptor['count'] ?? null;
+            if ($count !== null && (!is_array($count) || !is_string($count['apiPath'] ?? null)
+                || !$isCustomerPath($count['apiPath']) || !array_key_exists($count['apiPath'], $registeredGetRoutes))) {
+                $drop($id, "count.apiPath must be one of the plugin's GET customer routes");
+                continue;
+            }
+
+            // The staff rules, through the same validator (ids are shared with staff screens).
+            $feature = array_intersect_key($descriptor, array_flip(['id', 'label', 'screen', 'requiredPermission', 'blocks', 'embed', 'icon']));
+            $dropped = [];
+            $normalized = $this->validateFrontendFeature($feature, $plugin->getName(), $pluginKey, $ownPermissions, $registeredGetRoutes, $registeredWriteRoutes, $dropped);
+            if ($normalized === null) {
+                continue;
+            }
+            $paths = [];
+            array_walk_recursive($normalized, static function (mixed $value) use (&$paths): void {
+                if (is_string($value) && str_starts_with($value, '/api/')) {
+                    $paths[] = $value;
+                }
+            });
+            $foreign = array_values(array_unique(array_filter($paths, static fn (string $p): bool => !$isCustomerPath($p))));
+            if ($foreign !== []) {
+                $drop($id, 'it uses routes not declared for customers: ' . implode(', ', $foreign));
+                continue;
+            }
+
+            $screen = [
+                'id' => $normalized['id'],
+                'label' => $normalized['label'],
+                'placement' => $placement,
+                'screen' => $kind,
+                'requiredPermission' => $permission,
+                'icon' => is_string($descriptor['icon'] ?? null) ? $descriptor['icon'] : null,
+                'order' => is_int($descriptor['order'] ?? null) ? $descriptor['order'] : 100,
+            ];
+            if ($kind === 'blocks') {
+                $screen['blocks'] = $normalized['blocks'] ?? [];
+            } else {
+                $embed = is_array($normalized['embed'] ?? null) ? $normalized['embed'] : [];
+                $screen['embed'] = $embed + ['fullScreen' => is_array($descriptor['embed'] ?? null) && ($descriptor['embed']['fullScreen'] ?? false) === true];
+            }
+            if (is_array($count)) {
+                $screen['count'] = ['apiPath' => $this->router->versionedPath((string) $count['apiPath'])];
+            }
+            $out[] = $screen;
+        }
+
+        return $out;
+    }
+
+    /**
      * Setup points and widgets of the plugins on in the current workspace
      * (SDK 1.115), in load order. Who may see each is the caller's business:
      * {@see \Whity\Api\DashboardApiHandler} checks the permissions.
@@ -1950,6 +2106,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             // plugins: another loader in the same process keeps its own.
             \Whity\Core\Identity\CustomerGradePermissions::remove((string) $pluginKey);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginCustomerRoutes::removeOwner((string) $info['namespacePrefix']);
 
             if ($this->hookManager !== null) {
                 foreach ($info['hooks'] as $hook) {
@@ -3339,6 +3496,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // plugin leaves nothing reachable without tenant resolution.
         \Whity\Core\Plugin\PluginPublicRoutes::removeOwner($info['namespacePrefix']);
         \Whity\Core\Plugin\PluginServiceRoutes::removeOwner($info['namespacePrefix']);
+        \Whity\Core\Plugin\PluginCustomerRoutes::removeOwner((string) $info['namespacePrefix']);
         \Whity\Core\Plugin\PluginCapabilities::forget($info['plugin']->getName());
         \Whity\Core\Plugin\PluginRouteLimits::removeOwner((string) $info['namespacePrefix']);
         // A disabled or uninstalled plugin vouches for nothing (#1872): its
@@ -4521,6 +4679,9 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // requiredPermission with the block's. Merging the two maps removes a
         // duplicated fact rather than adding a permission.
         $registeredWriteRoutes = [];
+        // Paths declared `'customer' => true` (SDK 1.174), as the plugin wrote them.
+        /** @var array<string, true> $customerRoutePaths */
+        $customerRoutePaths = [];
         // GET path => the SAME wrapped handler passed to Router::register(),
         // so a theme-override route (WC-242) can be invoked in-process
         // without a second HTTP round-trip; keyed identically to
@@ -4586,6 +4747,21 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 }
             }
 
+            // A CUSTOMER route (SDK 1.174, WHIT-1424): the only kind the
+            // customer area's token opens. Refused, never quietly made
+            // private or public, when the declaration is off.
+            $wantsCustomer = array_key_exists('customer', $declared) && $declared['customer'] !== false;
+            if ($wantsCustomer) {
+                $refusal = \Whity\Core\Plugin\PluginCustomerRoutes::refusal($declared['customer'], $requiredPermission, $declared['public'] ?? null, $wantsService);
+                if ($refusal !== null) {
+                    $this->logWarning(
+                        "Plugin {$pluginKey} route {$method} {$path} asks to be a customer route: {$refusal}; "
+                        . 'the route was NOT registered (fail-closed).'
+                    );
+                    continue;
+                }
+            }
+
             if ($wantsPublic) {
                 $refusal = match (true) {
                     $declared['public'] === true => \Whity\Core\Plugin\PluginPublicRoutes::refusal(
@@ -4625,7 +4801,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 // OpenAPI declaration through to the router/generator.
                 $schema = isset($route['schema']) && is_array($route['schema']) ? $route['schema'] : null;
 
-                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead, $wantsService);
+                $wrappedHandler = $this->wrapHandler($pluginKey, $handler, $wantsPublic, $wantsPublicForm, $wantsPublicRead, $wantsService, $wantsCustomer);
                 $accepted = $this->router->register(
                     $method,
                     $path,
@@ -4680,6 +4856,21 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                         $this->logWarning(
                             "Plugin {$pluginKey} service route {$method} {$path} could not be resolved to itself; "
                             . 'it stays registered but no token can open it.'
+                        );
+                    }
+                }
+
+                if ($wantsCustomer && is_string($requiredPermission)) {
+                    $served = $this->router->versionedPath((string) $path);
+                    $probe = (string) preg_replace('/\{[^}]+\}/', '1', $served);
+                    $resolved = $this->router->match(new \Whity\Core\Request(strtoupper((string) $method), $probe, [], ''));
+                    if ($resolved !== null && ($resolved['namespacePrefix'] ?? null) === $namespacePrefix) {
+                        \Whity\Core\Plugin\PluginCustomerRoutes::add((string) $namespacePrefix, (string) $method, (string) $resolved['path'], (string) $path, $requiredPermission);
+                        $customerRoutePaths[(string) $path] = true;
+                    } else {
+                        $this->logWarning(
+                            "Plugin {$pluginKey} customer route {$method} {$path} could not be resolved to itself; "
+                            . 'it stays registered but the customer area cannot open it.'
                         );
                     }
                 }
@@ -5179,6 +5370,11 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             $registeredGetRoutes,
             $registeredWriteRoutes
         );
+
+        // 4a'. Screens for the workspace's customers (SDK 1.174, WHIT-1424):
+        //      checked like staff screens, and every route they touch must
+        //      be one of the plugin's customer routes.
+        $this->customerScreens[$pluginKey] = $this->collectCustomerScreens($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes, $customerRoutePaths);
 
         // 4b. The plugin's guided setup (SDK 1.109, WHIT-1148): each step is
         //     checked exactly like a blocks screen, so its forms may only post
@@ -6490,9 +6686,17 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      * @param callable $handler The raw plugin route handler.
      * @return callable(Request, array<string, string>): Response
      */
-    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false, bool $service = false): callable
+    private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false, bool $service = false, bool $customer = false): callable
     {
-        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead, $service): Response {
+        return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead, $service, $customer): Response {
+            // SDK 1.174 (WHIT-1424): the customer area's token opens only
+            // customer routes; on one, who the customer is goes on the request.
+            if ($request instanceof \Whity\Core\Request) {
+                $refused = \Whity\Core\Plugin\PluginCustomerRoutes::guard($request, $customer);
+                if ($refused !== null) {
+                    return $refused;
+                }
+            }
             // Defence in depth: a service route runs only once the tenant
             // isolation middleware has verified a service token and attached the call.
             if ($service && \Whity\Sdk\Http\ServiceCall::from($request) === null) {

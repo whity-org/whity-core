@@ -59,7 +59,15 @@ export interface FrameBridgeOptions {
   fetchToken: () => Promise<FrameToken>;
   /** The network call; `fetch` in the app, a stub in tests. */
   send: (url: string, init: RequestInit) => Promise<Response>;
-  context: () => { locale: string; dir: 'ltr' | 'rtl'; theme: 'light' | 'dark' };
+  context: () => {
+    locale: string;
+    dir: 'ltr' | 'rtl';
+    theme: 'light' | 'dark';
+    /** SDK 1.174: `customer` inside a workspace's customer area. */
+    audience?: 'staff' | 'customer';
+    /** SDK 1.174: the workspace's brand, so a frame can match its look. */
+    brand?: { name: string; color: string | null; logo: string | null };
+  };
   onResize: (height: number) => void;
   onNavigate: (to: string) => void;
   onToast: (message: string, tone: Tone) => void;

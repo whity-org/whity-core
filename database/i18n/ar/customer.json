@@ -130,6 +130,8 @@
         "receipt.method.cheque": "شيك",
         "receipt.method.cliq": "كليك",
         "receipt.reference": "المرجع",
+        "screen.close": "إغلاق",
+        "screen.gone": "هذه الصفحة غير متاحة لك",
         "state.busy": "محاولات كثيرة من هنا",
         "state.busyBody": "انتظر دقيقة ثم حاول مرة أخرى.",
         "state.failed": "لم يُفتح هذا",
@@ -143,6 +145,7 @@
         "tab.bills": "الفواتير",
         "tab.bookings": "الحجوزات",
         "tab.home": "الرئيسية",
-        "tab.messages": "الرسائل"
+        "tab.messages": "الرسائل",
+        "tab.more": "المزيد"
     }
 }

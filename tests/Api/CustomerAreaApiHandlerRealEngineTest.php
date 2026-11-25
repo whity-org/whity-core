@@ -281,6 +281,38 @@ final class CustomerAreaApiHandlerRealEngineTest extends TestCase
         self::assertSame(404, $this->call('home', 'example-bakery')['status']);
     }
 
+    public function testPluginTabsAndHomeCardsShowOnlyWithTheirPermission(): void
+    {
+        $this->as(31);
+        $tabs = $this->call('area', 'example-bakery')['body']['data']['tabs'];
+        self::assertSame('x:courses', $tabs[0]['id'], 'plugin tabs come first, after Home');
+        self::assertNotContains('x:grades', array_column($tabs, 'id'));
+        self::assertSame(['next-lesson'], array_column($this->call('home', 'example-bakery')['body']['data']['cards'], 'id'));
+        self::assertSame(200, $this->call('screen', 'example-bakery', ['screen' => 'courses'])['status']);
+        self::assertSame(404, $this->call('screen', 'example-bakery', ['screen' => 'grades'])['status']);
+
+        // Ibrahim holds none of it.
+        $this->as(32);
+        self::assertSame([], array_values(array_filter(array_column($this->call('area', 'example-bakery')['body']['data']['tabs'], 'id'), static fn (string $id): bool => str_starts_with($id, 'x:'))));
+        self::assertSame(404, $this->call('screen', 'example-bakery', ['screen' => 'courses'])['status']);
+        self::assertSame(404, $this->call('screenToken', 'example-bakery', ['screen' => 'courses'], 'POST', [])['status']);
+    }
+
+    public function testAScreenTokenIsBoundToThisWorkspaceAndMarkedForCustomers(): void
+    {
+        $this->as(31, ['type' => 'access', 'jti' => 'session-1', 'active_tenant_id' => 2]);
+        $out = $this->call('screenToken', 'example-bakery', ['screen' => 'courses'], 'POST', []);
+
+        self::assertSame(200, $out['status']);
+        $claims = (new \Whity\Auth\JwtParser('customer-area-test-secret-at-least-32-bytes-long'))->parse($out['body']['data']['token']);
+        self::assertIsArray($claims);
+        self::assertSame(\Whity\Core\Plugin\PluginFrameTokens::TYPE, $claims['type']);
+        self::assertSame('customer', $claims['audience']);
+        self::assertSame(1, $claims['active_tenant_id'], 'bound to the area\'s workspace, not the session\'s');
+        self::assertSame('Courses', $claims['plugin_ns']);
+        self::assertSame('session-1', $claims['session_jti']);
+    }
+
     // ---- Helpers ----
 
     private function scalar(string $sql): mixed
@@ -365,6 +397,15 @@ final class CustomerAreaApiHandlerRealEngineTest extends TestCase
             $messaging,
             new DatabaseSharedStore($pdo),
             new AuditLogger($pdo, new NullLogger()),
+            // SDK 1.174: one plugin with a tab and a Home card, open to
+            // holders of courses_course:read (Ahmad, 31, only).
+            static fn (): array => [
+                ['id' => 'courses', 'label' => ['en' => 'Courses', 'ar' => 'الدورات'], 'placement' => 'tab', 'screen' => 'blocks', 'requiredPermission' => 'courses_course:read', 'icon' => 'document', 'order' => 5, 'blocks' => [['type' => 'text', 'text' => 'Hi']], 'plugin' => 'Courses', 'namespace' => 'Courses'],
+                ['id' => 'next-lesson', 'label' => 'Next lesson', 'placement' => 'home', 'screen' => 'blocks', 'requiredPermission' => 'courses_course:read', 'icon' => null, 'order' => 1, 'blocks' => [['type' => 'text', 'text' => 'Lesson 4']], 'plugin' => 'Courses', 'namespace' => 'Courses'],
+                ['id' => 'grades', 'label' => 'Grades', 'placement' => 'tab', 'screen' => 'blocks', 'requiredPermission' => 'courses_grade:read', 'icon' => null, 'order' => 6, 'blocks' => [], 'plugin' => 'Courses', 'namespace' => 'Courses'],
+            ],
+            static fn (int $profileId, string $permission, int $tenantId): bool => $profileId === 31 && $tenantId === 1 && $permission === 'courses_course:read',
+            new \Whity\Auth\JwtParser('customer-area-test-secret-at-least-32-bytes-long'),
         );
     }
 }

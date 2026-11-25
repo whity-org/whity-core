@@ -247,9 +247,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsPinnedAndItsChangelogEntryIsOnTop(): void
     {
         $this->assertSame(
-            '1.173.0',
+            '1.174.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.173: a plugin names the routes it serves through Sync\\SyncController, so Whity Desktop relays that data both ways (Contribute\\PluginSyncResourcesInterface, WHIT-1422). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
+            'SDK 1.174: plugin screens for a workspace\'s customers in their customer area (Contribute\\PluginCustomerScreensInterface, the customer route key, Http\\CustomerCall, Testing\\CustomerIsolationTestCase, WHIT-1424). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
         );
 
         $changelog = (string) file_get_contents(self::SDK_DIR . '/CHANGELOG.md');

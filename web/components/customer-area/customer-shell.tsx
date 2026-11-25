@@ -14,7 +14,9 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import { addScopedAuthorization, apiFetch } from '@/lib/api/client';
+import { screenAuthorization } from '@/lib/customer-screen';
 import { BuiltOnWhity } from '@whity/ui/built-on-whity';
 import { Icon, type IconName } from '@whity/ui/icon';
 import { TenantLogo } from '@whity/ui/tenant-logo';
@@ -25,6 +27,7 @@ import { UserText } from '@/components/ui/user-text';
 import { useAuth } from '@/lib/auth-context';
 import { useBranding } from '@/lib/branding-context';
 import { areaHref, type CustomerAreaData, type CustomerTabId } from '@/lib/customer-area';
+import { useLocalized } from './area-parts';
 
 interface Tab {
   id: CustomerTabId;
@@ -34,36 +37,95 @@ interface Tab {
   count: number;
 }
 
-const ICONS: Record<CustomerTabId, IconName> = {
+const ICONS: Record<string, IconName> = {
   home: 'dashboard',
   bookings: 'appointment',
   bills: 'invoice',
   messages: 'comment',
   account: 'user',
+  more: 'more',
 };
+
+/** Up to five tabs fit the phone bar; past that: Home, the next three, and More (CA.12). */
+export const PHONE_TABS = 5;
 
 /** Home first and Account last, the workspace's tabs between (CA.13). */
 export function useCustomerTabs(area: CustomerAreaData): Tab[] {
   const t = useTranslation('customer');
+  const name = useLocalized();
   const handle = area.workspace.handle;
-  const label: Record<CustomerTabId, string> = {
+  const core: Record<string, string> = {
     home: t('tab.home', 'Home'),
     bookings: t('tab.bookings', 'Bookings'),
     bills: t('tab.bills', 'Bills'),
     messages: t('tab.messages', 'Messages'),
     account: t('tab.account', 'Account'),
   };
-  const ids: CustomerTabId[] = ['home', ...area.tabs.map((tab) => tab.id as CustomerTabId), 'account'];
-  const counts = new Map(area.tabs.map((tab) => [tab.id, tab.count]));
+  const middle: Tab[] = area.tabs.map((tab) => {
+    const id = tab.id as CustomerTabId;
+    if (id.startsWith('x:')) {
+      // A plugin's tab (SDK 1.174): its own label and icon, its own page.
+      const label = typeof tab.label === 'string' ? tab.label : name(tab.label as Record<string, string> | null);
+      return { id, label, icon: (tab.icon as IconName | null) ?? 'plugin', href: areaHref(handle, `x/${id.slice(2)}`), count: tab.count };
+    }
+    return { id, label: core[id] ?? id, icon: ICONS[id] ?? 'plugin', href: areaHref(handle, id), count: tab.count };
+  });
 
-  return ids.map((id) => ({ id, label: label[id], icon: ICONS[id], href: areaHref(handle, id), count: counts.get(id as never) ?? 0 }));
+  return [
+    { id: 'home', label: core.home, icon: ICONS.home, href: areaHref(handle, 'home'), count: 0 },
+    ...middle,
+    { id: 'account', label: core.account, icon: ICONS.account, href: areaHref(handle, 'account'), count: 0 },
+  ];
+}
+
+/**
+ * A plugin tab's count (SDK 1.174): its `count` route, called with that
+ * screen's customer token, answers `{"count": n}`.
+ */
+function usePluginCounts(area: CustomerAreaData): Record<string, number> {
+  const [counts, setCounts] = useState<Record<string, number>>({});
+  useEffect(() => {
+    const handle = area.workspace.handle;
+    let alive = true;
+    const removers: (() => void)[] = [];
+    for (const tab of area.tabs) {
+      const path = tab.count_path;
+      if (!tab.id.startsWith('x:') || typeof path !== 'string' || path === '') continue;
+      removers.push(addScopedAuthorization(screenAuthorization(handle, tab.id.slice(2), [path])));
+      apiFetch(path)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((body: { count?: unknown; data?: { count?: unknown } } | null) => {
+          const n = body?.count ?? body?.data?.count;
+          if (alive && typeof n === 'number' && Number.isFinite(n)) setCounts((c) => ({ ...c, [tab.id]: Math.max(0, Math.floor(n)) }));
+        })
+        .catch(() => undefined);
+    }
+    return () => {
+      alive = false;
+      removers.forEach((remove) => remove());
+    };
+  }, [area]);
+
+  return counts;
+}
+
+/** The phone bar: all tabs when they fit, else Home, the next three and More. */
+export function phoneTabs(tabs: Tab[], moreLabel: string, handle: string): Tab[] {
+  if (tabs.length <= PHONE_TABS) return tabs;
+  const rest = tabs.slice(PHONE_TABS - 1);
+  return [
+    ...tabs.slice(0, PHONE_TABS - 1),
+    { id: 'more', label: moreLabel, icon: 'more', href: areaHref(handle, 'more'), count: rest.reduce((n, tab) => n + tab.count, 0) },
+  ];
 }
 
 export function CustomerShell({ area, children }: { area: CustomerAreaData; children: ReactNode }) {
   const t = useTranslation('customer');
   const branding = useBranding();
   const pathname = usePathname() ?? '';
-  const tabs = useCustomerTabs(area);
+  const pluginCounts = usePluginCounts(area);
+  const tabs = useCustomerTabs(area).map((tab) => (tab.id in pluginCounts ? { ...tab, count: pluginCounts[tab.id] } : tab));
+  const phone = phoneTabs(tabs, t('tab.more', 'More'), area.workspace.handle);
   const keyboardOpen = useKeyboardOpen();
   const { logout } = useAuth();
   const router = useRouter();
@@ -137,8 +199,8 @@ export function CustomerShell({ area, children }: { area: CustomerAreaData; chil
         className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-card pb-[env(safe-area-inset-bottom)] sm:hidden"
         data-testid="customer-phone-tabs"
       >
-        <ul className="grid h-16 items-stretch px-1" style={{ gridTemplateColumns: `repeat(${Math.min(tabs.length, 5)}, minmax(0, 1fr))` }}>
-          {tabs.slice(0, 5).map((tab) => (
+        <ul className="grid h-16 items-stretch px-1" style={{ gridTemplateColumns: `repeat(${phone.length}, minmax(0, 1fr))` }}>
+          {phone.map((tab) => (
             <li key={tab.id} className="flex">
               <Link
                 href={tab.href}
@@ -177,6 +239,8 @@ function Count({ n, label }: { n: number; label: string }) {
 
 /** Which tab a path belongs to: `/@h/bills/quotes/7` (or its rewrite `/w/h/...`) is Bills. */
 export function activeTab(pathname: string, handle: string): CustomerTabId {
-  const rest = pathname.replace(new RegExp(`^/(?:@|w/)${handle}`), '').split('/')[1] ?? '';
-  return (['bookings', 'bills', 'messages', 'account'] as const).find((id) => id === rest) ?? 'home';
+  const parts = pathname.replace(new RegExp(`^/(?:@|w/)${handle}`), '').split('/');
+  const rest = parts[1] ?? '';
+  if (rest === 'x' && parts[2]) return `x:${parts[2]}`;
+  return (['bookings', 'bills', 'messages', 'account', 'more'] as const).find((id) => id === rest) ?? 'home';
 }
