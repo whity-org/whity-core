@@ -1550,6 +1550,10 @@
                 {
                     "what": "A plugin names the hardware it uses on the desktop (Contribute\\PluginDesktopCapabilitiesInterface); the person sets each capability to Off, Ask first or Allowed on their device",
                     "since": "1.167"
+                },
+                {
+                    "what": "A plugin names the routes it serves through Sync\\SyncController (Contribute\\PluginSyncResourcesInterface); the desktop app relays that data both ways between the device and the workspace",
+                    "since": "1.173"
                 }
             ],
             "missing": [

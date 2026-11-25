@@ -939,6 +939,7 @@ Planned: later.
 
 - Plugins run under the offline desktop PHP host (SDK 1.27)
 - A plugin names the hardware it uses on the desktop (Contribute\PluginDesktopCapabilitiesInterface); the person sets each capability to Off, Ask first or Allowed on their device (SDK 1.167)
+- A plugin names the routes it serves through Sync\SyncController (Contribute\PluginSyncResourcesInterface); the desktop app relays that data both ways between the device and the workspace (SDK 1.173)
 
 **Missing**
 
