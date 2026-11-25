@@ -1471,4 +1471,29 @@ final class StubOidcHttp implements HttpClient
         self::assertArrayNotHasKey('code', $query);
     }
 
+
+    public function testExpiredCodesAreSweptOnTheNextExchangeAndByTheCleanupJob(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $stale = $this->loopbackQuery($this->runCallback())['code'];
+        $this->now += SsoAuthHandler::NATIVE_CODE_TTL + 1;
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the expired row waits for a sweep');
+
+        // Another exchange sweeps it, whatever that exchange's own outcome.
+        self::assertSame(401, $this->exchange(str_repeat('x', 43))->getStatusCode());
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'));
+        self::assertSame(401, $this->exchange($stale)->getStatusCode(), 'and it cannot be used afterwards');
+
+        // The daily job covers an instance nobody exchanges on.
+        $codes = new \Whity\Auth\NativeSignInCodes($this->pdo, fn (): int => $this->now);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', -1);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', 60);
+        ob_start();
+        (new \Whity\Commands\RevokedTokensCleanupCommand($this->pdo))->execute();
+        $output = (string) ob_get_clean();
+        self::assertStringContainsString('Cleaned 1 expired native sign-in codes', $output);
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the live one stays');
+    }
+
 }

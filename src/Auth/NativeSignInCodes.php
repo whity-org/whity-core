@@ -69,6 +69,9 @@ final class NativeSignInCodes
      */
     public function consume(string $code): ?array
     {
+        // Every exchange also sweeps what nobody collected: a code that expired
+        // is dead whether or not it is ever presented.
+        $this->pruneExpired();
         $hash = hash('sha256', $code);
         $select = $this->pdo->prepare(
             'SELECT profile_id, email, provider_id, provider_tenant_id, tenant_trust, code_challenge, expires_at
@@ -108,10 +111,21 @@ final class NativeSignInCodes
         return rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
     }
 
-    private function purgeExpired(): void
+    /**
+     * Delete every code past its expiry. Run on each issue and exchange, and
+     * daily by `revoked-tokens:cleanup` for an instance nobody signs in to.
+     */
+    public function pruneExpired(): int
     {
         $stmt = $this->pdo->prepare('DELETE FROM native_sign_in_codes WHERE expires_at < ?');
-        $stmt->bindValue(1, ($this->clock)() - 3600, PDO::PARAM_INT);
+        $stmt->bindValue(1, ($this->clock)(), PDO::PARAM_INT);
         $stmt->execute();
+
+        return $stmt->rowCount();
+    }
+
+    private function purgeExpired(): void
+    {
+        $this->pruneExpired();
     }
 }
