@@ -15,7 +15,7 @@ final class CreateMyCoursesEnrolmentsTable implements MigrationInterface
             CREATE TABLE IF NOT EXISTS mycourses_enrolments (
                 id SERIAL PRIMARY KEY,
                 tenant_id INTEGER NOT NULL,
-                contact_id INTEGER NOT NULL,
+                contact_id INTEGER NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
                 course VARCHAR(200) NOT NULL,
                 lessons INTEGER NOT NULL DEFAULT 8,
                 lessons_done INTEGER NOT NULL DEFAULT 0,
