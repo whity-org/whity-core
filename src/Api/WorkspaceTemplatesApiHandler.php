@@ -429,6 +429,43 @@ final class WorkspaceTemplatesApiHandler
                 'template' => $template['key'],
                 'made' => $result['made'],
                 'skipped' => $result['skipped'],
+                'items' => $result['items'],
+            ]]);
+        });
+    }
+
+    /**
+     * What applying would do, with the same body as apply, changing nothing
+     * and auditing nothing (SDK 1.169, WHIT-1409): each item with `add`,
+     * `keep` (already there), `done` (an earlier run made it), `left` (not
+     * ticked) or `skip` and why.
+     *
+     * @param array<string, string> $params
+     */
+    public function preview(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request, $params): Response {
+            $profileId = self::profileId($request);
+            if ($profileId === null) {
+                return Response::error('Sign in to choose a template.', 401);
+            }
+            $template = $this->catalogue->find((string) ($params['key'] ?? ''));
+            if ($template === null) {
+                return Response::error('There is no such template.', 404);
+            }
+            $body = JsonBody::parsed($request);
+            $examples = ($body['examples'] ?? true) !== false;
+            $theme = ($body['theme'] ?? true) !== false ? ($this->theme($template, $tenantId, $this->language())['id'] ?? null) : null;
+            $run = $this->runs->find($tenantId, (string) $template['key']);
+            $result = ($this->applier)()->preview($tenantId, $profileId, $template, $examples, $theme);
+
+            return Response::json(['data' => [
+                'template' => $template['key'],
+                'version' => $template['version'],
+                'appliedVersion' => $run['version'] ?? null,
+                'made' => $result['made'],
+                'skipped' => $result['skipped'],
+                'items' => $result['items'],
             ]]);
         });
     }

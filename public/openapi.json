@@ -101450,6 +101450,122 @@
                 ]
             }
         },
+        "/api/v1/workspace/templates/{key}/preview": {
+            "post": {
+                "operationId": "post_api_v1_workspace_templates_key_preview",
+                "summary": "Preview what applying a workspace template would do",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Runs the same engine as apply with the same body, as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed. Each item says add, keep (already there), done (an earlier run made it, so it is not made again), left (not ticked) or skip and why.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "description": "The template's key (bakery)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApplyWorkspaceTemplateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What applying would make, keep and skip",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PreviewWorkspaceTemplateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "There is no such template",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/workspace/templates/{key}/setup/current/{kind}": {
             "get": {
                 "operationId": "get_api_v1_workspace_templates_key_setup_current_kind",
@@ -106795,6 +106911,13 @@
                                         "reason"
                                     ]
                                 }
+                            },
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WorkspaceTemplateItem"
+                                },
+                                "description": "Each item of the template and what happened to it (SDK 1.169)"
                             }
                         },
                         "required": [
@@ -132675,6 +132798,74 @@
                     "data"
                 ]
             },
+            "PreviewWorkspaceTemplateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "template": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "integer",
+                                "description": "The version on offer"
+                            },
+                            "appliedVersion": {
+                                "type": "integer",
+                                "nullable": true,
+                                "description": "The version this workspace applied last, or null when it never applied it"
+                            },
+                            "made": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "integer"
+                                },
+                                "description": "How many of each part would be made"
+                            },
+                            "skipped": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "part": {
+                                            "type": "string"
+                                        },
+                                        "key": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "part",
+                                        "key",
+                                        "reason"
+                                    ]
+                                }
+                            },
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WorkspaceTemplateItem"
+                                }
+                            }
+                        },
+                        "required": [
+                            "template",
+                            "version",
+                            "appliedVersion",
+                            "made",
+                            "skipped",
+                            "items"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ProfileRelationsResponse": {
                 "type": "object",
                 "properties": {
@@ -145083,6 +145274,38 @@
                     "hasExamples",
                     "hasSetup",
                     "chosen"
+                ]
+            },
+            "WorkspaceTemplateItem": {
+                "type": "object",
+                "properties": {
+                    "part": {
+                        "type": "string",
+                        "description": "settings, theme, calendar, services, roles, forms, documents or examples"
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "The template's key for the item"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "add",
+                            "keep",
+                            "done",
+                            "left",
+                            "skip"
+                        ],
+                        "description": "add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason"
+                    },
+                    "reason": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "part",
+                    "key",
+                    "action"
                 ]
             },
             "WorkspaceTemplateListResponse": {
