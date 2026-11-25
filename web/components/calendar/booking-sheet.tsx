@@ -19,7 +19,7 @@
  * asks first.
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -240,6 +240,31 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
   );
 }
 
+type ReminderLog = NonNullable<CalendarBooking['reminders']>;
+
+/** The booking's reminders, read once for the booking shown; empty until they arrive or when none were sent. */
+function useReminderLog(booking: CalendarBooking): ReminderLog {
+  const [loaded, setLoaded] = useState<{ id: number; sent: string | null; log: ReminderLog } | null>(null);
+  const sent = booking.reminder_sent_at ?? null;
+  useEffect(() => {
+    if (booking.reminders !== undefined || sent === null) return;
+    let cancelled = false;
+    calendarApi
+      .booking(booking.id)
+      .then((full) => {
+        if (!cancelled) setLoaded({ id: booking.id, sent, log: full.reminders ?? [] });
+      })
+      .catch(() => {
+        // The line is extra: without it the booking still shows.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [booking.id, booking.reminders, sent]);
+  if (booking.reminders !== undefined) return booking.reminders;
+  return loaded !== null && loaded.id === booking.id && loaded.sent === sent ? loaded.log : [];
+}
+
 function BookingFacts({
   booking,
   service,
@@ -254,6 +279,8 @@ function BookingFacts({
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const dates = useDateDisplay({ timeZone });
+  // WHIT-1417: the reminders sent come only with the one booking, not the calendar's list.
+  const reminders = useReminderLog(booking);
 
   const rows: { label: string; value: React.ReactNode; testId?: string }[] = [];
   if (!dates.hidden) {
@@ -302,7 +329,7 @@ function BookingFacts({
       testId: 'booking-coming',
     });
   }
-  if (booking.reminders && booking.reminders.length > 0) {
+  if (reminders.length > 0) {
     // WHIT-1417 (AP.14): every reminder sent, newest first, one line per channel.
     const channel = (full: string) => {
       // A plugin's channel is "plugin:whatsapp"; the desk shows the channel.
@@ -313,7 +340,7 @@ function BookingFacts({
       label: t('booking.fact.reminders', 'Reminders'),
       value: (
         <ul className="space-y-1">
-          {[...booking.reminders].reverse().map((r, i) => (
+          {[...reminders].reverse().map((r, i) => (
             <li key={i} className={r.outcome === 'sent' ? undefined : 'text-destructive'}>
               {r.outcome === 'sent'
                 ? t('reminder.sent', 'Reminder sent {time} by {channel}', { time: dates.time(r.sent_at ?? '') ?? '—', channel: channel(r.channel) })
