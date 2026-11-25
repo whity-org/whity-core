@@ -54,7 +54,7 @@ final class RevokedTokensCleanupCommandTest extends TestCase
         $output = $this->runCleanup();
 
         // Deleted count reported.
-        $this->assertSame("Cleaned 2 expired revocation entries\n", $output);
+        $this->assertSame("Cleaned 2 expired revocation entries\nCleaned 0 expired native sign-in codes\n", $output);
 
         // Only the two non-expired rows survive.
         $this->assertSame(2, $this->countRows());
@@ -71,7 +71,7 @@ final class RevokedTokensCleanupCommandTest extends TestCase
 
         $output = $this->runCleanup();
 
-        $this->assertSame("Cleaned 0 expired revocation entries\n", $output);
+        $this->assertSame("Cleaned 0 expired revocation entries\nCleaned 0 expired native sign-in codes\n", $output);
         $this->assertSame(2, $this->countRows(), 'No rows expired, so none are deleted.');
     }
 
@@ -83,7 +83,7 @@ final class RevokedTokensCleanupCommandTest extends TestCase
 
         $output = $this->runCleanup();
 
-        $this->assertSame("Cleaned 3 expired revocation entries\n", $output);
+        $this->assertSame("Cleaned 3 expired revocation entries\nCleaned 0 expired native sign-in codes\n", $output);
         $this->assertSame(0, $this->countRows(), 'All rows expired, so the table is emptied.');
     }
 
@@ -93,7 +93,7 @@ final class RevokedTokensCleanupCommandTest extends TestCase
 
         $output = $this->runCleanup();
 
-        $this->assertSame("Cleaned 0 expired revocation entries\n", $output);
+        $this->assertSame("Cleaned 0 expired revocation entries\nCleaned 0 expired native sign-in codes\n", $output);
         $this->assertSame(0, $this->countRows());
     }
 

@@ -141,6 +141,28 @@ describe('PublicBookingScreen', () => {
     expect(await screen.findByTestId('book-problem')).toHaveTextContent('Someone has just booked that time');
   });
 
+  it('says a booking sent twice is already in, and keeps the chosen time', async () => {
+    const keys: unknown[] = [];
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      if (url === '/api/v1/public/booking/example-bakery') return respond(200, { data: page });
+      if (url.startsWith('/api/v1/public/booking/example-bakery/slots')) return respond(200, { data: slots });
+      if (init?.method === 'POST') {
+        keys.push((JSON.parse(String(init.body)) as Record<string, unknown>).idempotency_key);
+        return respond(409, { error: 'We already have this booking.', details: { code: 'already_sent' } });
+      }
+      return respond(404, {});
+    });
+    render(<PublicBookingScreen workspace="example-bakery" />);
+    await chooseTimeAndFill('09:00');
+    clock = 9_000;
+    fireEvent.click(screen.getByTestId('book-submit'));
+    expect(await screen.findByTestId('book-problem')).toHaveTextContent('We already have this booking. Check your email for the details.');
+    const times = screen.getByRole('group', { name: 'Free times' });
+    expect(within(times).getByRole('button', { name: '09:00' })).toHaveAttribute('aria-pressed', 'true');
+    expect(keys).toHaveLength(1);
+    expect(typeof keys[0]).toBe('string');
+  });
+
   it('sends the hidden field empty and how long the page was open, then confirms', async () => {
     const posted: Record<string, unknown>[] = [];
     fetchMock.mockImplementation((url: string, init?: RequestInit) => {
@@ -174,6 +196,8 @@ describe('PublicBookingScreen', () => {
       email: 'rana@example-bakery.com',
       website: '',
       elapsed_ms: 7_500,
+      // AP.17: one new key for each press of Book.
+      idempotency_key: expect.stringMatching(/^[A-Za-z0-9_-]{8,64}$/),
     });
     expect(screen.getByTestId('book-manage')).toHaveAttribute('href', `/booking/${'b'.repeat(64)}`);
     expect(screen.getByTestId('book-ics')).toHaveAttribute('href', `/api/v1/public/bookings/${'b'.repeat(64)}/ics`);

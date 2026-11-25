@@ -129,7 +129,92 @@ final class SsoAuthHandler
          * being offered a workspace of their own. Null refuses `form`.
          */
         private readonly ?\Whity\Core\Form\FormRepository $forms = null,
+        /**
+         * WHIT-1350: records linking an identity to a signed-in account
+         * (`/start?link=1`). Null records nothing.
+         */
+        private readonly ?\Whity\Core\Audit\AuditLoggerInterface $audit = null,
+        /**
+         * WHIT-1406: a native app's sign-in return (`/start?mode=native`). The
+         * one-time code between the callback and `exchange()`. Null refuses
+         * `mode=native` and the exchange.
+         */
+        private readonly ?\Whity\Auth\NativeSignInCodes $nativeCodes = null,
+        /** Slows a guessing client at `exchange()`; null means no throttle (tests). */
+        private readonly ?\Whity\Auth\LoginThrottleService $throttle = null,
     ) {
+    }
+
+    /**
+     * The signed-in person asking to link the operator's identity provider to
+     * their own account (WHIT-1350), or null when there is no session, the
+     * feature is not wired, or the session is confined to one workspace by a
+     * workspace's own provider (that sign-in must never reach the person's
+     * global account).
+     */
+    private function linkTarget(): ?int
+    {
+        if ($this->sessions === null || $this->identities === null) {
+            return null;
+        }
+        $claims = $this->sessions->validateAccessToken();
+        $profileId = $claims['profile_id'] ?? null;
+        if (!is_int($profileId) || $profileId <= 0 || isset($claims[\Whity\Auth\TenantConfinement::CLAIM])) {
+            return null;
+        }
+
+        return $profileId;
+    }
+
+    /** Back to Settings › Security with what happened. */
+    private function linkOutcome(string $outcome): Response
+    {
+        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
+
+        return new Response(302, '', ['Location' => $base . '/settings/security?identity_link=' . rawurlencode($outcome)]);
+    }
+
+    /**
+     * Finish linking (WHIT-1350). The account is the one the session at
+     * `/start` named, carried in the signed flow cookie, and the same session
+     * must still be here. The provider's answer proves who the person is
+     * there, so the addresses need not match: that is the point, since a
+     * first sign-in links only by a matching verified address. No session is
+     * minted or changed.
+     */
+    private function completeLink(int $profileId, string $providerKey, int $tenantId, \Whity\Sdk\Auth\ExternalIdentity $identity): Response
+    {
+        if ($tenantId !== 0 || $this->identities === null || $this->linkTarget() !== $profileId) {
+            return $this->linkOutcome('failed');
+        }
+
+        $existing = $this->identities->findGlobalByIssuerSubject($identity->issuer, $identity->subject);
+        if ($existing !== null) {
+            return $this->linkOutcome((int) $existing['profile_id'] === $profileId ? 'linked' : 'taken');
+        }
+        foreach ($this->identities->findByProfileId($profileId) as $row) {
+            if ($row['provider_id'] === null && (string) $row['provider_key'] === $providerKey) {
+                // One account at this provider per person: unlink the old one first.
+                return $this->linkOutcome('already_linked');
+            }
+        }
+
+        try {
+            $id = $this->identities->link($profileId, $providerKey, $identity->issuer, $identity->subject, $identity->normalizedEmail());
+        } catch (\PDOException) {
+            // Somebody linked the same account a moment ago (unique index).
+            return $this->linkOutcome('taken');
+        }
+
+        $this->audit?->record('auth.identity.linked', [
+            'tenant_id' => 0,
+            'actor_user_id' => $profileId,
+            'target_type' => 'external_identity',
+            'target_id' => $id,
+            'metadata' => ['provider_key' => $providerKey, 'via' => 'settings'],
+        ]);
+
+        return $this->linkOutcome('linked');
     }
 
     /**
@@ -206,21 +291,21 @@ final class SsoAuthHandler
         $signingTenantId = is_int($flow['reauth_tenant_id'] ?? null) ? $flow['reauth_tenant_id'] : -1;
         $routeId = (int) ($flow['reauth_route_id'] ?? 0);
         $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
-        $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
-        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
-        $back = static fn (string $outcome): Response => new Response(302, '', [
-            'Location' => $base . $returnTo . ($purpose !== null ? '?identity_check=' : '?signing=') . rawurlencode($outcome),
-        ]);
+        $back = function (string $outcome, ?string $detail = null) use ($flow): Response {
+            $this->logReauth($outcome, $flow, $detail);
+
+            return $this->reauthBack($flow, $outcome);
+        };
 
         if ($this->identities === null || $this->signingChallenges === null || $signingTenantId < 0 || ($routeId <= 0 && $purpose === null)) {
-            return $back('sign_in_failed');
+            return $back('sign_in_failed', 'not_wired');
         }
 
         $link = $tenantId === 0
             ? $this->identities->findGlobalByIssuerSubject($identity->issuer, $identity->subject)
             : $this->identities->findByProviderSubject($providerId, $identity->subject);
         if ($link === null || (int) $link['profile_id'] !== $profileId) {
-            return $back('sign_in_mismatch');
+            return $back('sign_in_mismatch', $link === null ? 'not_linked' : 'other_profile');
         }
 
         $authTime = $identity->claims['auth_time'] ?? null;
@@ -229,11 +314,16 @@ final class SsoAuthHandler
             || $authTime > $now + 60
             || $now - $authTime > \Whity\Core\Document\Signing\SigningChallengeRepository::FRESH_SIGN_IN_TTL
         ) {
-            return $back('sign_in_not_fresh');
+            return $back('sign_in_not_fresh', is_int($authTime) ? 'auth_time_age=' . ($now - $authTime) : 'no_auth_time');
         }
 
         if ($purpose !== null) {
-            $this->signingChallenges->recordGateFreshSignIn($signingTenantId, $profileId, \Whity\Core\Security\IdentityCheck::key($purpose));
+            // Kept where the approval's check looks for it, whichever workspace is open now.
+            $this->signingChallenges->recordGateFreshSignIn(
+                \Whity\Core\Security\IdentityCheck::FRESH_SIGN_IN_TENANT,
+                $profileId,
+                \Whity\Core\Security\IdentityCheck::key($purpose),
+            );
         } else {
             $this->signingChallenges->recordFreshSignIn($signingTenantId, $profileId, $routeId);
         }
@@ -321,17 +411,36 @@ final class SsoAuthHandler
         if ($this->query('reauth') === 'sign') {
             $reauth = $this->reauthTarget();
             if ($reauth === null) {
+                $this->logReauth('reauth_unavailable', null, $this->reauthRefusal(), 'sign');
                 return $this->fail('reauth_unavailable');
             }
         } elseif ($this->query('reauth') === 'gate') {
             // Confirming a gated approval (WHIT-1147).
             $reauth = $this->reauthGateTarget();
             if ($reauth === null) {
+                $this->logReauth('reauth_unavailable', null, $this->reauthRefusal(), 'gate');
                 return $this->fail('reauth_unavailable');
             }
         }
+        if ($reauth !== null) {
+            $this->logReauth('started', [
+                'reauth_profile_id' => $reauth['profile_id'],
+                'reauth_purpose' => $reauth['purpose'] ?? null,
+            ]);
+        }
 
-        $joinSlug = $reauth === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
+        // WHIT-1350: linking the operator's provider to the signed-in account
+        // from Settings › Security. Who is asking travels only in the signed
+        // flow cookie, and the same session is checked again at the callback.
+        $linkProfileId = null;
+        if ($reauth === null && $this->query('link') === '1') {
+            $linkProfileId = $this->linkTarget();
+            if ($linkProfileId === null) {
+                return $this->linkOutcome('sign_in_first');
+            }
+        }
+
+        $joinSlug = $reauth === null && $linkProfileId === null ? strtolower(trim((string) ($this->query('join') ?? ''))) : '';
         $joinTenantId = null;
         if ($joinSlug !== '') {
             $joinTenantId = $this->joinTenant($request, $joinSlug);
@@ -343,7 +452,7 @@ final class SsoAuthHandler
         // #2355: sign-in started from a form's public link. The form names its
         // workspace; both travel only inside the signed flow cookie.
         $form = null;
-        $formSlug = $reauth === null && $joinTenantId === null
+        $formSlug = $reauth === null && $linkProfileId === null && $joinTenantId === null
             ? strtolower(trim((string) ($this->query('form') ?? '')))
             : '';
         if ($formSlug !== '') {
@@ -356,17 +465,39 @@ final class SsoAuthHandler
         // WHIT-1168: an invitation accepted by signing in. The token rides in
         // the signed flow cookie and is checked at the callback, where the
         // invited address must belong to the person who signed in.
-        $inviteToken = $reauth === null && $joinTenantId === null && $form === null
+        $inviteToken = $reauth === null && $linkProfileId === null && $joinTenantId === null && $form === null
             ? trim((string) ($this->query('invite') ?? ''))
             : '';
         if ($inviteToken !== '' && ($this->invitations === null || strlen($inviteToken) > 256)) {
             $inviteToken = '';
         }
 
+        // WHIT-1406: a native app (Whity Desktop) asks for its sign-in result
+        // on its loopback listener instead of a browser session. Where to
+        // return, and the PKCE challenge the exchange must answer, travel only
+        // inside the signed flow cookie. A plain sign-in only: never with a
+        // reauth, a link, a join, a form or an invitation.
+        $native = null;
+        if ($this->query('mode') === 'native') {
+            if ($this->nativeCodes === null || $reauth !== null || $linkProfileId !== null
+                || $joinTenantId !== null || $form !== null || $inviteToken !== ''
+            ) {
+                return $this->fail('native_unavailable');
+            }
+            $native = self::nativeTarget($this->query('port'), $this->query('code_challenge'), $this->query('state'));
+            if ($native === null) {
+                return $this->fail('native_invalid');
+            }
+        }
+
         // Joining (from a sign-up page or a form) uses the operator's
         // global-trust providers only.
-        $tenantId = $joinTenantId !== null || $form !== null ? 0 : $this->resolveTenantId($request);
+        // Linking uses them too: only they speak for the person's own account.
+        $tenantId = $joinTenantId !== null || $form !== null || $linkProfileId !== null ? 0 : $this->resolveTenantId($request);
         $config = $this->providers->findEnabledByProviderKey($tenantId, $providerKey);
+        if ($config === null && $linkProfileId !== null) {
+            return $this->linkOutcome('provider_unavailable');
+        }
         if ($config === null) {
             // Not configured for this tenant → generic bounce (no enumeration).
             return $this->startRefused($joinTenantId, $joinSlug, $form, 'provider_unavailable');
@@ -412,6 +543,10 @@ final class SsoAuthHandler
             'reauth_return_to'  => $reauth['return_to'] ?? null,
             'reauth_route_id'   => $reauth['route_id'] ?? null,
             'reauth_purpose'    => $reauth['purpose'] ?? null,
+            'link_profile_id'   => $linkProfileId,
+            'native_port'       => $native['port'] ?? null,
+            'native_challenge'  => $native['challenge'] ?? null,
+            'native_state'      => $native['state'] ?? null,
         ], self::FLOW_TTL, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, self::FLOW_TTL);
 
@@ -425,7 +560,8 @@ final class SsoAuthHandler
             $pkce['challenge'],
             // A fresh sign-in: the provider asks again even when it remembers
             // the person, and reports when they signed in.
-            $reauth !== null ? ['prompt' => 'login', 'max_age' => '0'] : [],
+            // Linking asks too, so the person picks the account they mean.
+            $reauth !== null ? ['prompt' => 'login', 'max_age' => '0'] : ($linkProfileId !== null ? ['prompt' => 'login'] : []),
         );
 
         return new Response(302, '', ['Location' => $authorizeUrl]);
@@ -435,6 +571,21 @@ final class SsoAuthHandler
      * @param array<string, string> $params
      */
     public function callback(Request $request, array $params): Response
+    {
+        $this->reauthCallback = null;
+        $this->nativeCallback = null;
+        try {
+            return $this->handleCallback($request, $params);
+        } finally {
+            $this->reauthCallback = null;
+            $this->nativeCallback = null;
+        }
+    }
+
+    /**
+     * @param array<string, string> $params
+     */
+    private function handleCallback(Request $request, array $params): Response
     {
         if (!$this->ssoEnabled()) {
             return $this->fail('sso_disabled');
@@ -455,10 +606,23 @@ final class SsoAuthHandler
         if ($flow === null || ($flow['type'] ?? null) !== 'oidc_flow') {
             return $this->fail('expired');
         }
+        if (is_int($flow['reauth_profile_id'] ?? null)) {
+            $this->reauthCallback = $flow;
+        }
+        if (is_int($flow['native_port'] ?? null) && is_string($flow['native_state'] ?? null)) {
+            $this->nativeCallback = $flow;
+        }
 
         // The provider may signal an error (user denied consent, etc.).
-        if ($this->query('error') !== null) {
-            return $this->fail('denied');
+        $providerError = $this->query('error');
+        if ($providerError !== null) {
+            // The provider's error code (e.g. login_required) is logged for a reauth: it says
+            // whether the provider refused the fresh sign-in itself.
+            return $this->fail(
+                $this->reauthCallback !== null && preg_match('/^[a-z_]{1,40}$/', $providerError) === 1
+                    ? 'denied:' . $providerError
+                    : 'denied'
+            );
         }
 
         // CSRF/replay: the echoed state MUST equal the state minted into the cookie.
@@ -530,6 +694,11 @@ final class SsoAuthHandler
         // flow cookie only; it never mints a session.
         if (isset($flow['reauth_profile_id']) && is_int($flow['reauth_profile_id'])) {
             return $this->completeReauth($flow, $providerId, $tenantId, $identity);
+        }
+
+        // WHIT-1350: linking to the signed-in account. Never mints a session.
+        if (isset($flow['link_profile_id']) && is_int($flow['link_profile_id'])) {
+            return $this->completeLink($flow['link_profile_id'], $providerKey, $tenantId, $identity);
         }
 
         // WHIT-917: a join started on a workspace's sign-up page. Read from the
@@ -648,6 +817,13 @@ final class SsoAuthHandler
             } catch (\Throwable $e) {
                 error_log('[sso] ' . self::SIGNED_IN_EVENT . ' listener failed for profile ' . $profileId . ': ' . $e->getMessage());
             }
+        }
+
+        // WHIT-1406: a native app gets a one-time code on its loopback
+        // listener and exchanges it for a token-mode session itself. No
+        // cookie is set here: the browser that signed in holds nothing.
+        if ($this->nativeCallback !== null) {
+            return $this->nativeReturn($flow, $profileId, $email, $providerId, $tenantId, $ctx, $request);
         }
 
         // Mint the session (sets cookies as a side effect). Global-trust logs the
@@ -1103,9 +1279,255 @@ final class SsoAuthHandler
         return new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_NO_WORKSPACE)]);
     }
 
-    /** Bounce to the login page with a generic, non-enumerating SSO marker. */
+    /**
+     * Bounce to the login page with a generic, non-enumerating SSO marker.
+     *
+     * A callback for signing in AGAIN (to sign, or to confirm a gated approval) goes back to the
+     * page it came from with `sign_in_failed` instead: that person is already signed in, and the
+     * login page left them signing in afresh with nothing recorded (WHIT-1371).
+     */
     private function fail(string $reason): Response
     {
+        $native = $this->nativeCallback;
+        if ($native !== null) {
+            // The app is waiting on 127.0.0.1; a bounce to the login page would
+            // leave it waiting. The reason is the same non-enumerating code.
+            return self::loopbackRedirect($native, ['error' => $reason]);
+        }
+
+        $reauth = $this->reauthCallback;
+        if ($reauth !== null) {
+            $this->logReauth('sign_in_failed', $reauth, $reason);
+
+            return $this->reauthBack($reauth, 'sign_in_failed');
+        }
+
         return new Response(302, '', ['Location' => $this->frontendLink(\Whity\Core\Http\FrontendUrls::SSO_LOGIN) . '?sso_error=' . $reason]);
+    }
+
+    /**
+     * What the reauth callback in progress came from, read from the signed flow cookie; null for
+     * any other callback. Reset per request: workers keep this object between requests.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $reauthCallback = null;
+
+    /**
+     * The native flow in progress, read from the signed flow cookie; null for
+     * any other callback. Reset per request: workers keep this object.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $nativeCallback = null;
+
+    /**
+     * How long a native app's one-time code lives (WHIT-1406). The app is
+     * already listening when the browser is redirected to it.
+     */
+    public const NATIVE_CODE_TTL = \Whity\Auth\NativeSignInCodes::TTL_SECONDS;
+
+    /**
+     * The native return a `/start?mode=native` asks for, or null when any part
+     * is not what the app would send: a loopback port a person's app can
+     * listen on (1024-65535), a PKCE S256 challenge, a state of the app's own.
+     *
+     * @return array{port: int, challenge: string, state: string}|null
+     */
+    public static function nativeTarget(?string $port, ?string $challenge, ?string $state): ?array
+    {
+        if ($port === null || preg_match('/^[1-9][0-9]{3,4}$/', $port) !== 1) {
+            return null;
+        }
+        $portNumber = (int) $port;
+        if ($portNumber < 1024 || $portNumber > 65535) {
+            return null;
+        }
+        if ($challenge === null || preg_match('/^[A-Za-z0-9_-]{43,128}$/', $challenge) !== 1) {
+            return null;
+        }
+        if ($state === null || preg_match('/^[A-Za-z0-9_-]{8,128}$/', $state) !== 1) {
+            return null;
+        }
+
+        return ['port' => $portNumber, 'challenge' => $challenge, 'state' => $state];
+    }
+
+    /**
+     * Only ever to the loopback address and the port the app named at
+     * `/start`, with the app's own state echoed, so a redirect can't be
+     * pointed anywhere else by anything that happened in between.
+     *
+     * @param array<string, mixed> $flow
+     * @param array<string, string> $query
+     */
+    private static function loopbackRedirect(array $flow, array $query): Response
+    {
+        $port = (int) $flow['native_port'];
+        $query = ['state' => (string) $flow['native_state']] + $query;
+
+        return new Response(302, '', ['Location' => 'http://127.0.0.1:' . $port . '/callback?' . http_build_query($query)]);
+    }
+
+    /**
+     * WHIT-1406: the person is signed in by the provider; give the native app a
+     * one-time code bound to the PKCE challenge it sent, and audit it. The code
+     * carries the provider's trust tier, so `exchange()` confines the session
+     * exactly as a browser sign-in through the same provider would be.
+     *
+     * @param array<string, mixed> $flow
+     */
+    private function nativeReturn(
+        array $flow,
+        int $profileId,
+        string $email,
+        int $providerId,
+        int $tenantId,
+        FederatedProviderContext $ctx,
+        Request $request,
+    ): Response {
+        if ($this->nativeCodes === null || !is_string($flow['native_challenge'] ?? null)) {
+            return $this->fail('native_unavailable');
+        }
+        $code = $this->nativeCodes->issue(
+            $profileId,
+            $email,
+            $providerId,
+            $tenantId,
+            !$ctx->isGlobalTrust(),
+            (string) $flow['native_challenge'],
+            self::NATIVE_CODE_TTL,
+        );
+        $this->audit?->record('auth.native.code_issued', [
+            'tenant_id'   => null,
+            'actor_id'    => $profileId,
+            'target_type' => 'profile',
+            'target_id'   => $profileId,
+            'metadata'    => ['provider_key' => (string) ($flow['provider_key'] ?? ''), 'port' => (int) $flow['native_port']],
+        ]);
+
+        return self::loopbackRedirect($flow, ['code' => $code]);
+    }
+
+    /**
+     * POST /api/v1/auth/sso/native/exchange (WHIT-1406): the native app turns
+     * its one-time code into a token-mode session. Body `{code, code_verifier}`
+     * and the header `X-Auth-Mode: token`, since the answer is tokens in the
+     * body and never a cookie. The code is spent on the first attempt whatever
+     * its outcome; a wrong verifier, an expired code or a replay answer the
+     * same generic 401 and are audited by reason. What comes back is what a
+     * federated browser sign-in gets: tokens, or the memberships to choose
+     * from with a selection token for `/auth/select-tenant`.
+     *
+     * @param array<string, string> $params
+     */
+    public function exchange(Request $request, array $params = []): Response
+    {
+        if ($this->nativeCodes === null) {
+            return Response::error('Native sign-in is not available', 404);
+        }
+        if (strtolower(trim((string) ($request->getHeader('X-Auth-Mode') ?? ''))) !== 'token') {
+            return Response::error('Send X-Auth-Mode: token', 400);
+        }
+        $ip = isset($_SERVER['REMOTE_ADDR']) && is_string($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null;
+        if ($this->throttle !== null && $this->throttle->isThrottled(null, $ip)) {
+            return \Whity\Core\RateLimit\RateLimited::response(60);
+        }
+
+        $body = json_decode($request->getBody(), true);
+        $code = is_array($body) && is_string($body['code'] ?? null) ? $body['code'] : '';
+        $verifier = is_array($body) && is_string($body['code_verifier'] ?? null) ? $body['code_verifier'] : '';
+        if (preg_match('/^[A-Za-z0-9_-]{43}$/', $code) !== 1 || preg_match('/^[A-Za-z0-9_-]{43,128}$/', $verifier) !== 1) {
+            return Response::error('code and code_verifier are required', 400);
+        }
+
+        $row = $this->nativeCodes->consume($code);
+        if ($row === null) {
+            return $this->exchangeRefused('unknown_code', null, $ip);
+        }
+        if ($this->nativeCodes->isExpired($row)) {
+            return $this->exchangeRefused('expired', $row['profile_id'], $ip);
+        }
+        if (!hash_equals($row['code_challenge'], \Whity\Auth\NativeSignInCodes::challengeFor($verifier))) {
+            return $this->exchangeRefused('wrong_verifier', $row['profile_id'], $ip);
+        }
+
+        $result = $this->auth->completeFederatedLogin(
+            $row['profile_id'],
+            $row['email'],
+            $request,
+            $row['tenant_trust'] ? $row['provider_tenant_id'] : null,
+            $row['tenant_trust'],
+        );
+        $this->audit?->record('auth.native.exchanged', [
+            'tenant_id'   => $row['tenant_trust'] ? $row['provider_tenant_id'] : null,
+            'actor_id'    => $row['profile_id'],
+            'target_type' => 'profile',
+            'target_id'   => $row['profile_id'],
+            'metadata'    => ['provider_id' => $row['provider_id'], 'status' => $result->getStatusCode()],
+        ]);
+
+        return $result;
+    }
+
+    /** One generic answer for every refused exchange; the reason goes to the audit log only. */
+    private function exchangeRefused(string $reason, ?int $profileId, ?string $ip): Response
+    {
+        $this->throttle?->recordFailure(null, $ip);
+        $this->audit?->record('auth.native.exchange_refused', [
+            'tenant_id'   => null,
+            'actor_id'    => $profileId,
+            'target_type' => 'profile',
+            'target_id'   => $profileId,
+            'metadata'    => ['reason' => $reason],
+        ]);
+
+        return Response::error('Invalid or expired code', 401);
+    }
+
+    /**
+     * Back to the page that asked for the sign-in, with the outcome it explains.
+     *
+     * @param array<string, mixed> $flow
+     */
+    private function reauthBack(array $flow, string $outcome): Response
+    {
+        $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
+        $returnTo = (string) ($flow['reauth_return_to'] ?? '/');
+        $base = rtrim(($this->frontendUrls ?? new \Whity\Core\Http\FrontendUrls(['APP_URL' => $this->appUrl]))->base(), '/');
+
+        return new Response(302, '', [
+            'Location' => $base . $returnTo . ($purpose !== null ? '?identity_check=' : '?signing=') . rawurlencode($outcome),
+        ]);
+    }
+
+    /**
+     * One line per signing-in-again outcome, so a failure can be traced (WHIT-1371). Only the
+     * person's id, the approval's kind (never its subject), the outcome and a short reason: no
+     * token, code, email or subject.
+     *
+     * @param array<string, mixed>|null $flow
+     */
+    private function logReauth(string $outcome, ?array $flow, ?string $detail = null, ?string $mode = null): void
+    {
+        $purpose = is_string($flow['reauth_purpose'] ?? null) ? $flow['reauth_purpose'] : null;
+        // Scrubbed like every log line here; it carries no secret to begin with.
+        \Whity\Core\Log\ScrubbedErrorLog::write('[sso.reauth] ' . json_encode([
+            'outcome'    => $outcome,
+            'mode'       => $mode ?? ($purpose !== null ? 'gate' : 'sign'),
+            'kind'       => $purpose !== null ? strstr($purpose, ':', true) : null,
+            'profile_id' => is_int($flow['reauth_profile_id'] ?? null) ? $flow['reauth_profile_id'] : null,
+            'detail'     => $detail,
+        ], JSON_UNESCAPED_SLASHES));
+    }
+
+    /** Why a `?reauth=` start was refused, for the log. */
+    private function reauthRefusal(): string
+    {
+        if ($this->sessions === null || $this->identities === null || $this->signingChallenges === null) {
+            return 'not_wired';
+        }
+
+        return $this->sessions->validateAccessToken() === null ? 'no_session' : 'bad_request';
     }
 }

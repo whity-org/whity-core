@@ -5,6 +5,17 @@ declare(strict_types=1);
 namespace Whity\Sdk\Manifest;
 
 use ReflectionClass;
+use Whity\Sdk\Contribute\PluginContactFieldsInterface;
+use Whity\Sdk\Contribute\PluginDashboardInterface;
+use Whity\Sdk\Contribute\PluginJobsInterface;
+use Whity\Sdk\Contribute\PluginNotificationsInterface;
+use Whity\Sdk\Contribute\PluginOnboardingInterface;
+use Whity\Sdk\Contribute\PluginScheduledJobsInterface;
+use Whity\Sdk\Contribute\PluginSettingsInterface;
+use Whity\Sdk\Contribute\PluginThemesInterface;
+use Whity\Sdk\Contribute\PluginWorkspaceTemplateExtensionsInterface;
+use Whity\Sdk\Contribute\PluginWorkspaceTemplatesInterface;
+use Whity\Sdk\JobInterface;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\PluginAgentPresetsInterface;
 use Whity\Sdk\PluginEntitlementsInterface;
@@ -36,7 +47,8 @@ use Whity\Sdk\Tenant\PluginTablesInterface;
  * the same registries and the same checks.
  *
  * HYBRID BY OVERRIDING. A subclass may override any method to add what JSON
- * can't express (routes and their handlers, hooks, migrations, jobs), and may
+ * can't express (routes and their handlers, hooks, migrations, job handlers
+ * that need collaborators), and may
  * call the parent to keep the declared part:
  *
  * ```php
@@ -62,12 +74,25 @@ abstract class ManifestPlugin implements
     PluginDataTypesInterface,
     PluginEntitlementsInterface,
     PluginAgentPresetsInterface,
-    PluginHomeCardInterface
+    PluginHomeCardInterface,
+    PluginSettingsInterface,
+    PluginNotificationsInterface,
+    PluginJobsInterface,
+    PluginScheduledJobsInterface,
+    PluginDashboardInterface,
+    PluginOnboardingInterface,
+    PluginContactFieldsInterface,
+    PluginThemesInterface,
+    PluginWorkspaceTemplatesInterface,
+    PluginWorkspaceTemplateExtensionsInterface
 {
     /** The file name the manifest is read from, next to the subclass. */
     public const FILE_NAME = 'plugin.json';
 
     private readonly PluginManifest $manifest;
+
+    /** @var array<string, JobInterface>|null built on first use */
+    private ?array $jobs = null;
 
     /**
      * @throws InvalidManifestException
@@ -206,5 +231,162 @@ abstract class ManifestPlugin implements
     public function getHomeCard(): ?array
     {
         return $this->manifest->homeCard();
+    }
+
+    /** `settings` from the manifest (SDK 1.163, D4). */
+    public function getSettings(): array
+    {
+        return $this->manifest->settings();
+    }
+
+    /** `notifications` from the manifest (SDK 1.163, D4). */
+    public function getNotificationTypes(): array
+    {
+        /** @var array<string, array{label: array{en: string, ar: string}, emailDefault?: bool}> */
+        return $this->manifest->notificationTypes();
+    }
+
+    /**
+     * The handlers `jobs` names, each built once with no constructor
+     * arguments (SDK 1.163, D4). A subclass whose handlers need collaborators
+     * overrides this and may call the parent for the rest.
+     *
+     * @return array<string, JobInterface>
+     * @throws InvalidManifestException when a class is missing or isn't a JobInterface
+     */
+    public function getJobs(): array
+    {
+        if ($this->jobs !== null) {
+            return $this->jobs;
+        }
+        $jobs = [];
+        $problems = [];
+        foreach ($this->manifest->jobs() as $name => $declaration) {
+            $class = ltrim($declaration['class'], '\\');
+            if (!class_exists($class) || !is_subclass_of($class, JobInterface::class)) {
+                $problems[] = "jobs.{$name}.class: {$class} is not a class implementing " . JobInterface::class;
+                continue;
+            }
+            $jobs[$name] = new $class();
+        }
+        if ($problems !== []) {
+            throw new InvalidManifestException($this->manifestPath(), $problems);
+        }
+
+        return $this->jobs = $jobs;
+    }
+
+    /** The jobs whose declaration says `"submittable": true` (SDK 1.163, D4). */
+    public function getSubmittableJobs(): array
+    {
+        $names = [];
+        foreach ($this->manifest->jobs() as $name => $declaration) {
+            if (($declaration['submittable'] ?? false) === true) {
+                $names[] = (string) $name;
+            }
+        }
+
+        return $names;
+    }
+
+    /** Each job with a `schedule`, bare name => cron (SDK 1.163, D4). */
+    public function getScheduledJobs(): array
+    {
+        $schedules = [];
+        foreach ($this->manifest->jobs() as $name => $declaration) {
+            if (isset($declaration['schedule'])) {
+                $schedules[(string) $name] = $declaration['schedule'];
+            }
+        }
+
+        return $schedules;
+    }
+
+    /**
+     * `dashboard` from the manifest, or nothing (SDK 1.163, D4). Its routes
+     * are ones a subclass adds in PHP; the host drops what names none.
+     */
+    public function getDashboard(): array
+    {
+        return $this->manifest->dashboard() ?? [];
+    }
+
+    /**
+     * `onboarding` from the manifest, or nothing (SDK 1.163, D4). Its `status`
+     * is a GET route a subclass adds in PHP.
+     */
+    public function getOnboarding(): array
+    {
+        /** @phpstan-ignore return.type (the shape is checked by OnboardingValidator when the manifest loads) */
+        return $this->manifest->onboarding() ?? [];
+    }
+
+    /** `contactFields` from the manifest (SDK 1.163, D4). */
+    public function getContactFields(): array
+    {
+        /** @phpstan-ignore return.type (the shape is checked by ContactFieldValidator when the manifest loads) */
+        return $this->manifest->contactFields();
+    }
+
+    /**
+     * The theme files `themes` lists, read from the plugin's directory and
+     * decoded (SDK 1.163, D4). The host checks each against
+     * `schemas/theme/v1.json` and drops one that fails.
+     *
+     * @throws InvalidManifestException when a file can't be read or isn't JSON
+     */
+    public function getThemes(): array
+    {
+        return $this->readJsonFiles('themes', $this->manifest->themeFiles());
+    }
+
+    /**
+     * The workspace templates `workspaceTemplates` lists (SDK 1.170), read
+     * from the plugin's directory. The host checks each and drops one that
+     * fails.
+     *
+     * @throws InvalidManifestException when a file can't be read or isn't JSON
+     */
+    public function getWorkspaceTemplates(): array
+    {
+        return $this->readJsonFiles('workspaceTemplates', $this->manifest->workspaceTemplateFiles());
+    }
+
+    /**
+     * The template extensions `workspaceTemplateExtensions` lists (SDK
+     * 1.170), read from the plugin's directory.
+     *
+     * @throws InvalidManifestException when a file can't be read or isn't JSON
+     */
+    public function getWorkspaceTemplateExtensions(): array
+    {
+        return $this->readJsonFiles('workspaceTemplateExtensions', $this->manifest->workspaceTemplateExtensionFiles());
+    }
+
+    /**
+     * @param list<string> $files
+     * @return list<array<string, mixed>>
+     * @throws InvalidManifestException
+     */
+    private function readJsonFiles(string $key, array $files): array
+    {
+        $dir = dirname($this->manifestPath());
+        $out = [];
+        $problems = [];
+        foreach ($files as $i => $file) {
+            $raw = @file_get_contents($dir . DIRECTORY_SEPARATOR . $file);
+            $decoded = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($decoded)) {
+                $problems[] = "{$key}[{$i}]: {$file} can't be read as JSON";
+                continue;
+            }
+            $out[] = $decoded;
+        }
+        if ($problems !== []) {
+            throw new InvalidManifestException($this->manifestPath(), $problems);
+        }
+
+        /** @var list<array<string, mixed>> */
+        return $out;
     }
 }

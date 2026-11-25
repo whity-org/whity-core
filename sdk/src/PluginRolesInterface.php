@@ -54,6 +54,9 @@ namespace Whity\Sdk;
  * if desired.
  *
  * TODO: a future option could remove roles with zero user/OU assignments.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginRolesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginRolesInterface
 {

@@ -200,7 +200,7 @@ final class MembershipAuditTrailRealEngineTest extends TestCase
     {
         $response = $this->handler()->create($this->request('POST', '/api/users', [
             'email' => 'fresh@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'tenantId' => 1,
         ]));

@@ -120,6 +120,11 @@ final class PasswordSignInRealEngineTest extends TestCase
         self::assertNotNull(PasswordSignIn::cannotTurnOff($this->pdo, $operator));
 
         (new ExternalIdentityRepository($this->pdo))->link($operator, 'whity_id', 'https://id.whity.test', 'op-sub', 'operator@whity.test');
+        // WHIT-1350: the install's own admin is a platform operator too, still unlinked.
+        self::assertStringContainsString('system@whity.local', (string) PasswordSignIn::cannotTurnOff($this->pdo, $operator));
+
+        $installAdmin = (int) $this->scalar("SELECT profile_id FROM profile_emails WHERE email = 'system@whity.local'");
+        (new ExternalIdentityRepository($this->pdo))->link($installAdmin, 'whity_id', 'https://id.whity.test', 'system-sub', null);
         self::assertNull(PasswordSignIn::cannotTurnOff($this->pdo, $operator));
     }
 

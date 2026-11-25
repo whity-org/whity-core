@@ -8,6 +8,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { formatMoney } from '@whity/ui/money/currency';
 import { AvailablePlans } from './available-plans';
 import { ChangePlan } from './change-plan';
+import { localizePlanText } from '@/lib/billing/plan-cards';
 
 /**
  * WHAT THIS WORKSPACE IS PAYING FOR, AND WHAT IT HAS PAID.
@@ -35,6 +36,8 @@ interface AccessState {
   has_access: boolean;
   status: string | null;
   plan: string | null;
+  /** WHIT-1397: what the cards call it; `plan` is only its key. */
+  plan_name?: string | null;
   access_until: string | null;
   cancel_at_period_end: boolean;
 }
@@ -99,7 +102,9 @@ export function SubscriptionPanel() {
             {access.plan !== null && (
               <div className="flex gap-2">
                 <dt className="text-muted-foreground">{t('billing.subscription.plan', 'Plan')}</dt>
-                <dd className="font-medium">{access.plan}</dd>
+                <dd className="font-medium">
+                  {localizePlanText(t, access.plan, access.plan_name ?? access.plan, null).name}
+                </dd>
               </div>
             )}
             {dates.date(access.access_until) !== null && (

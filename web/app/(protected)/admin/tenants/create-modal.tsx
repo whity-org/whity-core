@@ -159,7 +159,7 @@ export function CreateTenantModal({
               name="slug"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>{t('tenants.create.slug.label', 'Slug')}</FormLabel>
+                  <FormLabel>{t('tenants.create.slug.label', 'Handle')}</FormLabel>
                   <FormControl>
                     <Input
                       placeholder={t('tenants.create.slug.placeholder', 'my-company')}

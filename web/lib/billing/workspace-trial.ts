@@ -40,6 +40,9 @@ export type TrialBannerKind = 'read_only' | 'reminder' | null;
  */
 export function trialBannerKind(trial: WorkspaceTrial | null, canPay: boolean): TrialBannerKind {
   if (trial === null) return null;
+  // Expired or canceled: the paused banner says it (2026-11-22). This one's
+  // words are about a TRIAL that ended, which stays `trialing`.
+  if (trial.read_only && trial.status !== 'trialing') return null;
   if (trial.read_only) return 'read_only';
   if (
     canPay &&

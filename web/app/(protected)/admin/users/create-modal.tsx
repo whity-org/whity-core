@@ -34,6 +34,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslation, type TranslateFn } from '@whity/features/i18n';
 import { useRoleOptions } from './use-role-options';
 import { PasswordStrengthIndicator } from '@/components/PasswordStrengthIndicator';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 // Only the fields the API actually reads (UserCreateRequest): the server
 // derives `name` from the email local-part and always creates the user in the
@@ -49,8 +50,8 @@ const buildCreateUserSchema = (t: TranslateFn) =>
     password: z
       .string()
       .min(
-        8,
-        t('users.create.validation.password', 'Password must be at least 8 characters')
+        PASSWORD_MIN_LENGTH,
+        t('users.create.validation.password', 'Password must be at least 12 characters')
       ),
     role: z.string().min(1, t('users.create.validation.role', 'Role is required')),
   });

@@ -17,6 +17,9 @@ namespace Whity\Sdk;
  * `['en' => 'Whity for Salons', 'ar' => 'Whity للصالونات']`. Each language is
  * required, up to 60 characters; a declaration that fails is ignored with a
  * logged reason and people see the id.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginDisplayNameInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginDisplayNameInterface
 {

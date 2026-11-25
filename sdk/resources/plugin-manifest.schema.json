@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://whity.dev/schemas/plugin-manifest/1.json",
   "title": "Whity plugin manifest (plugin.json)",
-  "description": "Format whity.plugin/1, SDK 1.47 (records: 1.50). Whity\\Sdk\\Manifest\\ManifestValidator is authoritative: it also checks references (a role grants only declared permissions, a screen is gated by one, a data type lives in a declared tenant table) and runs each screen's blocks through the block contract.",
+  "description": "Format whity.plugin/1, SDK 1.47 (records: 1.50; settings, notifications, jobs, dashboard, onboarding, contactFields and themes: 1.163). Whity\\Sdk\\Manifest\\ManifestValidator is authoritative: it also checks references (a role grants only declared permissions, a screen is gated by one, a data type lives in a declared tenant table) and runs each screen's blocks through the block contract.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -927,6 +927,347 @@
           "type": "string",
           "pattern": "^[a-z0-9-]{1,64}$"
         }
+      }
+    },
+    "settings": {
+      "description": "SDK 1.163 (D4): the settings this plugin declares, bare key => declaration, as PluginSettingsInterface::getSettings() returns them. Stored and validated by the host; secrets are never settings.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "default"
+        ],
+        "properties": {
+          "type": {
+            "enum": [
+              "string",
+              "bool",
+              "int",
+              "enum"
+            ]
+          },
+          "default": {
+            "type": [
+              "string",
+              "boolean",
+              "integer"
+            ],
+            "description": "The value until someone changes it. It must satisfy the setting's own constraints."
+          },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "description": "type enum only: the allowed values."
+          },
+          "min": {
+            "type": "integer",
+            "description": "type int only."
+          },
+          "max": {
+            "type": "integer",
+            "description": "type int only."
+          },
+          "max_length": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "type string only: characters, not bytes."
+          },
+          "pattern": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^[^/]+$",
+            "description": "type string only: a bare regular expression; the host adds the delimiters."
+          },
+          "label": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Language => name; falls back to the key."
+          },
+          "description": {
+            "type": "string"
+          },
+          "global_only": {
+            "type": "boolean",
+            "description": "Settable by the operator only, never per workspace."
+          },
+          "admin": {
+            "type": "boolean",
+            "description": "Shown on the host's own settings screens. Off by default."
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "enum"
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "options"
+              ]
+            },
+            "else": {
+              "not": {
+                "required": [
+                  "options"
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "int"
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "min"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "max"
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "string"
+                }
+              }
+            },
+            "else": {
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "max_length"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "pattern"
+                    ]
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    "notifications": {
+      "description": "SDK 1.163 (D4): notice types this plugin sends, bare key => declaration, as PluginNotificationsInterface::getNotificationTypes() returns them.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_.]*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "label"
+        ],
+        "properties": {
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "emailDefault": {
+            "type": "boolean",
+            "description": "Also by email for a person who never chose (SDK 1.141)."
+          }
+        }
+      }
+    },
+    "jobs": {
+      "description": "SDK 1.163 (D4): the jobs this plugin ships, bare name => declaration. The class implements Whity\\Sdk\\JobInterface and takes no constructor arguments; schedule is a five-field cron expression; submittable lets a workspace ask for the job.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "class"
+        ],
+        "properties": {
+          "class": {
+            "type": "string",
+            "pattern": "^\\\\?[A-Za-z_][A-Za-z0-9_]*(\\\\[A-Za-z_][A-Za-z0-9_]*)+$"
+          },
+          "schedule": {
+            "type": "string",
+            "pattern": "^\\s*\\S+(\\s+\\S+){4}\\s*$",
+            "description": "minute hour day-of-month month day-of-week"
+          },
+          "submittable": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "dashboard": {
+      "description": "SDK 1.163 (D4): dashboard setup points and widgets, as PluginDashboardInterface::getDashboard() returns them. Whity\\Sdk\\Manifest\\DashboardValidator is authoritative for the parts below.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "setup": {
+          "type": "object"
+        },
+        "widgets": {
+          "type": "array",
+          "items": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "onboarding": {
+      "description": "SDK 1.163 (D4): a guided setup, as PluginOnboardingInterface::getOnboarding() returns it. status is one of the plugin's own GET routes; permission one of its own permissions.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title",
+        "status",
+        "permission",
+        "steps"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/label"
+        },
+        "description": {
+          "$ref": "#/$defs/label"
+        },
+        "status": {
+          "type": "string",
+          "pattern": "^/"
+        },
+        "permission": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "title",
+              "blocks"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,40}$"
+              },
+              "title": {
+                "$ref": "#/$defs/label"
+              },
+              "description": {
+                "$ref": "#/$defs/label"
+              },
+              "blocks": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "contactFields": {
+      "description": "SDK 1.163 (D4): this plugin's own fields on core contacts, as PluginContactFieldsInterface::getContactFields() returns them. Whity\\Sdk\\Manifest\\ContactFieldValidator is authoritative.",
+      "type": "array",
+      "maxItems": 30,
+      "items": {
+        "type": "object",
+        "required": [
+          "key",
+          "label",
+          "type"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "$ref": "#/$defs/label"
+          },
+          "type": {
+            "enum": [
+              "text",
+              "textarea",
+              "number",
+              "date",
+              "select",
+              "multiselect",
+              "checkbox",
+              "profile_ref"
+            ]
+          }
+        }
+      }
+    },
+    "themes": {
+      "description": "SDK 1.163 (D4, TH.13): theme files inside the plugin, each in the format of schemas/theme/v1.json. The host checks every file when the plugin loads.",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)[A-Za-z0-9_./-]{1,200}\\.json$"
+      }
+    },
+    "workspaceTemplates": {
+      "description": "SDK 1.170 (WHIT-1413): workspace template files inside the plugin, each a manifest as Whity\\Sdk\\Manifest\\WorkspaceTemplateValidator checks it (docs/wiki/Plugin-Workspace-Templates.md). The host checks every file when the plugin loads.",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)[A-Za-z0-9_./-]{1,200}\\.json$"
+      }
+    },
+    "workspaceTemplateExtensions": {
+      "description": "SDK 1.170 (WHIT-1413): files with pieces this plugin adds to another plugin's workspace template, each checked by WorkspaceTemplateValidator::extensionErrors().",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)[A-Za-z0-9_./-]{1,200}\\.json$"
       }
     }
   },

@@ -1,0 +1,29 @@
+{
+  "name": "@whity/plugin-sdk",
+  "version": "1.172.0",
+  "description": "What a Whity plugin's frontend needs: the block contract and types, a typed builder, a client for the plugin's own routes, page walking, bilingual text and test helpers. Versioned in lockstep with the PHP SDK, whity/plugin-sdk.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/whity-org/whity-core.git",
+    "directory": "packages/plugin-sdk"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./testing": "./src/testing.ts"
+  },
+  "types": "./src/index.ts",
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "generate": "php ../../scripts/plugin-sdk-contract.php",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "test": "node --experimental-strip-types --test \"test/*.test.ts\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^5"
+  }
+}

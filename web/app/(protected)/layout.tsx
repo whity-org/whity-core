@@ -7,6 +7,7 @@ import { AppCommandPalette } from '@/components/shell/app-command-palette';
 import { MaintenanceNotice } from '@/components/shell/maintenance-notice';
 import { PlanLimitBanner } from '@/components/billing/plan-limit-banner';
 import { WorkspaceTrialBanner } from '@/components/billing/workspace-trial-banner';
+import { WorkspacePauseBanner, WorkspacePauseGate, WorkspacePauseProvider } from '@/components/billing/workspace-pause';
 import { PhoneNav } from '@/components/shell/phone-nav';
 import { DataTableLabels } from '@/components/shell/data-table-labels';
 import { PushOffer } from '@/components/pwa/push-offer';
@@ -47,6 +48,7 @@ export default function ProtectedLayout({
         <Sidebar />
 
         {/* Main Content */}
+        <WorkspacePauseProvider>
         <main className="min-w-0 flex-1 overflow-auto">
           {/* WHIT-147: the top bar holds search (⌘K); the palette mounts once per shell. */}
           <TopBar />
@@ -55,14 +57,20 @@ export default function ProtectedLayout({
           <PlanLimitBanner />
           {/* WHIT-1207: a further workspace's trial ending, or read-only after it, with Pay. */}
           <WorkspaceTrialBanner />
+          {/* 2026-11-22: an expired or canceled workspace: read-only for payers, with Billing. */}
+          <WorkspacePauseBanner />
           {/* Gutters 16px on phones, 24 from 640, 32 from 768 (register 4.5).
               A page marked data-full-width (the calendar, CV.1) takes the whole width. */}
           <div className="p-4 sm:p-6 md:p-8 max-w-7xl has-[[data-full-width]]:max-w-none">
             {/* WHIT-1077: the notifications ask, after sign-in on any page, until answered. */}
             <PushOffer className="mb-6" />
-            <DataTableLabels>{children}</DataTableLabels>
+            {/* People who can't pay a paused workspace see why, and who can (2026-11-22). */}
+            <DataTableLabels>
+              <WorkspacePauseGate>{children}</WorkspacePauseGate>
+            </DataTableLabels>
           </div>
         </main>
+        </WorkspacePauseProvider>
         <AppCommandPalette />
         <PhoneNav />
         {/* WHIT-1155: on a phone's browser, open the installed app or install it. */}

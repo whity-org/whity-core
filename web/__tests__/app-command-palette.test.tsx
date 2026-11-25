@@ -34,7 +34,7 @@ jest.mock('@whity/features/i18n', () => ({
     setLanguage,
   }),
 }));
-const switchTenant = jest.fn(async () => undefined);
+const switchTenant = jest.fn<Promise<void>, [number]>(async () => undefined);
 /** The signed-in client: `/api/me/*` and Chat's directory, by path. */
 let apiRoutes: Record<string, unknown> = {};
 /** The typed client's GET, answered from `apiRoutes` by path and query. */
@@ -65,7 +65,8 @@ jest.mock('@/lib/auth-context', () => ({
     switchTenant,
   }),
 }));
-jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast: jest.fn() }) }));
+const addToast = jest.fn();
+jest.mock('@/lib/toast-context', () => ({ useToast: () => ({ addToast }) }));
 let mockPermissions: string[] = [];
 jest.mock('@/hooks/useCapabilities', () => ({
   useCapabilities: () => ({ has: (p: string) => mockPermissions.includes(p) }),
@@ -82,6 +83,7 @@ beforeEach(() => {
   setPreference.mockReset();
   setLanguage.mockReset();
   switchTenant.mockClear();
+  addToast.mockClear();
   clearNewIntent();
   apiMock.mockClear();
   apiRoutes = {};
@@ -239,6 +241,19 @@ describe('AppCommandPalette commands', () => {
     expect(screen.queryByText('Example Bakery')).not.toBeInTheDocument();
     fireEvent.click(screen.getByText('Example Clinic'));
     await waitFor(() => expect(switchTenant).toHaveBeenCalledWith(2));
+  });
+
+  it('a refused switch says why in plain words, never silently (2026-11-22)', async () => {
+    const { WorkspaceSwitchRefused } = jest.requireActual('@/lib/workspace-switch');
+    switchTenant.mockRejectedValueOnce(new WorkspaceSwitchRefused(403, 'Access to the requested tenant is forbidden'));
+    openWith('/switch ');
+    fireEvent.click(screen.getByText('Example Clinic'));
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith(
+        'You’re no longer a member of that workspace. Ask one of its owners to add you again.',
+        'error',
+      ),
+    );
   });
 
   it('goes to a screen from the caller’s own navigation', () => {

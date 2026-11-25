@@ -281,6 +281,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1417 (AP.14): booking reminders the queue lost, every five
+        // minutes; each reminder is claimed when sent, so it goes out once.
+        if ((int) $now->format('i') % 5 === 0) {
+            $this->queue->dispatch(\Whity\Core\Calendar\BookingReminderSweepJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'calendar-reminder-sweep-' . $bucket,
+            ]);
+        }
+
         // WHIT-1339: settled audit rows into the hash chain, every five minutes.
         if ((int) $now->format('i') % 5 === 0) {
             $this->queue->dispatch(\Whity\Core\Audit\AuditSealJob::NAME, [], [

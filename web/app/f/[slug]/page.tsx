@@ -39,7 +39,8 @@ import { useThemeMode } from '@/lib/theme-mode-context';
 import {
   type Answer, type LocalizedText, type UploadedFileRef
 } from '@/components/forms/form-fields';
-import { FormFill, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { FormFill, formContentLanguage, type FillableField, type FormSectionSpec } from '@/components/forms/form-fill';
+import { ContentDirection } from '@whity/ui/content-direction';
 import { useRefusalMessage, type RefusalBody } from '@/components/forms/form-refusals';
 import { api } from '@/lib/api/client';
 import { localizedText } from '@whity/ui/localized-text';
@@ -282,6 +283,8 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const translatedDescription = Array.isArray(form.description_i18n) ? null : form.description_i18n;
   const description = localizedText(translatedDescription, preferArabic ? 'ar' : 'en') || form.description;
   const submitLabel = localizedText(form.submit_label, preferArabic ? 'ar' : 'en') || t('fill.send', 'Send');
+  // WHIT-1379: the form reads in its own language's direction; the page around it keeps the interface's.
+  const content = formContentLanguage(form, form.fields, form.sections ?? [], preferArabic);
 
   if (submitted) {
     return shell(
@@ -302,7 +305,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   return shell(
     // A banner leads in place of the brand-coloured top edge.
     <Card className={form.banner ? undefined : 'border-t-4 border-t-primary'}>
-      <FormHeader title={title} description={description} banner={form.banner} />
+      <FormHeader title={title} description={description} banner={form.banner} content={content} />
 
       <CardContent>
         {form.accepts_submissions && form.sign_in_required === true && typeof form.form_id === 'number' ? (
@@ -331,50 +334,52 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
               : t('fill.closed', 'This form is not accepting responses.')}
           </p>
         ) : (
-          <FormFill
-            fields={form.fields}
-            sections={form.sections ?? []}
-            answers={answers}
-            onAnswersChange={setAnswers}
-            preferArabic={preferArabic}
-            upload={uploadAttachment}
-            submitLabel={submitLabel}
-            submit={submitAnswers}
-            footer={
-              <>
-                {/* Hidden from people and from screen readers; only a bot fills it. */}
-                <div aria-hidden="true" className="pointer-events-none absolute -start-[9999px] top-0 h-px w-px overflow-hidden opacity-0">
-                  <label htmlFor="form-website">Website</label>
-                  <input
-                    id="form-website"
-                    name="website"
-                    type="text"
-                    tabIndex={-1}
-                    autoComplete="off"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                  />
-                </div>
-                {form.bot_check?.site_key && (
-                  <span className="block space-y-1.5" data-testid="form-bot-check">
-                    <TurnstileWidget
-                      siteKey={form.bot_check.site_key}
-                      language={currentLanguage ?? 'en'}
-                      theme={theme === 'dark' ? 'dark' : 'light'}
-                      resetKey={resetKey}
-                      onToken={onToken}
-                      onError={onBotError}
+          <ContentDirection content={content}>
+            <FormFill
+              fields={form.fields}
+              sections={form.sections ?? []}
+              answers={answers}
+              onAnswersChange={setAnswers}
+              preferArabic={preferArabic}
+              upload={uploadAttachment}
+              submitLabel={submitLabel}
+              submit={submitAnswers}
+              footer={
+                <>
+                  {/* Hidden from people and from screen readers; only a bot fills it. */}
+                  <div aria-hidden="true" className="pointer-events-none absolute -start-[9999px] top-0 h-px w-px overflow-hidden opacity-0">
+                    <label htmlFor="form-website">Website</label>
+                    <input
+                      id="form-website"
+                      name="website"
+                      type="text"
+                      tabIndex={-1}
+                      autoComplete="off"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
                     />
-                    {botFailed && (
-                      <span className="block text-sm text-destructive">
-                        {t('fill.botFailed', 'The check didn’t load. Refresh the page and try again.')}
-                      </span>
-                    )}
-                  </span>
-                )}
-              </>
-            }
-          />
+                  </div>
+                  {form.bot_check?.site_key && (
+                    <span className="block space-y-1.5" data-testid="form-bot-check">
+                      <TurnstileWidget
+                        siteKey={form.bot_check.site_key}
+                        language={currentLanguage ?? 'en'}
+                        theme={theme === 'dark' ? 'dark' : 'light'}
+                        resetKey={resetKey}
+                        onToken={onToken}
+                        onError={onBotError}
+                      />
+                      {botFailed && (
+                        <span className="block text-sm text-destructive">
+                          {t('fill.botFailed', 'The check didn’t load. Refresh the page and try again.')}
+                        </span>
+                      )}
+                    </span>
+                  )}
+                </>
+              }
+            />
+          </ContentDirection>
         )}
       </CardContent>
     </Card>

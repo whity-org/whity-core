@@ -105,3 +105,11 @@ anti-FOUC script source. `web/lib/theme-mode-context.tsx` is the React
 provider built on top of it. A non-JS client (Flutter) can't import this file
 directly but should replicate the same key, values, and resolution rule by
 hand.
+
+## Internal entry points (deprecated for outside use)
+
+These entries are still in `exports`, but nothing outside this package imports them. They are building blocks of other components (the `editor/*` pieces make up `@whity/ui/editor/doc-editor`) or screens only Whity's own apps use. Don't import them from an app: they may change without notice, and they will be removed from `exports` at this package's next major (WHIT-1394). Import the component that uses them instead.
+
+`@whity/ui/agent-run-status`, `@whity/ui/beta-warning`, `@whity/ui/collapsible`, `@whity/ui/color-card`, `@whity/ui/menu-bar`, `@whity/ui/switcher`, `@whity/ui/time-picker`, `@whity/ui/top-nav`, `@whity/ui/editor`, `@whity/ui/editor/block-list`, `@whity/ui/editor/block-toolbar`, `@whity/ui/editor/bubble`, `@whity/ui/editor/collab-rail`, `@whity/ui/editor/editor.css`, `@whity/ui/editor/field-picker`, `@whity/ui/editor/gutter`, `@whity/ui/editor/node-views`, `@whity/ui/editor/schema-rich`, `@whity/ui/editor/slash`, `@whity/ui/editor/table-keys`, `@whity/ui/editor/toolbar`.
+
+The list is every entry that `web/`, `templates/` and the other packages don't import (SDK lane, decision D8, November 2026). `@whity/ui/globals.css` is not on it: it is how an app outside whity-core gets the theme.

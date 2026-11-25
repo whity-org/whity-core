@@ -88,7 +88,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'name' => 'Ignored Name',
             'email' => 'create-admin@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'tenantId' => 1,
         ]));
@@ -128,7 +128,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-byid@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role_id' => 1,
             'tenantId' => 1,
         ]));
@@ -153,7 +153,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-default@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'tenantId' => 1,
         ]));
 
@@ -181,7 +181,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-ghost@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'ghost-role',
             'tenantId' => 1,
         ]));
@@ -207,7 +207,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-foreign-role@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'tenant2-private',
             'tenantId' => 1,
         ]));
@@ -233,7 +233,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'shared@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'tenantId' => 1,
         ]));
@@ -267,7 +267,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'dupe@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'tenantId' => 1,
         ]));
@@ -297,7 +297,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-with-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'ou_id' => $ouId,
         ]));
@@ -328,7 +328,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-foreign-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'ou_id' => $foreignOuId,
         ]));
@@ -359,7 +359,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-no-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
         ]));
 
@@ -384,7 +384,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-null-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'ou_id' => null,
         ]));
 
@@ -407,7 +407,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'create-bad-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'ou_id' => 'engineering',
         ]));
 
@@ -431,7 +431,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'promote-with-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
             'ou_id' => $ouId,
         ]));
@@ -460,7 +460,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $handler = $this->handler();
         $response = $handler->create($this->authedRequest('POST', '/api/users', [
             'email' => 'promote-keep-ou@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => 'admin',
         ]));
 
@@ -2069,7 +2069,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         $response = $this->handler()->create($this->authedRequest(
             'POST',
             '/api/users',
-            $body + ['email' => 'empty-role@example.com', 'password' => 'secret-123']
+            $body + ['email' => 'empty-role@example.com', 'password' => 'secret-123-long']
         ));
 
         $this->assertSame(400, $response->getStatusCode(), "{$label}: {$response->getBody()}");
@@ -2105,7 +2105,7 @@ final class UsersApiHandlerRealEngineTest extends TestCase
         MockRequestFactory::setTestTenant(1);
         $response = $this->handler()->create($this->authedRequest('POST', '/api/users', [
             'email' => 'null-role-with-id@example.com',
-            'password' => 'secret-123',
+            'password' => 'secret-123-long',
             'role' => null,
             'role_id' => 1,
         ]));

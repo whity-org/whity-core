@@ -1632,6 +1632,18 @@ $pluginLoader = new PluginLoader(
 // Inject the shared $totpService (built at step 3b) so the login-path 2FA validation uses the
 // SAME encryption key as the setup/confirm path (WC-95).
 // WC-0abcc29f: brute-force throttle uses the shared DatabaseSharedStore.
+// READINESS CE-7: a new password that has been in a data breach or is too
+// common is refused. WHITY_BREACHED_PASSWORDS: `online` (default) asks the
+// Have I Been Pwned range API by k-anonymity and falls back to the built-in
+// list when it can't be reached; `offline` uses the built-in list only; `off`
+// turns the check off.
+$breachedPasswordsMode = strtolower((string) ($_ENV['WHITY_BREACHED_PASSWORDS'] ?? getenv('WHITY_BREACHED_PASSWORDS') ?: 'online'));
+\Whity\Core\PasswordPolicy::setBreachedPasswords(match ($breachedPasswordsMode) {
+    'off' => null,
+    'offline' => new \Whity\Core\Identity\BreachedPasswords(),
+    default => \Whity\Core\Identity\BreachedPasswords::online(),
+});
+
 // Brute-force login throttle thresholds are operator-configurable (like the HTTP
 // RATE_LIMIT_* rules); unset falls back to the service defaults (10/20/900s).
 $loginThrottle = new LoginThrottleService(
@@ -1879,6 +1891,17 @@ $router->register('GET', '/api/me', [$authHandler, 'handleMe'], null);
 $router->register('PATCH', '/api/me', [$authHandler, 'handleUpdateMe'], null);
 $router->register('POST', '/api/auth/refresh', [$authHandler, 'handleRefresh'], null);
 $router->register('POST', '/api/auth/logout', [$authHandler, 'handleLogout'], null);
+// WHIT-1350: the one-time sign-in link `whity-cli auth operator-link <email>`
+// prints for a platform operator with no Whity ID. Public: the signed,
+// single-use, 15-minute token is the credential. Not behind the password
+// guard: it is the way in when password sign-in is off.
+$router->register('POST', '/api/auth/operator-link', [new \Whity\Api\OperatorLinkHandler(
+    $db->getPdo(),
+    $jwtParser,
+    new DatabaseSharedStore($db->getPdo()),
+    $authHandler,
+    $auditLogger,
+), 'open'], null);
 // WC-b-logout-others: sign out of all OTHER sessions & devices (bump token_epoch
 // then re-mint the current session). Self-authenticating like /me and refresh.
 $router->register('POST', '/api/me/logout-others', [$authHandler, 'handleLogoutOthers'], null);
@@ -2168,7 +2191,15 @@ $router->register('DELETE', '/api/roles/{id:\d+}/permissions', [$rolesHandler, '
 // grant migration reaching only the seeded admin role (#834).
 $router->register('GET', '/api/roles/{id:\d+}/assignments', [$rolesHandler, 'assignments'], null, null, \Whity\Core\RBAC\CorePermissions::ROLES_READ);
 
-$tenantsHandler = new TenantsApiHandler($db->getPdo(), $hookManager);
+// Workspace @handles (WHIT-1363, design section 36): checked against the
+// operator's own reserved list, audited, and announced as tenant.handle_changed.
+$workspaceHandles = new \Whity\Core\Tenant\Handles(
+    $db->getPdo(),
+    static fn (): string => (string) ($settingsService->getGlobal()[\Whity\Core\Settings\SettingsRegistry::HANDLES_RESERVED] ?? ''),
+    $auditLogger,
+    $hookManager,
+);
+$tenantsHandler = new TenantsApiHandler($db->getPdo(), $hookManager, $workspaceHandles);
 // Tenants are gated on PERMISSION SLUGS, not on the `admin` role name (#990),
 // for the reason the roles block above states: a role is a row a deployment may
 // rename or replace, a slug is a contract. `tenants:read/write/delete` have been
@@ -2994,7 +3025,18 @@ $templateRuns = new \Whity\Core\Workspace\Templates\TemplateRuns($db->getPdo());
 $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
     new \Whity\Core\Workspace\Templates\TemplateCatalogue($pluginLoader),
     $templateRuns,
-    static fn (): \Whity\Core\Workspace\Templates\TemplateApplier => new \Whity\Core\Workspace\Templates\TemplateApplier($hostWorkspaceSetup->forTemplates(), $templateRuns, static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId)),
+    // WHIT-1409 (SDK 1.169): the preview asks the same gates for each write it only records.
+    static function () use ($hostWorkspaceSetup, $templateRuns, $roleChecker): \Whity\Core\Workspace\Templates\TemplateApplier {
+        $templateSetup = $hostWorkspaceSetup->forTemplates();
+
+        return new \Whity\Core\Workspace\Templates\TemplateApplier(
+            $templateSetup,
+            $templateRuns,
+            static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+            null,
+            static fn (string $method, string $path): bool => $templateSetup->permits($method, $path),
+        );
+    },
     $codePluginActivation,
     $auditLogger,
     static fn (): string => $serverLabels->languageCode(),
@@ -3024,6 +3066,10 @@ $workspaceTemplatesHandler->useThemes(static fn (int $tenantId, string $id): ?ar
 $workspaceTemplatesHandler->useTrialStarter(static fn (int $tenantId, ?int $profileId, string $plugin, ?int $days): \Whity\Core\Response => $workspaceCodePluginsHandler->startTrialFor($tenantId, $profileId, $plugin, $days));
 $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler, 'list'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+// WHIT-1409 (SDK 1.169): what applying would do, changing nothing.
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/preview', [$workspaceTemplatesHandler, 'preview'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+// WHIT-1413 (SDK 1.170): "Use the template's version" of one item (WT.2, WT.3).
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents|pipelines}/{item:[a-z][a-z0-9-]*}/adopt', [$workspaceTemplatesHandler, 'adoptItem'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // WHIT-1195: a chosen template's guided setup, as the caller.
 $router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', [$workspaceTemplatesHandler, 'setupStatus'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
@@ -3356,6 +3402,15 @@ $externalBillingHandler->useWorkspaceTrial(new \Whity\Core\Billing\WorkspaceTria
     ),
     $settingsService,
 ));
+// 2026-11-22: an expired or canceled workspace is paused; members who can't pay
+// are told so and who its owners are, instead of meeting a 402.
+$externalBillingHandler->useWorkspacePause(new \Whity\Core\Billing\WorkspacePause(
+    new \Whity\Core\Subscription\SubscriptionService(
+        new \Whity\Core\Subscription\SubscriptionRepository($db->getPdo()),
+        $settingsService
+    ),
+    new \Whity\Core\Tenant\WorkspaceOwners($db->getPdo()),
+));
 $cashPaymentsHandler = new \Whity\Api\CashPaymentsApiHandler($cashPayments, $auditLogger);
 $router->register('GET', '/api/billing/cash-payments', [$cashPaymentsHandler, 'list'], null, null, CorePermissions::PLANS_MANAGE);
 $router->register('POST', '/api/billing/cash-payments', [$cashPaymentsHandler, 'record'], null, null, CorePermissions::PLANS_MANAGE);
@@ -3380,6 +3435,9 @@ $router->register('GET',  '/api/billing/receipts', [$externalBillingHandler, 're
 // WHIT-1207: the plan's trial and how to pay, for every member (the banner tells
 // those who can't pay to ask an owner).
 $router->register('GET',  '/api/billing/trial',    [$externalBillingHandler, 'trial']);
+// 2026-11-22: whether the workspace is paused (expired or canceled) and who its
+// owners are, for every member: those who can't pay see a plain paused page.
+$router->register('GET',  '/api/billing/pause',    [$externalBillingHandler, 'pause']);
 
 // WHIT-1040: the plan limits the business model sells, and where a workspace
 // stands against them. Every one of them warns and none refuses: customers are
@@ -5781,7 +5839,10 @@ $inventoryLocations = new \Whity\Core\Inventory\LocationService($inventoryDb, $i
 $inventoryReasons = new \Whity\Core\Inventory\ReasonCatalog($inventoryDb, $inventoryWorkspace);
 // WHIT-1235: lots, serial numbers and expiry; FEFO and the warning window are workspace settings.
 $inventoryLots = new \Whity\Core\Inventory\LotService($inventoryDb, static fn (int $tenantId): array => $settingsService->effective($tenantId));
-$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots);
+// WHIT-1318 A4a: the moving average cost (IV.18), kept with each stock batch;
+// the batch then goes to the bound accounting export (IV.22), core's books by default.
+$inventoryCosts = new \Whity\Core\Inventory\InventoryCosts($inventoryDb, $inventoryItems->currencyFor(...));
+$inventoryLedger = new \Whity\Core\Inventory\StockLedger($inventoryDb, $inventoryWorkspace, $inventoryItems, $inventoryUnits, $hookManager, $inventoryReasons, $inventoryLots, $inventoryCosts);
 $inventoryItems->useOpeningLots($inventoryLedger->moveIntoOpeningLots(...));
 // WHIT-1233: adjustments, counts and transfers as records. Above the
 // workspace's value an adjustment or a count's differences travel a route
@@ -6147,6 +6208,24 @@ $router->register('GET',    '/api/accounting/expense-claims/{id:\d+}',          
 $router->register('POST',   '/api/accounting/expense-claims/{id:\d+}/reimburse',  [$accountingExpensesHandler, 'reimburse'],  null, null, CorePermissions::PAYMENTS_WRITE);
 $router->register('GET',    '/api/accounting/petty-cash',                         [$accountingExpensesHandler, 'pettyCash'],  null, null, CorePermissions::PAYMENTS_READ);
 $router->register('POST',   '/api/accounting/petty-cash/spends',                  [$accountingExpensesHandler, 'spend'],      null, null, CorePermissions::PAYMENTS_WRITE);
+// WHIT-1318 A4a: stock in the books (Q3, on by default). Core accounting is
+// the default WorkspaceAccountingExport; an outside export binds over it.
+$accountingStock = new \Whity\Core\Accounting\StockBooks($accountingDb, $accountingWorkspace, $accountingLedger, $inventoryCosts);
+\Whity\register_service(\Whity\Sdk\Contribute\WorkspaceAccountingExport::class, $accountingStock); // @phpstan-ignore-line
+$accountingStockHandler = new \Whity\Api\AccountingStockApiHandler($accountingStock);
+$router->register('GET',    '/api/accounting/stock',                              [$accountingStockHandler, 'show'],    null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('PATCH',  '/api/accounting/stock',                              [$accountingStockHandler, 'update'],  null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('POST',   '/api/accounting/stock/opening',                      [$accountingStockHandler, 'open'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+$router->register('GET',    '/api/accounting/stock/waiting',                      [$accountingStockHandler, 'waiting'], null, null, CorePermissions::ACCOUNTING_READ);
+$router->register('POST',   '/api/accounting/stock/costs',                        [$accountingStockHandler, 'cost'],    null, null, CorePermissions::ACCOUNTING_SETTINGS);
+// Stock with no cost waits in the Inbox for the people who set accounting up.
+$inboxSourceRegistry->registerCoreSource(
+    \Whity\Core\Accounting\StockCostInboxSource::KEY,
+    new \Whity\Core\Accounting\StockCostInboxSource(
+        $accountingDb,
+        static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
+    )
+);
 
 $meetingsHandler = new \Whity\Api\MeetingsApiHandler(
     $conveningBodyRepository,
@@ -6428,6 +6507,7 @@ $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',    
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel',      [$publicBookingHandler, 'cancel'],      null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/accept',      [$publicBookingHandler, 'acceptSuggestion'], null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/coming',      [$publicBookingHandler, 'coming'],      null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/ics',         [$publicBookingHandler, 'ics'],         null);
 $router->register('GET',  '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [$publicBookingHandler, 'feed'],        null);
 $brandingHandler = new \Whity\Api\BrandingApiHandler(
@@ -6873,12 +6953,21 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     new \Whity\Core\Identity\PersonalPhone($db->getPdo()),
     // #2355: signing in from a form's public link joins the form's workspace.
     $formRepository,
+    // WHIT-1350: linking the operator's provider from Settings › Security is audited.
+    $auditLogger,
+    // WHIT-1406: a native app's sign-in return (Whity Desktop) and its exchange.
+    new \Whity\Auth\NativeSignInCodes($db->getPdo()),
+    $loginThrottle,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
 $router->register('GET', '/api/auth/sso/providers',                      [$ssoAuthHandler, 'providers'], null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/start',    [$ssoAuthHandler, 'start'],    null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/callback', [$ssoAuthHandler, 'callback'], null);
+// WHIT-1406: a native app exchanges the one-time code from its loopback
+// listener for a token-mode session. Public like the rest of /auth/sso/
+// (EnforceTenantIsolation::PUBLIC_ROUTE_PREFIXES); the code is the credential.
+$router->register('POST', '/api/auth/sso/native/exchange', [$ssoAuthHandler, 'exchange'], null);
 // WHIT-994: after a sign-in that found no workspace. Public like select-tenant:
 // the caller holds only the short-lived workspace_setup cookie the callback
 // set (no session). The POST creates their workspace only when every gate in
@@ -6932,7 +7021,7 @@ $router->register('POST',   '/api/me/ownership-offers/{id:\d+}/decline',     [$w
 // 13g. Authenticated "connected accounts" management (WC-f3b17bd2): the caller
 // lists / unlinks their own federated identities. Self-authenticating via the
 // access token (cookie or Bearer), scoped to the caller's profile.
-$meIdentitiesHandler = new \Whity\Api\MeIdentitiesApiHandler($tokenValidator, $externalIdentityRepository, $db->getPdo());
+$meIdentitiesHandler = new \Whity\Api\MeIdentitiesApiHandler($tokenValidator, $externalIdentityRepository, $db->getPdo(), $settingsService);
 $router->register('GET',    '/api/me/identities',            [$meIdentitiesHandler, 'list'],   null);
 $router->register('DELETE', '/api/me/identities/{id:\d+}',   [$meIdentitiesHandler, 'unlink'], null);
 

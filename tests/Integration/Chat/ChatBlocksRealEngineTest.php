@@ -84,14 +84,17 @@ final class ChatBlocksRealEngineTest extends TestCase
     public function testARecordShowsItsCurrentStatusAndOnlyFromThisWorkspace(): void
     {
         $this->pdo->exec('INSERT INTO calendar_services (id, tenant_id, name, duration_minutes, created_at, updated_at) VALUES (1, ' . self::A . ", 'Cake tasting', 75, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        // Tomorrow at 10:00 UTC: record search lists bookings from a week ago on,
+        // so a fixed date stops being found a week after it was written.
+        $day = gmdate('Y-m-d', time() + 86400);
         $this->pdo->exec('INSERT INTO calendar_bookings (id, tenant_id, service_id, profile_id, customer_name, starts_at, ends_at, blocks_from, blocks_until, status, source, created_at, updated_at)
-            VALUES (7, ' . self::A . ", 1, " . self::AWSS . ", 'Ahmad Khalil', '2026-11-17 10:00:00', '2026-11-17 11:15:00', '2026-11-17 10:00:00', '2026-11-17 11:15:00', 'confirmed', 'staff', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+            VALUES (7, ' . self::A . ", 1, " . self::AWSS . ", 'Ahmad Khalil', '{$day} 10:00:00', '{$day} 11:15:00', '{$day} 10:00:00', '{$day} 11:15:00', 'confirmed', 'staff', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
 
         $shared = $this->chat->post(self::A, ChatViewer::person(self::AMRO), $this->group, 'Tasting tomorrow', [], 'message', null, null, false, [],
             ['type' => 'record', 'record' => 'booking', 'id' => 7]);
         self::assertSame('Cake tasting · Ahmad Khalil', $shared['block']['title']);
         self::assertSame('confirmed', $shared['block']['status']);
-        self::assertSame('2026-11-17T10:00:00Z', $shared['block']['starts_at']);
+        self::assertSame("{$day}T10:00:00Z", $shared['block']['starts_at']);
         self::assertSame('Awss Haddad', $shared['block']['with']);
 
         $this->pdo->exec("UPDATE calendar_bookings SET status = 'cancelled' WHERE id = 7");

@@ -21,7 +21,9 @@ import path from "path";
  * styles, so a strict policy would break the app. frame-ancestors is safe for
  * an HTML document and adds nothing the app depends on. The omitted directives
  * can be layered in later behind a nonce-based strategy without touching this
- * division of responsibility.
+ * division of responsibility. That strategy now exists as a Report-Only policy
+ * with a per-request nonce, set in proxy.ts from lib/csp.ts (READINESS CE-12);
+ * this enforced header stays as it is until the reports are quiet.
  *
  * HSTS is gated the same way as the backend: emitted only outside development
  * (NODE_ENV !== 'development'), so a browser never pins HSTS over local
@@ -120,6 +122,7 @@ const nextConfig: NextConfig = {
   transpilePackages: [
     "@whity/ui",
     "@whity/api-client",
+    "@whity/plugin-sdk",
     "@tanstack/react-table",
     "@tanstack/table-core",
   ],

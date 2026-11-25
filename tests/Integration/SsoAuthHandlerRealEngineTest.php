@@ -59,6 +59,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
     private int $tenantProviderId;  // TENANT-TRUST provider (Acme's own IdP)
     private \Whity\Core\Settings\SettingsService $settings;
     private \Whity\Core\Hooks\HookManager $hooks;
+    /** The native sign-in codes' clock (WHIT-1406); tests move it. */
+    private int $now = 1_800_000_000;
 
     protected function setUp(): void
     {
@@ -131,6 +133,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             $frontendUrls,
             invitations: new \Whity\Core\Identity\InvitationService($this->pdo, new \Whity\Core\Identity\ProfileProvisioner($this->pdo)),
             phones: new \Whity\Core\Identity\PersonalPhone($this->pdo),
+            audit: new AuditLogger($this->pdo, new NullLogger()),
+            nativeCodes: new \Whity\Auth\NativeSignInCodes($this->pdo, fn (): int => $this->now),
         );
         $this->handler = ($this->makeHandler)();
 
@@ -139,10 +143,17 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         $_COOKIE = [];
     }
 
+    /** Puts error_log back after a test that captured it. */
+    private ?\Closure $restoreErrorLog = null;
+
     protected function tearDown(): void
     {
         $_GET = [];
         $_COOKIE = [];
+        if ($this->restoreErrorLog !== null) {
+            ($this->restoreErrorLog)();
+            $this->restoreErrorLog = null;
+        }
     }
 
     private function seed(): void
@@ -421,6 +432,211 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         }
     }
 
+    /**
+     * The whole fresh-sign-in round trip for a gated approval (WHIT-1147, found on
+     * app.whity.dev 2026-11-22): an owner who signs in only through the provider starts
+     * the check, signs in again there, comes back, and the approval goes through.
+     */
+    public function testAnOwnerWhoSignsInAgainCanApproveWithinFiveMinutes(): void
+    {
+        $purpose = 'workspace-ownership:offer-' . $this->tenantId . '-9-co_owner';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()]);
+
+        self::assertStringEndsWith('/admin/settings/owners?identity_check=signed_in', $result['location']);
+        self::assertSame('fresh_sign_in', $result['verify']($purpose));
+        self::assertNull($result['verify']($purpose), 'used once');
+    }
+
+    /**
+     * Accepting an ownership offer is checked in the OFFER's workspace, while the sign-in comes
+     * back under whichever workspace the person has open. Both must find the same record.
+     */
+    public function testAFreshSignInCountsWhicheverWorkspaceIsOpen(): void
+    {
+        $this->exec("INSERT INTO tenants (name, slug, created_at) VALUES ('AAU IRB', 'aau-irb', NOW())");
+        $offerTenant = (int) $this->pdo->lastInsertId();
+        $purpose = 'workspace-ownership:accept-1';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()]);
+
+        self::assertStringEndsWith('?identity_check=signed_in', $result['location']);
+        $check = new \Whity\Core\Security\IdentityCheck($this->pdo, new \Whity\Core\Document\Signing\SigningChallengeRepository($this->pdo));
+        self::assertSame('fresh_sign_in', $check->verify($offerTenant, $this->profileId, $purpose, null));
+    }
+
+    /**
+     * A sign-in the provider did not make just now (an old session it answered from, or one
+     * with no `auth_time` at all) confirms nothing, and the page is told why.
+     *
+     * @return iterable<string, array{array<string, mixed>}>
+     */
+    public static function staleSignIns(): iterable
+    {
+        yield 'ten minutes old' => [['auth_time' => time() - 600]];
+        yield 'no auth_time' => [[]];
+        yield 'in the future' => [['auth_time' => time() + 3600]];
+    }
+
+    /** @param array<string, mixed> $claims */
+    #[\PHPUnit\Framework\Attributes\DataProvider('staleSignIns')]
+    public function testAStaleSignInConfirmsNothing(array $claims): void
+    {
+        $purpose = 'workspace-ownership:offer-' . $this->tenantId . '-9-co_owner';
+        $result = $this->gateRoundTrip($purpose, $claims);
+
+        self::assertStringEndsWith('?identity_check=sign_in_not_fresh', $result['location']);
+        self::assertNull($result['verify']($purpose));
+    }
+
+    /**
+     * When the provider refuses or the callback fails, a person signing in AGAIN goes back to the
+     * page they came from, told it didn't work, never to the login page, where "Continue with
+     * Whity ID" signed them in afresh and recorded nothing (WHIT-1371). The log says why.
+     */
+    public function testAFailedReauthCallbackGoesBackToThePageAndIsLogged(): void
+    {
+        $log = $this->captureErrorLog();
+        $_COOKIE = ['sso_flow_token' => $this->jwtParser->create([
+            'state' => 's', 'nonce' => 'n', 'code_verifier' => 'v',
+            'provider_id' => $this->providerId, 'tenant_id' => 0, 'provider_key' => 'google',
+            'reauth_profile_id' => $this->profileId, 'reauth_tenant_id' => $this->tenantId,
+            'reauth_return_to' => '/admin/settings/owners', 'reauth_route_id' => null,
+            'reauth_purpose' => 'workspace-ownership:offer-1-9-co_owner',
+        ], 600, 'oidc_flow')];
+        $_GET = ['error' => 'login_required', 'state' => 's'];
+        $handler = new SsoAuthHandler(...$this->handlerArgsWithReauth());
+
+        $res = $handler->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertSame(self::APP_URL . '/admin/settings/owners?identity_check=sign_in_failed', $this->location($res));
+        $line = $this->lastReauthLog($log);
+        self::assertSame('sign_in_failed', $line['outcome']);
+        self::assertSame('denied:login_required', $line['detail']);
+        self::assertSame('workspace-ownership', $line['kind'], 'the kind, never the subject');
+        self::assertSame($this->profileId, $line['profile_id']);
+
+        // The next, ordinary sign-in on the same worker still lands on the login page.
+        $_COOKIE = [];
+        $_GET = ['code' => 'c', 'state' => 's'];
+        self::assertStringContainsString('sso_error=expired', $this->location($handler->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google'])));
+    }
+
+    public function testEveryReauthOutcomeIsLoggedWithoutSecrets(): void
+    {
+        $log = $this->captureErrorLog();
+        $this->gateRoundTrip('workspace-ownership:offer-' . $this->tenantId . '-9-co_owner', ['auth_time' => time() - 900]);
+
+        $text = (string) file_get_contents($log);
+        self::assertStringContainsString('"outcome":"started"', $text);
+        $line = $this->lastReauthLog($log);
+        self::assertSame('sign_in_not_fresh', $line['outcome']);
+        self::assertMatchesRegularExpression('/^auth_time_age=9\d\d$/', (string) $line['detail']);
+        self::assertStringNotContainsString(self::SUBJECT, $text);
+        self::assertStringNotContainsString('alice@acme.test', $text);
+        self::assertStringNotContainsString('offer-', $text);
+    }
+
+    private function captureErrorLog(): string
+    {
+        $file = (string) tempnam(sys_get_temp_dir(), 'reauth-log');
+        $previous = ini_set('error_log', $file);
+        $this->restoreErrorLog = static function () use ($previous, $file): void {
+            ini_set('error_log', $previous === false ? '' : $previous);
+            @unlink($file);
+        };
+
+        return $file;
+    }
+
+    /** @return array<string, mixed> */
+    private function lastReauthLog(string $file): array
+    {
+        $lines = array_values(array_filter(
+            explode("\n", (string) file_get_contents($file)),
+            static fn (string $l): bool => str_contains($l, '[sso.reauth] '),
+        ));
+        self::assertNotSame([], $lines, 'a reauth outcome is logged');
+        $json = substr((string) end($lines), (int) strpos((string) end($lines), '[sso.reauth] ') + 13);
+
+        return (array) json_decode(trim($json), true);
+    }
+
+    /** Someone else signing in at the provider never confirms this approver. */
+    public function testADifferentPersonsSignInConfirmsNothing(): void
+    {
+        $this->exec("INSERT INTO profiles (display_name, password_hash, two_factor_enabled, two_factor_backup_codes_version, token_epoch, created_at, updated_at)
+            VALUES ('Mallory', 'x', false, 0, 0, NOW(), NOW())");
+        $other = (int) $this->pdo->lastInsertId();
+        (new ExternalIdentityRepository($this->pdo))->link($other, 'google', self::ISSUER, 'google-sub-mallory', 'mallory@acme.test');
+
+        $purpose = 'workspace-ownership:offer-' . $this->tenantId . '-9-co_owner';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()], 'google-sub-mallory');
+
+        self::assertStringEndsWith('?identity_check=sign_in_mismatch', $result['location']);
+        self::assertNull($result['verify']($purpose));
+    }
+
+    /** A fresh sign-in for one approval does not approve another, and runs out after five minutes. */
+    public function testAFreshSignInCountsForThatApprovalOnlyAndForFiveMinutes(): void
+    {
+        $purpose = 'workspace-ownership:remove-' . $this->tenantId . '-9';
+        $result = $this->gateRoundTrip($purpose, ['auth_time' => time()]);
+
+        self::assertNull($result['verify']('workspace-ownership:remove-' . $this->tenantId . '-10'), 'another approval');
+        $this->exec("UPDATE signing_challenges SET expires_at = '2000-01-01 00:00:00'");
+        self::assertNull($result['verify']($purpose), 'after five minutes');
+    }
+
+    /**
+     * @param array<string, mixed> $claims
+     * @return array{location: string, verify: \Closure(string): ?string}
+     */
+    private function gateRoundTrip(string $purpose, array $claims, string $sub = self::SUBJECT): array
+    {
+        $this->linkIdentity();
+        $this->exec("UPDATE profiles SET auth_method = 'idp' WHERE id = " . $this->profileId);
+        $handler = new SsoAuthHandler(...$this->handlerArgsWithReauth());
+        $challenges = new \Whity\Core\Document\Signing\SigningChallengeRepository($this->pdo);
+        $check = new \Whity\Core\Security\IdentityCheck($this->pdo, $challenges);
+
+        $started = $check->start($this->tenantId, $this->profileId, $purpose, 'changing who owns a workspace');
+        self::assertSame('fresh_sign_in', $started['method'] ?? null);
+        self::assertSame($purpose, $started['purpose'] ?? null, 'the page is told which approval to sign in again for');
+
+        $_COOKIE = ['access_token' => $this->jwtParser->create([
+            'profile_id' => $this->profileId, 'active_tenant_id' => $this->tenantId,
+            'email' => 'alice@acme.test', 'role' => 'admin', 'token_epoch' => 0,
+        ], 900, 'access')];
+        $_GET = ['reauth' => 'gate', 'purpose' => $purpose, 'return_to' => '/admin/settings/owners'];
+        $start = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        $authorize = $this->location($start);
+        self::assertStringStartsWith('https://accounts.google.com/', $authorize, $authorize);
+        parse_str((string) parse_url($authorize, PHP_URL_QUERY), $q);
+        self::assertSame('login', $q['prompt'] ?? null);
+
+        // The flow cookie start() set (headers can't be read back under the CLI).
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+            'state' => $q['state'], 'nonce' => $q['nonce'], 'code_verifier' => 'v',
+            'provider_id' => $this->providerId, 'tenant_id' => 0, 'provider_key' => 'google',
+            'reauth_profile_id' => $this->profileId, 'reauth_tenant_id' => $this->tenantId,
+            'reauth_return_to' => '/admin/settings/owners', 'reauth_route_id' => null,
+            'reauth_purpose' => $purpose,
+        ], 600, 'oidc_flow');
+        $now = time();
+        $this->http->tokenResponse = ['id_token' => JWT::encode([
+            'iss' => self::ISSUER, 'aud' => self::CLIENT_ID, 'sub' => $sub, 'email' => 'alice@acme.test',
+            'email_verified' => true, 'nonce' => $q['nonce'], 'iat' => $now, 'exp' => $now + 3600,
+        ] + $claims, $this->privatePem, 'RS256', $this->kid), 'access_token' => 'at'];
+        $_GET = ['code' => 'c', 'state' => $q['state']];
+        $back = $handler->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+        $_GET = [];
+        $_COOKIE = [];
+
+        return [
+            'location' => $this->location($back),
+            'verify' => fn (string $p): ?string => $check->verify($this->tenantId, $this->profileId, $p, null),
+        ];
+    }
+
     /** @return array<string, mixed> */
     private function handlerArgsWithReauth(): array
     {
@@ -444,6 +660,99 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             'identities' => new ExternalIdentityRepository($this->pdo),
             'signingChallenges' => new \Whity\Core\Document\Signing\SigningChallengeRepository($this->pdo),
         ];
+    }
+
+    // ── linking from Settings › Security (WHIT-1350) ─────────────────────────
+
+    private function linkHandler(): SsoAuthHandler
+    {
+        return new SsoAuthHandler(...$this->handlerArgsWithReauth() + ['audit' => new AuditLogger($this->pdo, new NullLogger())]);
+    }
+
+    /** @param array<string, mixed> $extra */
+    private function sessionCookie(array $extra = []): string
+    {
+        return $this->jwtParser->create([
+            'profile_id'       => $this->profileId,
+            'active_tenant_id' => $this->tenantId,
+            'email'            => 'alice@acme.test',
+            'role'             => 'admin',
+            'token_epoch'      => 0,
+        ] + $extra, 900, 'access');
+    }
+
+    /** A link flow whose provider account is a DIFFERENT address from the core account. */
+    private function primeLinkFlow(string $sub = 'wid-sub-1', ?int $linkProfileId = null): void
+    {
+        $this->primeFlow(sub: $sub, email: 'amro@personal.test');
+        $flow = $this->jwtParser->parse($_COOKIE['sso_flow_token']);
+        self::assertIsArray($flow);
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+            'state' => 'state-1', 'nonce' => 'nonce-1', 'code_verifier' => 'verifier-1',
+            'provider_id' => $this->providerId, 'tenant_id' => 0, 'provider_key' => 'google',
+            'link_profile_id' => $linkProfileId ?? $this->profileId,
+        ], 600, 'oidc_flow');
+        $_COOKIE['access_token'] = $this->sessionCookie();
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+    }
+
+    public function testLinkingStartsOnlyFromASessionAndAlwaysUsesTheOperatorsProvider(): void
+    {
+        $handler = $this->linkHandler();
+        $_GET = ['link' => '1'];
+        $refused = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        self::assertStringContainsString('/settings/security?identity_link=sign_in_first', $this->location($refused));
+
+        $_COOKIE = ['access_token' => $this->sessionCookie()];
+        $_GET = ['link' => '1'];
+        $res = $handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        self::assertStringStartsWith('https://accounts.google.com/o/oauth2/v2/auth', $this->location($res));
+        self::assertStringContainsString('prompt=login', $this->location($res));
+    }
+
+    public function testASessionConfinedByAWorkspaceProviderCannotLink(): void
+    {
+        $_COOKIE = ['access_token' => $this->sessionCookie([\Whity\Auth\TenantConfinement::CLAIM => $this->tenantId])];
+        $_GET = ['link' => '1'];
+        $res = $this->linkHandler()->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('identity_link=sign_in_first', $this->location($res));
+    }
+
+    public function testLinkingAttachesTheProviderAccountWhateverItsAddressAndIsAudited(): void
+    {
+        $this->primeLinkFlow();
+        $res = $this->linkHandler()->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('/settings/security?identity_link=linked', $this->location($res));
+        $link = (new ExternalIdentityRepository($this->pdo))->findGlobalByIssuerSubject(self::ISSUER, 'wid-sub-1');
+        self::assertNotNull($link);
+        self::assertSame($this->profileId, (int) $link['profile_id']);
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.identity.linked'"));
+        self::assertArrayNotHasKey('user', json_decode($res->getBody(), true) ?? [], 'no session is minted');
+    }
+
+    public function testAProviderAccountLinkedToSomebodyElseIsRefused(): void
+    {
+        $this->exec("INSERT INTO profiles (display_name, password_hash, two_factor_enabled, token_epoch, created_at, updated_at)
+            VALUES ('Awss Haddad', '', false, 0, NOW(), NOW())");
+        $other = (int) $this->pdo->lastInsertId();
+        (new ExternalIdentityRepository($this->pdo))->link($other, 'google', self::ISSUER, 'wid-sub-1', 'awss@acme.test');
+
+        $this->primeLinkFlow();
+        $res = $this->linkHandler()->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('identity_link=taken', $this->location($res));
+        self::assertSame(0, (int) $this->col("SELECT COUNT(*) FROM external_identities WHERE profile_id = {$this->profileId}"));
+    }
+
+    public function testTheCallbackRefusesWhenTheSessionIsNoLongerThePersonWhoStarted(): void
+    {
+        $this->primeLinkFlow(linkProfileId: $this->profileId + 999);
+        $res = $this->linkHandler()->callback(new Request('GET', '/api/v1/auth/sso/google/callback', [], ''), ['provider' => 'google']);
+
+        self::assertStringContainsString('identity_link=failed', $this->location($res));
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM external_identities'));
     }
 
     // ── headless frontend (WHIT-693) ──────────────────────────────────────────
@@ -948,6 +1257,224 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
         self::assertNull($this->phoneOf($this->profileId));
     }
+    private const NATIVE_VERIFIER = 'native-verifier-0123456789abcdefghijklmnopqrstuvwxyz-ABCDEF';
+
+    /** @return array{port: int, challenge: string, state: string} */
+    private function nativeTarget(): array
+    {
+        return ['port' => 43127, 'challenge' => \Whity\Auth\NativeSignInCodes::challengeFor(self::NATIVE_VERIFIER), 'state' => 'app-state-12345678'];
+    }
+
+    private function primeNativeFlow(): void
+    {
+        $this->primeFlow();
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+            'state' => 'state-1',
+            'nonce' => 'nonce-1',
+            'code_verifier' => 'verifier-1',
+            'provider_id' => $this->providerId,
+            'tenant_id' => 0,
+            'provider_key' => 'google',
+            'native_port' => 43127,
+            'native_challenge' => $this->nativeTarget()['challenge'],
+            'native_state' => $this->nativeTarget()['state'],
+        ], 600, 'oidc_flow');
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+    }
+
+    /** @return array<string, string> */
+    private function loopbackQuery(\Whity\Sdk\Http\Response $res): array
+    {
+        $loc = $this->location($res);
+        self::assertStringStartsWith('http://127.0.0.1:43127/callback?', $loc, 'only ever to the loopback port the app named');
+        parse_str((string) parse_url($loc, PHP_URL_QUERY), $query);
+        /** @var array<string, string> $query */
+        return $query;
+    }
+
+    /** @param array<string, string> $headers */
+    private function exchange(string $code, string $verifier = self::NATIVE_VERIFIER, array $headers = ['X-Auth-Mode' => 'token']): \Whity\Sdk\Http\Response
+    {
+        return $this->handler->exchange(new Request(
+            'POST',
+            '/api/v1/auth/sso/native/exchange',
+            $headers,
+            (string) json_encode(['code' => $code, 'code_verifier' => $verifier]),
+        ));
+    }
+
+    public function testNativeStartCarriesTheReturnInsideTheFlowCookie(): void
+    {
+        $target = $this->nativeTarget();
+        $_GET = ['mode' => 'native', 'port' => (string) $target['port'], 'code_challenge' => $target['challenge'], 'state' => $target['state']];
+        $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+
+        // The flow cookie is sent as a header, which this harness can't read; the
+        // callback tests build the same flow and prove what the claims do.
+        self::assertSame(302, $res->getStatusCode());
+        $loc = $this->location($res);
+        self::assertStringStartsWith('https://accounts.google.com/', $loc);
+        self::assertStringContainsString('code_challenge_method=S256', $loc);
+        self::assertStringNotContainsString($target['state'], $loc, "the app's state is not the provider's state");
+        self::assertStringNotContainsString($target['challenge'], $loc, "the app's challenge is not the provider's challenge");
+        self::assertStringNotContainsString('43127', $loc, 'the loopback port stays inside the signed flow cookie');
+    }
+
+    public function testNativeStartRefusesAnythingButALoopbackPortAChallengeAndAState(): void
+    {
+        $target = $this->nativeTarget();
+        $cases = [
+            'privileged port' => ['port' => '80'],
+            'port too high' => ['port' => '70000'],
+            'not a port' => ['port' => 'abc'],
+            'no challenge' => ['code_challenge' => ''],
+            'short challenge' => ['code_challenge' => 'abc'],
+            'no state' => ['state' => ''],
+        ];
+        foreach ($cases as $label => $override) {
+            $_GET = ['mode' => 'native', 'port' => (string) $target['port'], 'code_challenge' => $target['challenge'], 'state' => $target['state']] + [];
+            foreach ($override as $k => $v) {
+                $_GET[$k] = $v;
+            }
+            $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+            self::assertStringContainsString('sso_error=native_invalid', $this->location($res), $label);
+            self::assertArrayNotHasKey('sso_flow_token', $_COOKIE, $label . ': no flow starts');
+            $_GET = [];
+            $_COOKIE = [];
+        }
+
+        // Native never rides with a join, a form, a link, an invitation or a reauth.
+        $_GET = ['mode' => 'native', 'port' => '43127', 'code_challenge' => $target['challenge'], 'state' => $target['state'], 'invite' => 'tok'];
+        $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        self::assertStringContainsString('sso_error=native_unavailable', $this->location($res));
+    }
+
+    public function testNativeCallbackSendsAOneTimeCodeToTheLoopbackAndSetsNoSession(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+
+        $res = $this->runCallback();
+
+        self::assertSame(302, $res->getStatusCode());
+        $query = $this->loopbackQuery($res);
+        self::assertSame('app-state-12345678', $query['state']);
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{43}$/', $query['code']);
+        self::assertArrayNotHasKey('access_token', $_COOKIE, 'the browser gets no session');
+        self::assertArrayNotHasKey('refresh_token', $_COOKIE);
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'));
+        self::assertSame(0, (int) $this->col("SELECT COUNT(*) FROM native_sign_in_codes WHERE code_hash = " . $this->pdo->quote($query['code'])), 'only the hash is stored');
+    }
+
+    public function testTheCodeExchangesOnceForATokenModeSessionAndNeverAgain(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        $res = $this->exchange($code);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        $body = json_decode($res->getBody(), true);
+        self::assertSame('Bearer', $body['token_type']);
+        self::assertNotEmpty($body['access_token']);
+        self::assertNotEmpty($body['refresh_token']);
+        self::assertSame('alice@acme.test', $body['user']['email']);
+        self::assertSame($this->tenantId, $body['user']['tenant_id']);
+        self::assertArrayNotHasKey('access_token', $_COOKIE, 'token mode sets no cookie');
+        $claims = $this->jwtParser->parse($body['access_token']);
+        self::assertNotNull($claims);
+        self::assertSame($this->profileId, $claims['profile_id']);
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'spent');
+
+        // Replay.
+        $again = $this->exchange($code);
+        self::assertSame(401, $again->getStatusCode());
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.native.exchange_refused'"));
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.native.exchanged'"));
+    }
+
+    public function testAWrongVerifierSpendsTheCodeAndGetsNothing(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        $wrong = $this->exchange($code, 'another-verifier-0123456789abcdefghijklmnopqrstuvwxyz');
+        self::assertSame(401, $wrong->getStatusCode());
+        self::assertStringNotContainsString('access_token', $wrong->getBody());
+
+        // The right verifier is too late now: one attempt spends the code.
+        self::assertSame(401, $this->exchange($code)->getStatusCode());
+        self::assertSame(
+            'wrong_verifier',
+            json_decode((string) $this->col("SELECT metadata FROM audit_log WHERE action = 'auth.native.exchange_refused' ORDER BY id ASC LIMIT 1"), true)['reason'] ?? null,
+        );
+    }
+
+    public function testAnExpiredCodeIsRefused(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        $this->now += SsoAuthHandler::NATIVE_CODE_TTL + 1;
+        $res = $this->exchange($code);
+        self::assertSame(401, $res->getStatusCode());
+        self::assertSame(
+            'expired',
+            json_decode((string) $this->col("SELECT metadata FROM audit_log WHERE action = 'auth.native.exchange_refused' ORDER BY id DESC LIMIT 1"), true)['reason'] ?? null,
+        );
+    }
+
+    public function testTheExchangeIsTokenModeOnlyAndChecksItsInput(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        self::assertSame(400, $this->exchange($code, self::NATIVE_VERIFIER, [])->getStatusCode(), 'no X-Auth-Mode: token');
+        self::assertSame(400, $this->exchange('short', self::NATIVE_VERIFIER)->getStatusCode());
+        self::assertSame(400, $this->exchange($code, 'short')->getStatusCode());
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'a refused shape spends nothing');
+        self::assertSame(200, $this->exchange($code)->getStatusCode());
+    }
+
+    public function testAProviderErrorOnANativeFlowGoesBackToTheLoopback(): void
+    {
+        $this->primeNativeFlow();
+        $_GET = ['error' => 'access_denied', 'state' => 'state-1'];
+
+        $query = $this->loopbackQuery($this->runCallback());
+        self::assertSame('denied', $query['error']);
+        self::assertSame('app-state-12345678', $query['state']);
+        self::assertArrayNotHasKey('code', $query);
+    }
+
+
+    public function testExpiredCodesAreSweptOnTheNextExchangeAndByTheCleanupJob(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $stale = $this->loopbackQuery($this->runCallback())['code'];
+        $this->now += SsoAuthHandler::NATIVE_CODE_TTL + 1;
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the expired row waits for a sweep');
+
+        // Another exchange sweeps it, whatever that exchange's own outcome.
+        self::assertSame(401, $this->exchange(str_repeat('x', 43))->getStatusCode());
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'));
+        self::assertSame(401, $this->exchange($stale)->getStatusCode(), 'and it cannot be used afterwards');
+
+        // The daily job covers an instance nobody exchanges on. It runs on the
+        // real clock, so these rows are dated against it.
+        $codes = new \Whity\Auth\NativeSignInCodes($this->pdo);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', 60);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', -1);
+        ob_start();
+        (new \Whity\Commands\RevokedTokensCleanupCommand($this->pdo))->execute();
+        $output = (string) ob_get_clean();
+        self::assertStringContainsString('Cleaned 1 expired native sign-in codes', $output);
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the live one stays');
+    }
 }
 
 /**
@@ -969,4 +1496,7 @@ final class StubOidcHttp implements HttpClient
     {
         return $this->tokenResponse;
     }
+
+    // ── native sign-in return (WHIT-1406) ────────────────────────────────────
+
 }

@@ -36,6 +36,9 @@ use Whity\Sdk\Mcp\McpToolContext;
  *   logged against the plugin.
  *
  * Refused entries are logged and skipped; the plugin keeps loading.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginMcpResourcesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginMcpResourcesInterface
 {

@@ -15,6 +15,9 @@ use Whity\Sdk\Calendar\BusyInterval;
  * before a booking is written. Answer quickly (cache; core logs any answer
  * slower than 1.5 seconds). A throw is logged and treated as "not busy", so
  * a provider that is down never stops bookings.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginCalendarBusyInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginCalendarBusyInterface
 {

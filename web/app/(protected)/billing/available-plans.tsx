@@ -8,8 +8,9 @@ import { useCapabilities } from '@/hooks/useCapabilities';
 import { BILLING_PAY } from '@/lib/capabilities';
 import { Button } from '@whity/ui/button';
 import { useTranslation } from '@whity/features/i18n';
-import { formatMoney } from '@whity/ui/money/currency';
 import { navigateExternal } from '@/lib/external-navigate';
+import { localizePlanCards, offersYearly, planCards, type BillingPeriod, type EntitlementValue } from '@/lib/billing/plan-cards';
+import { PeriodSwitch, PlanCardGrid } from './plan-card-grid';
 
 /**
  * WHAT THIS TENANT CAN BUY, AND THE BUTTON THAT BUYS IT.
@@ -41,6 +42,7 @@ interface PurchasablePlan {
   billing_period: string;
   is_per_seat: boolean;
   is_per_device: boolean;
+  entitlements?: Record<string, EntitlementValue>;
 }
 
 /**
@@ -58,6 +60,7 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
   const { hasPermission } = useCapabilities();
   const t = useTranslation('admin');
   const [starting, setStarting] = useState<string | null>(null);
+  const [period, setPeriod] = useState<BillingPeriod>('month');
 
   const canPay = hasPermission(BILLING_PAY);
 
@@ -114,84 +117,71 @@ export function AvailablePlans({ kind }: { kind: PlanKind }) {
     }
   };
 
-  const periodLabel = (plan: PurchasablePlan): string => {
-    const per = plan.billing_period === 'year'
-      ? t('billing.plans.perYear', 'per year')
-      : plan.billing_period === 'half_year'
-        ? t('billing.plans.perHalfYear', 'every 6 months')
-        : t('billing.plans.perMonth', 'per month');
-
-    if (plan.is_per_seat) {
-      return `${per} · ${t('billing.plans.perSeat', 'per seat')}`;
-    }
-    if (plan.is_per_device) {
-      return `${per} · ${t('billing.plans.perDevice', 'per device')}`;
-    }
-    return per;
-  };
+  const cards = localizePlanCards(planCards(plans, offersYearly(plans) ? period : 'month'), t);
+  // A workspace already on a plan without a paid subscription (Free) is not
+  // locked, and choosing the plan it is on does nothing (WHIT-1398). It is
+  // offered an upgrade instead, and its own card has no button.
+  const current = kind === 'tier' ? cards.find((card) => card.is_current) : undefined;
 
   return (
-    <section className="space-y-3" data-testid="available-plans">
-      <div>
-        <h2 className="text-base font-medium">
-          {kind === 'addon'
-            ? t('billing.plans.addons.title', 'Add-ons')
-            : t('billing.plans.title', 'Activate your workspace')}
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          {kind === 'addon'
-            ? t(
-                'billing.plans.addons.description',
-                'Bought alongside your plan. Devices are billed for each unit in service.'
-              )
-            : t(
-                'billing.plans.description',
-                'Choose a plan to activate this workspace. Everything else stays locked until then.'
-              )}
-        </p>
+    <section className="space-y-4" data-testid="available-plans">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h2 className="text-base font-medium">
+            {kind === 'addon'
+              ? t('billing.plans.addons.title', 'Add-ons')
+              : current !== undefined
+                ? t('billing.plans.upgradeTitle', 'Upgrade your workspace')
+                : t('billing.plans.title', 'Activate your workspace')}
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            {kind === 'addon'
+              ? t(
+                  'billing.plans.addons.description',
+                  'Bought alongside your plan. Devices are billed for each unit in service.'
+                )
+              : current !== undefined
+                ? t(
+                    'billing.plans.upgradeDescription',
+                    'You are on {plan}. Choose a plan for more staff, customers and features.',
+                    { plan: current.name }
+                  )
+                : t(
+                    'billing.plans.description',
+                    'Choose a plan to activate this workspace. Everything else stays locked until then.'
+                  )}
+          </p>
+        </div>
+        {offersYearly(plans) && <PeriodSwitch period={period} onChange={setPeriod} />}
       </div>
 
-      <ul className="grid gap-3 sm:grid-cols-2">
-        {plans.map((plan) => (
-          <li
-            key={`${plan.plan_key}:${plan.billing_period}`}
-            className="flex flex-col gap-3 rounded-lg border p-4"
+      <PlanCardGrid
+        cards={cards}
+        action={(card) => card.is_current ? null : (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => void subscribe(card.plan_key, card.price.billing_period)}
+            disabled={!canPay || starting !== null}
+            data-testid={`subscribe-${card.plan_key}`}
           >
-            <div>
-              <p className="font-medium">{plan.name}</p>
-              {plan.description !== null && (
-                <p className="text-sm text-muted-foreground">{plan.description}</p>
-              )}
-            </div>
-            <p className="text-sm">
-              <span className="font-medium">
-                {formatMoney(plan.unit_amount, plan.currency)}
-              </span>
-              <span className="ms-1 text-muted-foreground">{periodLabel(plan)}</span>
-            </p>
-            <Button
-              onClick={() => void subscribe(plan.plan_key, plan.billing_period)}
-              disabled={!canPay || starting !== null}
-              data-testid={`subscribe-${plan.plan_key}`}
-            >
-              {starting === plan.plan_key
-                ? t('billing.plans.starting', 'Opening checkout…')
-                : t('billing.plans.subscribe', 'Subscribe')}
-            </Button>
-            {/* Said plainly rather than by a disabled button with no
-                explanation: someone without the permission needs to know who to
-                ask, not to wonder whether the page is broken. */}
-            {!canPay && (
-              <p className="text-xs text-muted-foreground">
-                {t(
-                  'billing.plans.needsPermission',
-                  'You do not have permission to pay. Ask a workspace administrator.'
-                )}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
+            {starting === card.plan_key
+              ? t('billing.plans.starting', 'Opening checkout…')
+              : t('billing.plans.choose', 'Choose {plan}', { plan: card.name })}
+          </Button>
+        )}
+      />
+
+      {/* Said plainly rather than by a disabled button with no explanation:
+          someone without the permission needs to know who to ask. */}
+      {!canPay && (
+        <p className="text-sm text-muted-foreground">
+          {t(
+            'billing.plans.needsPermission',
+            'You do not have permission to pay. Ask a workspace administrator.'
+          )}
+        </p>
+      )}
     </section>
   );
 }

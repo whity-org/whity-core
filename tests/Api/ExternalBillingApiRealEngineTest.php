@@ -418,6 +418,24 @@ final class ExternalBillingApiRealEngineTest extends TestCase
         self::assertSame(SubscriptionService::STATUS_ACTIVE, $this->statusOf(self::TENANT));
     }
 
+    /**
+     * WHIT-1397: the Billing page showed "Plan enterprise", the billing
+     * service's key. The return answer carries the name the cards show.
+     */
+    public function testTheReturnNamesThePlanAsTheCardsDo(): void
+    {
+        $this->portal->access = new AccessSnapshot('tenant-1', true, 'pro', 'active', '2026-10-12T00:00:00+00:00');
+
+        $data = $this->json($this->handler->returnFrom($this->asTenant('GET', '/api/v1/billing/return')));
+
+        self::assertSame('pro', $data['plan']);
+        self::assertSame('Pro', $data['plan_name']);
+
+        $this->portal->access = new AccessSnapshot('tenant-1', true, 'gone', 'active', '2026-10-12T00:00:00+00:00');
+        $data = $this->json($this->handler->returnFrom($this->asTenant('GET', '/api/v1/billing/return')));
+        self::assertNull($data['plan_name']);
+    }
+
     // ── sending someone to pay ──────────────────────────────────────────────
 
     public function testCheckoutReturnsADestinationAndNeverTheReference(): void
@@ -551,6 +569,49 @@ final class ExternalBillingApiRealEngineTest extends TestCase
 
         self::assertFalse($byKey['pro'] ?? null, 'a tier is not an add-on');
         self::assertTrue($byKey['devices'] ?? null, 'devices are an add-on');
+    }
+
+    /**
+     * WHITY IS SOLD IN THE INSTANCE'S CURRENCY, NOT THE WORKSPACE'S. A
+     * workspace's own `billing.default_currency` is what it charges its
+     * customers in; reading it here hid every plan from a workspace whose
+     * currency the instance does not sell in (a JOD workspace on a USD install).
+     */
+    public function testThePlanlistUsesTheInstanceCurrencyNotTheWorkspaces(): void
+    {
+        $this->pdo->exec("INSERT INTO tenant_settings (tenant_id, setting_key, value, updated_at)
+                          VALUES (1, 'billing.default_currency', 'USD', CURRENT_TIMESTAMP)");
+
+        $response = $this->handler->plans($this->asTenant('GET', '/api/v1/billing/plans'));
+
+        self::assertSame(200, $response->getStatusCode());
+        $rows = json_decode((string) $response->getBody(), true)['data'];
+        $keys = array_column($rows, 'plan_key');
+        self::assertContains('pro', $keys, 'the instance sells in JOD, whatever the workspace bills its customers in');
+        self::assertSame(['JOD'], array_values(array_unique(array_column($rows, 'currency'))));
+    }
+
+    /**
+     * EACH PLAN SAYS WHAT IT COMES WITH, so the cards can list it: numbers as
+     * numbers (-1 unlimited), switches as booleans, and a plan with none as an
+     * empty object rather than an empty list.
+     */
+    public function testThePlanlistCarriesEachPlansEntitlementsTyped(): void
+    {
+        $this->pdo->exec("INSERT INTO plan_entitlements (plan_id, entitlement_key, value) VALUES
+                          (1, 'members.max', '25'), (1, 'customers.per_month', '-1'),
+                          (1, 'brand.remove_badge', 'true'), (1, 'note', 'ask us')");
+
+        $response = $this->handler->plans($this->asTenant('GET', '/api/v1/billing/plans'));
+
+        self::assertSame(200, $response->getStatusCode());
+        $body = (string) $response->getBody();
+        $rows = array_column(json_decode($body, true)['data'], null, 'plan_key');
+        self::assertSame(
+            ['brand.remove_badge' => true, 'customers.per_month' => -1, 'members.max' => 25, 'note' => 'ask us'],
+            $rows['pro']['entitlements']
+        );
+        self::assertStringContainsString('"entitlements":{}', $body, 'a plan with none is still an object');
     }
 
     // ── what they have paid ─────────────────────────────────────────────────

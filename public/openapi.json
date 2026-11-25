@@ -2,7 +2,7 @@
     "openapi": "3.0.0",
     "info": {
         "title": "Whity Core API",
-        "version": "0.2.31",
+        "version": "0.2.32",
         "description": "Request bodies are declared, not implied: where an operation accepts one, it is described here. An operation with no `requestBody` accepts none \u2014 a reviewed contract, not a gap in this document. The exception is an operation marked `x-whity-undocumented: true`: that one carries no authored contract at all, its summary and responses are generated defaults, and it may well take a body. Every CORE operation in the published `public/openapi.json` is authored, so the marker appears there only on plugin routes that declare no schema of their own; a document served live by a running instance may mark core routes too."
     },
     "servers": [
@@ -8153,6 +8153,660 @@
                 ]
             }
         },
+        "/api/v1/accounting/stock": {
+            "get": {
+                "operationId": "get_api_v1_accounting_stock",
+                "summary": "Show stock in the books",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Whether stock posts to the books, since when, what the stock is worth at its moving average cost and what the Stock account says. Minor units.",
+                "responses": {
+                    "200": {
+                        "description": "Stock in the books",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingStockStatus"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "patch": {
+                "operationId": "patch_api_v1_accounting_stock",
+                "summary": "Turn stock in the books on or off",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "On by default. Off stops posting stock; on again brings the Stock account to the stock's value with the next stock change, or at once with `/stock/opening`.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingStockSwitch"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Stock in the books",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/AccountingStockStatus"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/stock/costs": {
+            "post": {
+                "operationId": "post_api_v1_accounting_stock_costs",
+                "summary": "Give stock with no cost its cost",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "For an item on hand whose cost is unknown (no purchase price and no priced receipt): sets the cost of one base unit, in the workspace's currency, and posts the stock's value against Opening balances so the Stock account takes it in.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingStockCost"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The cost given",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "variant_id": {
+                                                    "type": "integer"
+                                                },
+                                                "value_minor": {
+                                                    "type": "integer",
+                                                    "description": "What the stock on hand is now worth."
+                                                },
+                                                "entry_id": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                }
+                                            },
+                                            "required": [
+                                                "variant_id",
+                                                "value_minor"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/stock/opening": {
+            "post": {
+                "operationId": "post_api_v1_accounting_stock_opening",
+                "summary": "Bring stock into the books now",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Values all stock at its current cost and posts what the Stock account lacks against Opening balances, once. Otherwise it happens with the first stock change.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/AccountingStockOpening"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "What was posted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "posted": {
+                                                    "type": "boolean"
+                                                },
+                                                "entry_id": {
+                                                    "type": "integer",
+                                                    "nullable": true
+                                                },
+                                                "amount_minor": {
+                                                    "type": "integer",
+                                                    "description": "What the Stock account was brought up (or down) by."
+                                                },
+                                                "unknown": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "integer"
+                                                    },
+                                                    "description": "Variants with no cost yet, not valued."
+                                                }
+                                            },
+                                            "required": [
+                                                "posted",
+                                                "amount_minor",
+                                                "unknown"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Refused: a duplicate code, a closed month, or already done",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A value that doesn't look right",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/accounting/stock/waiting": {
+            "get": {
+                "operationId": "get_api_v1_accounting_stock_waiting",
+                "summary": "Stock waiting for a cost",
+                "tags": [
+                    "accounting"
+                ],
+                "description": "Items on hand whose cost is unknown, so they are not in the Stock account, and moves since stock went into the books that posted nothing for want of a cost.",
+                "responses": {
+                    "200": {
+                        "description": "Waiting",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "items": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "variant_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "item_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "item_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "quantity": {
+                                                                "type": "integer",
+                                                                "description": "In the unit's smallest steps."
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "variant_id",
+                                                            "item_id",
+                                                            "item_name",
+                                                            "quantity"
+                                                        ]
+                                                    }
+                                                },
+                                                "moves": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "move_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "variant_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "item_name": {
+                                                                "type": "string"
+                                                            },
+                                                            "quantity": {
+                                                                "type": "integer"
+                                                            },
+                                                            "source_type": {
+                                                                "type": "string"
+                                                            },
+                                                            "source_id": {
+                                                                "type": "integer",
+                                                                "nullable": true
+                                                            },
+                                                            "occurred_at": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "move_id",
+                                                            "variant_id",
+                                                            "item_name",
+                                                            "quantity"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "items",
+                                                "moves"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/accounting/suppliers/{id}/statement": {
             "get": {
                 "operationId": "get_api_v1_accounting_suppliers_id_statement",
@@ -12031,6 +12685,87 @@
                 }
             }
         },
+        "/api/v1/auth/operator-link": {
+            "post": {
+                "operationId": "post_api_v1_auth_operator_link",
+                "summary": "Sign a platform operator in with a one-time link printed on the server",
+                "tags": [
+                    "auth"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/OperatorLinkRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Session issued in the system workspace; next is the page to open",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/OperatorLinkResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "410": {
+                        "description": "The link expired, was already used, or is not for a platform operator",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/password/forgot": {
             "post": {
                 "operationId": "post_api_v1_auth_password_forgot",
@@ -12393,6 +13128,98 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/sso/native/exchange": {
+            "post": {
+                "operationId": "post_api_v1_auth_sso_native_exchange",
+                "summary": "Exchange a native sign-in code for a token-mode session",
+                "tags": [
+                    "sso"
+                ],
+                "description": "Send `X-Auth-Mode: token`. Answers like `POST /api/login` in token mode: tokens, or `requires_tenant_selection` with the memberships and a `selection_token` for `POST /api/auth/select-tenant`. An unknown, expired or replayed code, or a wrong verifier, is a generic 401; the code is spent either way.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NativeSignInExchangeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Session issued, or a workspace to choose",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LoginResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Not token mode, or code and code_verifier missing or malformed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or expired code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts from this address",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -13892,6 +14719,78 @@
                         "bearerAuth": []
                     }
                 ]
+            }
+        },
+        "/api/v1/billing/pause": {
+            "get": {
+                "operationId": "get_api_v1_billing_pause",
+                "summary": "Whether this workspace is paused because its plan lapsed, and who its owners are",
+                "tags": [
+                    "billing"
+                ],
+                "description": "For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.",
+                "responses": {
+                    "200": {
+                        "description": "Whether this workspace is paused",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/WorkspacePauseResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
             }
         },
         "/api/v1/billing/plans": {
@@ -77037,7 +77936,7 @@
                         }
                     },
                     "409": {
-                        "description": "That time was just taken",
+                        "description": "That time was just taken, or this booking was already sent (`already_sent`)",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -77615,6 +78514,104 @@
                     },
                     "422": {
                         "description": "Already cancelled",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/bookings/{token}/coming": {
+            "post": {
+                "operationId": "post_api_v1_public_bookings_token_coming",
+                "summary": "The customer says they are coming (public, WHIT-1417); pressing it again changes nothing",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The 64-character token from the customer's email."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Noted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This link is invalid or has expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The booking is not confirmed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -100643,6 +101640,225 @@
                 ]
             }
         },
+        "/api/v1/workspace/templates/{key}/items/{part}/{item}/adopt": {
+            "post": {
+                "operationId": "post_api_v1_workspace_templates_key_items_part_item_adopt",
+                "summary": "Use the template's version of one item",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template's labels and its missing questions; a role gets the template's missing permissions the caller holds; a document gets a new copy beside the workspace's; a pipeline (SDK 1.172) gets a new review route, and its form moves to it only while the form still uses the route the template made.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "part",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "add when it was changed, keep when it already matched, skip with why",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdoptWorkspaceTemplateItemResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "There is no such template",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/workspace/templates/{key}/preview": {
+            "post": {
+                "operationId": "post_api_v1_workspace_templates_key_preview",
+                "summary": "Preview what applying a workspace template would do",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "Runs the same engine as apply with the same body, as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed. Each item says add, keep (already there), done (an earlier run made it, so it is not made again), left (not ticked) or skip and why.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "description": "The template's key (bakery)",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/ApplyWorkspaceTemplateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What applying would make, keep and skip",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PreviewWorkspaceTemplateResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "There is no such template",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/workspace/templates/{key}/setup/current/{kind}": {
             "get": {
                 "operationId": "get_api_v1_workspace_templates_key_setup_current_kind",
@@ -103709,6 +104925,85 @@
                     "next"
                 ]
             },
+            "AccountingStockCost": {
+                "type": "object",
+                "properties": {
+                    "variant_id": {
+                        "type": "integer",
+                        "description": "The item variant whose stock has no cost yet (from Stock waiting for a cost)."
+                    },
+                    "unit_cost_minor": {
+                        "type": "integer",
+                        "description": "The cost of one base unit (a kilogram, a piece), in minor units of the workspace's currency."
+                    },
+                    "date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD, in an open month. Default: today."
+                    }
+                },
+                "required": [
+                    "variant_id",
+                    "unit_cost_minor"
+                ]
+            },
+            "AccountingStockOpening": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "YYYY-MM-DD, in an open month. Default: today."
+                    }
+                }
+            },
+            "AccountingStockStatus": {
+                "type": "object",
+                "properties": {
+                    "stock_in_books": {
+                        "type": "boolean"
+                    },
+                    "since": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When stock first posted to the books since it was last turned on."
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "stock_value_minor": {
+                        "type": "integer",
+                        "description": "The stock's value at its moving average cost."
+                    },
+                    "stock_account_minor": {
+                        "type": "integer",
+                        "description": "What the Stock account says."
+                    },
+                    "items_without_cost": {
+                        "type": "integer"
+                    },
+                    "waiting": {
+                        "type": "integer",
+                        "description": "Stock changes that posted nothing for want of a cost."
+                    }
+                },
+                "required": [
+                    "stock_in_books",
+                    "currency",
+                    "stock_value_minor",
+                    "stock_account_minor"
+                ]
+            },
+            "AccountingStockSwitch": {
+                "type": "object",
+                "properties": {
+                    "stock_in_books": {
+                        "type": "boolean",
+                        "description": "Whether stock posts to the books."
+                    }
+                },
+                "required": [
+                    "stock_in_books"
+                ]
+            },
             "AccountingTaxCode": {
                 "type": "object",
                 "properties": {
@@ -104243,6 +105538,45 @@
                 },
                 "required": [
                     "stats"
+                ]
+            },
+            "AdoptWorkspaceTemplateItemResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "template": {
+                                "type": "string"
+                            },
+                            "part": {
+                                "type": "string"
+                            },
+                            "key": {
+                                "type": "string"
+                            },
+                            "action": {
+                                "type": "string",
+                                "enum": [
+                                    "add",
+                                    "keep",
+                                    "skip"
+                                ]
+                            },
+                            "reason": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "template",
+                            "part",
+                            "key",
+                            "action"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "Affiliate": {
@@ -105909,6 +107243,13 @@
                                         "reason"
                                     ]
                                 }
+                            },
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WorkspaceTemplateItem"
+                                },
+                                "description": "Each item of the template and what happened to it (SDK 1.169)"
                             }
                         },
                         "required": [
@@ -106523,6 +107864,10 @@
                                 "type": "string",
                                 "nullable": true
                             },
+                            "plan_name": {
+                                "type": "string",
+                                "nullable": true
+                            },
                             "access_until": {
                                 "type": "string",
                                 "nullable": true
@@ -107050,7 +108395,20 @@
                     },
                     "reminder_sent_at": {
                         "type": "string",
-                        "nullable": true
+                        "nullable": true,
+                        "description": "When the last reminder went."
+                    },
+                    "confirmed_by_customer_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When the customer pressed I'm coming (WHIT-1417)."
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBookingReminder"
+                        },
+                        "description": "Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14)."
                     },
                     "room_name": {
                         "type": "object",
@@ -107261,6 +108619,38 @@
                 },
                 "required": [
                     "starts_at"
+                ]
+            },
+            "CalendarBookingReminder": {
+                "type": "object",
+                "properties": {
+                    "hours_before": {
+                        "type": "integer",
+                        "description": "Which reminder: this many hours before the start."
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "`email`, or the text channel's key (such as `whatsapp`)."
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "enum": [
+                            "sent",
+                            "failed",
+                            "no_address"
+                        ],
+                        "description": "`no_address`: the booking has no email, or no phone for a text channel."
+                    },
+                    "sent_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "hours_before",
+                    "channel",
+                    "outcome",
+                    "sent_at"
                 ]
             },
             "CalendarBookingServiceChoice": {
@@ -108147,7 +109537,14 @@
                     },
                     "reminder_hours_before": {
                         "type": "integer",
-                        "description": "0 means no reminder."
+                        "description": "The first reminder's hours before; 0 means none. Kept for older clients: `reminders` lists them all."
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Every reminder, as hours before the start, largest first; empty means none (WHIT-1417)."
                     },
                     "payment_hold_minutes": {
                         "type": "integer"
@@ -108219,7 +109616,17 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 168,
-                        "description": "Send one reminder this many hours before; 0 sends none."
+                        "description": "Older clients: one reminder this many hours before; 0 sends none. Replaces `reminders`."
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "maxItems": 3,
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 168
+                        },
+                        "description": "Up to three reminders, as hours before the start, all different; empty sends none (WHIT-1417)."
                     },
                     "payment_hold_minutes": {
                         "type": "integer",
@@ -113550,11 +114957,20 @@
                             "fix": {
                                 "type": "string",
                                 "nullable": true
+                            },
+                            "code": {
+                                "type": "string"
+                            },
+                            "route_id": {
+                                "type": "integer",
+                                "nullable": true
                             }
                         },
                         "required": [
                             "reason",
-                            "fix"
+                            "fix",
+                            "code",
+                            "route_id"
                         ]
                     },
                     "signatures": {
@@ -128626,6 +130042,21 @@
                     "data"
                 ]
             },
+            "NativeSignInExchangeRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "code_verifier": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "code_verifier"
+                ]
+            },
             "NavigationItem": {
                 "type": "object",
                 "properties": {
@@ -129001,6 +130432,69 @@
             "OpenApiDocumentResponse": {
                 "type": "object",
                 "additionalProperties": true
+            },
+            "OperatorLinkRequest": {
+                "type": "object",
+                "properties": {
+                    "token": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "token"
+                ]
+            },
+            "OperatorLinkResponse": {
+                "type": "object",
+                "properties": {
+                    "user": {
+                        "type": "object",
+                        "properties": {
+                            "id": {
+                                "type": "integer"
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "phone": {
+                                "type": "string",
+                                "nullable": true,
+                                "description": "Your own phone number in E.164, or null (WHIT-1181)."
+                            },
+                            "role": {
+                                "type": "string"
+                            },
+                            "tenant_id": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "id",
+                            "email",
+                            "role",
+                            "tenant_id"
+                        ]
+                    },
+                    "next": {
+                        "type": "string"
+                    },
+                    "access_token": {
+                        "type": "string"
+                    },
+                    "refresh_token": {
+                        "type": "string"
+                    },
+                    "token_type": {
+                        "type": "string"
+                    },
+                    "expires_in": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "user",
+                    "next"
+                ]
             },
             "OrganizationalUnit": {
                 "type": "object",
@@ -131713,6 +133207,74 @@
                     "data"
                 ]
             },
+            "PreviewWorkspaceTemplateResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "template": {
+                                "type": "string"
+                            },
+                            "version": {
+                                "type": "integer",
+                                "description": "The version on offer"
+                            },
+                            "appliedVersion": {
+                                "type": "integer",
+                                "nullable": true,
+                                "description": "The version this workspace applied last, or null when it never applied it"
+                            },
+                            "made": {
+                                "type": "object",
+                                "additionalProperties": {
+                                    "type": "integer"
+                                },
+                                "description": "How many of each part would be made"
+                            },
+                            "skipped": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "part": {
+                                            "type": "string"
+                                        },
+                                        "key": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "part",
+                                        "key",
+                                        "reason"
+                                    ]
+                                }
+                            },
+                            "items": {
+                                "type": "array",
+                                "items": {
+                                    "$ref": "#/components/schemas/WorkspaceTemplateItem"
+                                }
+                            }
+                        },
+                        "required": [
+                            "template",
+                            "version",
+                            "appliedVersion",
+                            "made",
+                            "skipped",
+                            "items"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
             "ProfileRelationsResponse": {
                 "type": "object",
                 "properties": {
@@ -131891,6 +133453,10 @@
                     "suggested": {
                         "type": "boolean",
                         "description": "The business suggested this time for the request; the customer can take it."
+                    },
+                    "coming": {
+                        "type": "boolean",
+                        "description": "The customer already said they are coming (WHIT-1417)."
                     },
                     "starts_at": {
                         "type": "string"
@@ -132262,6 +133828,13 @@
                     "bot_token": {
                         "type": "string",
                         "description": "The bot-check token, when the page shows one."
+                    },
+                    "idempotency_key": {
+                        "type": "string",
+                        "minLength": 8,
+                        "maxLength": 64,
+                        "pattern": "^[A-Za-z0-9_-]{8,64}$",
+                        "description": "One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17)."
                     }
                 },
                 "required": [
@@ -133607,6 +135180,22 @@
                     },
                     "is_addon": {
                         "type": "boolean"
+                    },
+                    "entitlements": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "oneOf": [
+                                {
+                                    "type": "boolean"
+                                },
+                                {
+                                    "type": "integer"
+                                },
+                                {
+                                    "type": "string"
+                                }
+                            ]
+                        }
                     }
                 },
                 "required": [
@@ -142634,7 +144223,7 @@
                     "password": {
                         "type": "string",
                         "format": "password",
-                        "minLength": 8,
+                        "minLength": 12,
                         "maxLength": 72,
                         "description": "Initial password; must satisfy the site password policy."
                     },
@@ -143032,7 +144621,7 @@
                     "password": {
                         "type": "string",
                         "format": "password",
-                        "minLength": 8,
+                        "minLength": 12,
                         "maxLength": 72,
                         "description": "New password; must satisfy the site password policy. Refused with 409 when they also belong to another workspace, unless the caller is the system tenant."
                     },
@@ -143786,6 +145375,55 @@
                     "data"
                 ]
             },
+            "WorkspacePauseResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/WorkspacePauseState"
+                            }
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "WorkspacePauseState": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "description": "expired or canceled"
+                    },
+                    "reads_refused": {
+                        "type": "boolean",
+                        "description": "The wall refuses reads too, not only changes"
+                    },
+                    "owners": {
+                        "type": "array",
+                        "description": "The owners who can pay, by name",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "name": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "name"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "status",
+                    "reads_refused",
+                    "owners"
+                ]
+            },
             "WorkspacePlugin": {
                 "type": "object",
                 "properties": {
@@ -144045,6 +145683,11 @@
                     },
                     "chosen": {
                         "type": "boolean"
+                    },
+                    "update": {
+                        "$ref": "#/components/schemas/WorkspaceTemplateUpdate",
+                        "nullable": true,
+                        "description": "What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied"
                     }
                 },
                 "required": [
@@ -144056,6 +145699,39 @@
                     "hasExamples",
                     "hasSetup",
                     "chosen"
+                ]
+            },
+            "WorkspaceTemplateItem": {
+                "type": "object",
+                "properties": {
+                    "part": {
+                        "type": "string",
+                        "description": "settings, theme, calendar, services, roles, forms, documents or examples"
+                    },
+                    "key": {
+                        "type": "string",
+                        "description": "The template's key for the item"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "add",
+                            "keep",
+                            "done",
+                            "changed",
+                            "left",
+                            "skip"
+                        ],
+                        "description": "add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template's version, SDK 1.170); left: not ticked; skip: not done, see reason"
+                    },
+                    "reason": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "part",
+                    "key",
+                    "action"
                 ]
             },
             "WorkspaceTemplateListResponse": {
@@ -144372,6 +146048,69 @@
                 },
                 "required": [
                     "id"
+                ]
+            },
+            "WorkspaceTemplateUpdate": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "type": "integer",
+                        "description": "The template's version this workspace applied last"
+                    },
+                    "to": {
+                        "type": "integer",
+                        "description": "The version on offer"
+                    },
+                    "parts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "description": "template:{key}, extends:{key} or extension:{plugin}.{key}"
+                                },
+                                "from": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "Null for a part this workspace never applied, such as a new extension"
+                                },
+                                "to": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "from",
+                                "to"
+                            ]
+                        }
+                    },
+                    "changes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "version": {
+                                    "type": "integer"
+                                },
+                                "summary": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "version",
+                                "summary"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "from",
+                    "to",
+                    "parts",
+                    "changes"
                 ]
             },
             "WorkspaceTrialResponse": {

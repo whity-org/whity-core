@@ -74,6 +74,7 @@ final class ExternalBillingApiHandler
     }
 
     private ?\Whity\Core\Billing\WorkspaceTrial $workspaceTrial = null;
+    private ?\Whity\Core\Billing\WorkspacePause $workspacePause = null;
 
     // ── the tenant-facing surface ───────────────────────────────────────────
 
@@ -300,6 +301,9 @@ final class ExternalBillingApiHandler
             'has_access' => $snapshot->hasAccess,
             'status' => $snapshot->status,
             'plan' => $snapshot->planCode,
+            // The plan's name as the cards show it (WHIT-1397): the code is
+            // the billing service's key, which people should never read.
+            'plan_name' => $this->planName($snapshot->planCode),
             'access_until' => $snapshot->accessUntil,
             'cancel_at_period_end' => $snapshot->cancelAtPeriodEnd,
             // From the billing service when it could be reached, null otherwise
@@ -887,6 +891,31 @@ final class ExternalBillingApiHandler
         return Response::json(['data' => $state]);
     }
 
+    /** 2026-11-22: whether the workspace is paused because its plan lapsed, and who can pay. */
+    public function useWorkspacePause(\Whity\Core\Billing\WorkspacePause $pause): void
+    {
+        $this->workspacePause = $pause;
+    }
+
+    /**
+     * GET /api/v1/billing/pause — whether this workspace is paused because its
+     * subscription expired or was canceled, and the names of its owners.
+     *
+     * For EVERY member: people who can't pay are shown a plain page that says
+     * the workspace is paused until an owner pays and names the owners. Exempt
+     * from the payment wall with the rest of /billing, so a paused workspace
+     * can always find out why. `data` is null when it is not paused.
+     */
+    public function pause(Request $request): Response
+    {
+        $tenantId = TenantContext::getTenantId();
+        if ($tenantId === null) {
+            return Response::error('Tenant context is required', 403);
+        }
+
+        return Response::json(['data' => $this->workspacePause?->stateFor($tenantId)]);
+    }
+
     private function pluginBridge(): ?SdkBillingPortalBridge
     {
         return $this->portal instanceof ResolvingBillingPortal ? $this->portal->pluginBridge() : null;
@@ -942,6 +971,20 @@ final class ExternalBillingApiHandler
         }
     }
 
+    /** The name of the plan with this key, or null when there is none. */
+    private function planName(?string $planKey): ?string
+    {
+        if ($planKey === null || $planKey === '') {
+            return null;
+        }
+        $statement = $this->pdo->prepare('SELECT name FROM plans WHERE plan_key = :plan_key');
+        $statement->bindValue(':plan_key', $planKey);
+        $statement->execute();
+        $name = $statement->fetchColumn();
+
+        return is_string($name) && $name !== '' ? $name : null;
+    }
+
     private function currentPlanKey(int $tenantId): ?string
     {
         $statement = $this->pdo->prepare(
@@ -976,7 +1019,7 @@ final class ExternalBillingApiHandler
      */
     private function monthlyPrice(int $tenantId, string $planKey, string $preferredPeriod): ?float
     {
-        $currency = strtoupper($this->setting($tenantId, SettingsRegistry::BILLING_DEFAULT_CURRENCY, 'USD'));
+        $currency = $this->subscriptionCurrency();
         $statement = $this->pdo->prepare(
             'SELECT pp.unit_amount, pp.billing_period
                FROM plan_prices pp
@@ -1031,11 +1074,7 @@ final class ExternalBillingApiHandler
             return $tenantId;
         }
 
-        $currency = strtoupper($this->setting(
-            $tenantId,
-            SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'USD'
-        ));
+        $currency = $this->subscriptionCurrency();
 
         $statement = $this->pdo->prepare(
             'SELECT p.plan_key, p.name, p.description, p.is_addon,
@@ -1060,9 +1099,11 @@ final class ExternalBillingApiHandler
         $statement->execute();
 
         $current = $this->currentPlanKey($tenantId);
+        $prices = $statement->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $entitlements = $this->entitlementsByPlan(array_values(array_map(static fn (array $row): string => (string) $row['plan_key'], $prices)));
 
         $rows = [];
-        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+        foreach ($prices as $row) {
             $rows[] = [
                 'plan_key' => (string) $row['plan_key'],
                 // So Change plan can mark this workspace's own without another call.
@@ -1082,10 +1123,51 @@ final class ExternalBillingApiHandler
                 // does not. Offering them in one undifferentiated list would
                 // show every tenant at least one button that answers 409.
                 'is_addon' => DbBool::of($row['is_addon'] ?? false),
+                // What the plan comes with, so each card can list it (owner
+                // 23 Nov 2026). -1 is unlimited, true is a feature included.
+                'entitlements' => (object) ($entitlements[(string) $row['plan_key']] ?? []),
             ];
         }
 
         return Response::json(['data' => $rows]);
+    }
+
+    /**
+     * Each listed plan's entitlements, typed: "true"/"false" as booleans,
+     * whole numbers as integers, anything else as the stored text.
+     *
+     * @param list<string> $planKeys
+     * @return array<string, array<string, bool|int|string>>
+     */
+    private function entitlementsByPlan(array $planKeys): array
+    {
+        $planKeys = array_values(array_unique($planKeys));
+        if ($planKeys === []) {
+            return [];
+        }
+
+        $marks = implode(', ', array_fill(0, count($planKeys), '?'));
+        $statement = $this->pdo->prepare(
+            "SELECT p.plan_key, e.entitlement_key, e.value
+               FROM plan_entitlements e
+               JOIN plans p ON p.id = e.plan_id
+              WHERE p.plan_key IN ({$marks})
+              ORDER BY e.entitlement_key ASC"
+        );
+        $statement->execute($planKeys);
+
+        $out = [];
+        foreach ($statement->fetchAll(PDO::FETCH_ASSOC) ?: [] as $row) {
+            $value = (string) $row['value'];
+            $out[(string) $row['plan_key']][(string) $row['entitlement_key']] = match (true) {
+                $value === 'true' => true,
+                $value === 'false' => false,
+                preg_match('/^-?\d+$/', $value) === 1 => (int) $value,
+                default => $value,
+            };
+        }
+
+        return $out;
     }
 
     /**
@@ -1094,11 +1176,7 @@ final class ExternalBillingApiHandler
      */
     private function externalPriceRef(int $tenantId, string $planKey, string $interval): ?string
     {
-        $currency = strtoupper($this->setting(
-            $tenantId,
-            SettingsRegistry::BILLING_DEFAULT_CURRENCY,
-            'USD'
-        ));
+        $currency = $this->subscriptionCurrency();
 
         $bridge = $this->pluginBridge();
         if ($bridge !== null) {
@@ -1183,14 +1261,22 @@ final class ExternalBillingApiHandler
         return is_string($ref) && $ref !== '' ? $ref : null;
     }
 
-    private function setting(int $tenantId, string $key, string $fallback): string
+    /**
+     * The currency workspaces are billed in for their Whity subscription: the
+     * INSTANCE's setting, never the workspace's own. A workspace's
+     * `billing.default_currency` is what it charges its own customers in (a salon
+     * in Amman invoices in JOD); the operator sets what Whity itself is sold in.
+     * Reading the workspace's value hid every plan from a JOD workspace when the
+     * payment provider takes no JOD.
+     */
+    private function subscriptionCurrency(): string
     {
-        $value = $this->settings->effective($tenantId)[$key] ?? null;
-        if (is_string($value) && $value !== '') {
-            return $value;
+        $value = $this->settings->getGlobal()[SettingsRegistry::BILLING_DEFAULT_CURRENCY] ?? null;
+        if (is_string($value) && trim($value) !== '') {
+            return strtoupper(trim($value));
         }
 
-        return SettingsRegistry::defaultFor($key) ?: $fallback;
+        return strtoupper((string) (SettingsRegistry::defaultFor(SettingsRegistry::BILLING_DEFAULT_CURRENCY) ?: 'USD'));
     }
 
     /**

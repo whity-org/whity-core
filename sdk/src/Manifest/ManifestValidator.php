@@ -44,6 +44,10 @@ final class ManifestValidator
     public const TOP_LEVEL_KEYS = [
         'manifest', 'plugin', 'requires', 'permissions', 'roles', 'screens', 'tables', 'dataTypes', 'limits', 'records',
         'automations', 'tests', 'documents', 'agentPresets', 'homeCard',
+        // Schema part 1 (SDK 1.163, D4).
+        'settings', 'notifications', 'jobs', 'dashboard', 'onboarding', 'contactFields', 'themes',
+        // Workspace templates as files (SDK 1.170, WHIT-1413).
+        'workspaceTemplates', 'workspaceTemplateExtensions',
     ];
 
     private const NAME_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,63}$/';
@@ -133,6 +137,24 @@ final class ManifestValidator
         AgentPresetValidator::check($manifest['agentPresets'] ?? null, $errors);
         HomeCardValidator::check($manifest['homeCard'] ?? null, $manifest['records'] ?? null, $manifest['screens'] ?? null, $errors);
 
+        // Schema part 1 (SDK 1.163, D4): the declarative contribution points that were PHP only.
+        $slug = $pluginName !== null ? \Whity\Sdk\PluginNamespace::slug($pluginName) : null;
+        $errors = [
+            ...$errors,
+            ...SettingsValidator::errors($manifest['settings'] ?? null, $slug),
+            ...NotificationTypesValidator::errors($manifest['notifications'] ?? null, $slug),
+            ...JobsValidator::errors($manifest['jobs'] ?? null),
+            ...OnboardingValidator::errors($manifest['onboarding'] ?? null, array_keys($permissions)),
+            ...ThemeFilesValidator::errors($manifest['themes'] ?? null),
+            // The files' paths; what each says is checked when the plugin loads, and offline by `whity-cli plugin validate`.
+            ...ThemeFilesValidator::errors($manifest['workspaceTemplates'] ?? null, 'workspaceTemplates'),
+            ...ThemeFilesValidator::errors($manifest['workspaceTemplateExtensions'] ?? null, 'workspaceTemplateExtensions'),
+        ];
+        if (array_key_exists('dashboard', $manifest)) {
+            $errors = [...$errors, ...DashboardValidator::errors($manifest['dashboard'])];
+        }
+        self::checkContactFields($manifest['contactFields'] ?? null, $pluginName, $errors);
+
         return ['ok' => $errors === [], 'errors' => $errors];
     }
 
@@ -160,6 +182,39 @@ final class ManifestValidator
         self::checkLabel($plugin['description'] ?? null, 'plugin.description', self::MAX_DESCRIPTION, false, $errors);
 
         return $name;
+    }
+
+    /**
+     * `contactFields`: a list in {@see ContactFieldValidator}'s shape (SDK 1.163, D4).
+     *
+     * @param list<string> $errors
+     */
+    private static function checkContactFields(mixed $fields, ?string $pluginName, array &$errors): void
+    {
+        if ($fields === null) {
+            return;
+        }
+        if (!is_array($fields) || !array_is_list($fields)) {
+            $errors[] = 'contactFields: must be a list of fields';
+
+            return;
+        }
+        if (count($fields) > ContactFieldValidator::MAX_FIELDS) {
+            $errors[] = 'contactFields: at most ' . ContactFieldValidator::MAX_FIELDS . ' fields';
+        }
+        $seen = [];
+        foreach ($fields as $i => $field) {
+            foreach (ContactFieldValidator::errors($pluginName ?? 'plugin', $field) as $error) {
+                $errors[] = "contactFields[{$i}]: {$error}";
+            }
+            $key = is_array($field) && is_string($field['key'] ?? null) ? $field['key'] : null;
+            if ($key !== null) {
+                if (isset($seen[$key])) {
+                    $errors[] = "contactFields[{$i}].key: \"{$key}\" is used twice";
+                }
+                $seen[$key] = true;
+            }
+        }
     }
 
     /**

@@ -130,6 +130,10 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Daily apt refresh key
+        id: apt
+        run: echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7
         with:
@@ -146,8 +150,12 @@ jobs:
           # bakes it into build-identity.json and reports it on /api/build, so
           # the backend can finally answer which checkout it is running rather
           # than only which version the source claims to be.
+          # APT_REFRESH re-runs the base stage's `apt-get upgrade` once a day
+          # despite the layer cache, so Debian security fixes reach the next
+          # build (WHIT-1391, see the Dockerfile).
           build-args: |
             WHITY_BUILD_COMMIT=${{ inputs.commit }}
+            APT_REFRESH=${{ steps.apt.outputs.date }}
           tags: ${{ steps.image.outputs.tags }}
           # The layer cache (WHIT-1340). One `:buildcache` tag per image, shared
           # by develop and release builds: every green develop push refreshes it,

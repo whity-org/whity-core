@@ -331,7 +331,7 @@ export function CustomerChat({
     <>
       <section aria-label={name} className="flex min-h-0 min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-border px-4 py-2.5">
-          <IconButton icon="chevron-left" label={tc('action.back', 'Back to chats')} className="md:hidden rtl:rotate-180" onClick={onBack} />
+          <IconButton tooltip="bottom" icon="chevron-left" label={tc('action.back', 'Back to chats')} className="md:hidden rtl:rotate-180" onClick={onBack} />
           <CustomerAvatar name={name} channel={conversation.channel} size={40} label={channel} />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-base font-semibold text-foreground">{name}</h2>
@@ -416,6 +416,7 @@ export function CustomerChat({
             </Badge>
           )}
           <IconButton
+            tooltip="bottom"
             icon="info"
             label={detailsOpen ? tc('details.hide', 'Hide details') : tc('details.show', 'Show details')}
             pressed={detailsOpen}
@@ -924,12 +925,12 @@ export function ChatSidePane({
       className="absolute inset-0 z-20 flex min-h-0 flex-col bg-card md:inset-y-0 md:start-auto md:end-0 md:w-[22.5rem] md:border-s md:border-border md:shadow-lg xl:static xl:z-auto xl:shrink-0 xl:shadow-none"
     >
       <header className="flex items-start gap-2 border-b border-border px-4 py-3">
-        <IconButton icon="chevron-left" label={closeLabel} className="md:hidden rtl:rotate-180" onClick={onClose} />
+        <IconButton tooltip="bottom" icon="chevron-left" label={closeLabel} className="md:hidden rtl:rotate-180" onClick={onClose} />
         <div className="min-w-0 flex-1">
           <h2 className="truncate text-base font-semibold">{title}</h2>
           {subtitle && <p className="truncate text-sm text-muted-foreground">{subtitle}</p>}
         </div>
-        <IconButton icon="close" label={closeLabel} className="max-md:hidden" onClick={onClose} />
+        <IconButton tooltip="bottom" icon="close" label={closeLabel} className="max-md:hidden" onClick={onClose} />
       </header>
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4">{children}</div>
     </aside>

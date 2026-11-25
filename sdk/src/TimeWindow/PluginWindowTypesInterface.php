@@ -70,6 +70,9 @@ namespace Whity\Sdk\TimeWindow;
  *             'growing_season' => ['label' => 'Growing season', 'parent' => 'crop_year'],
  *         ];
  *     }
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginWindowTypesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginWindowTypesInterface
 {

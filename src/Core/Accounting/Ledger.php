@@ -50,7 +50,7 @@ final class Ledger
     public const MAX_PAGE = 200;
 
     /** Core's own source types. A plugin's are `<plugin>.<kind>`. */
-    public const CORE_SOURCES = ['manual', 'opening', 'reversal', 'invoice', 'credit_note', 'payment', 'cheque_deposit', 'cheque_bounce', 'transfer', 'bill', 'supplier_credit', 'commission'];
+    public const CORE_SOURCES = ['manual', 'opening', 'reversal', 'invoice', 'credit_note', 'payment', 'cheque_deposit', 'cheque_bounce', 'transfer', 'bill', 'supplier_credit', 'commission', 'stock'];
 
     public function __construct(
         private readonly AccountingDb $db,

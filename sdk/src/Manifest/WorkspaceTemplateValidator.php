@@ -43,6 +43,17 @@ namespace Whity\Sdk\Manifest;
  * itself; the host also checks what only it knows (that the offered plugin is
  * installed and paid, that each permission exists) and applies only what the
  * person choosing it may do.
+ *
+ * SDK 1.170 (WHIT-1413, design section 40): `extends` names a template this
+ * one builds on, `remove` drops some of the parent's items, `hidesParent`
+ * hides the parent's card where this one is offered, and `changes` says what
+ * each version added. {@see self::extensionErrors()} checks the pieces a
+ * plugin adds to another plugin's template. Older hosts refuse these keys, so
+ * a plugin using them requires `^1.170`.
+ *
+ * SDK 1.172 (WHIT-1419, design section 40.3): `pipelines` are review routes in
+ * Flows for the template's forms. Each stage names one of the template's roles
+ * by key; people are never named. A plugin using them requires `^1.172`.
  */
 final class WorkspaceTemplateValidator
 {
@@ -55,6 +66,8 @@ final class WorkspaceTemplateValidator
     public const MAX_EXAMPLES = 10;
     public const MAX_STEPS = 8;
     public const MAX_OFFER_LINES = 6;
+    public const MAX_PIPELINES = 5;
+    public const MAX_STAGES = 8;
 
     /** The longest trial a template may give, the same cap as a plugin's own. */
     public const MAX_TRIAL_DAYS = 90;
@@ -79,7 +92,15 @@ final class WorkspaceTemplateValidator
 
     public const DOCUMENT_KINDS = ['note', 'letter', 'template', 'label'];
 
-    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'examples', 'setup', 'offer', 'theme'];
+    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup', 'offer', 'theme', 'extends', 'remove', 'hidesParent', 'changes'];
+
+    /** What a template that extends another may drop from it (SDK 1.170), by list. */
+    public const REMOVABLE = ['services', 'roles', 'forms', 'documents', 'pipelines', 'steps'];
+
+    /** The parts an extension may add to another plugin's template (SDK 1.170). */
+    private const EXTENSION_KEYS = ['key', 'version', 'target', 'setsUp', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup'];
+
+    public const MAX_CHANGES = 20;
     private const KEY_PATTERN = '/^[a-z][a-z0-9-]{0,40}$/';
     private const PERMISSION_PATTERN = '/^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)+$/';
     private const ICON_PATTERN = '/^[a-z0-9-]{1,64}$/';
@@ -103,6 +124,11 @@ final class WorkspaceTemplateValidator
             return ['template: must be an object'];
         }
         $errors = self::unknownKeys($template, self::TOP_KEYS, 'template');
+        // A template that builds on another (SDK 1.170) may point at the
+        // parent's services and example contacts; those references are checked
+        // again on the template core composes from both.
+        $partial = array_key_exists('extends', $template);
+        array_push($errors, ...self::lineageErrors($template));
 
         if (!is_string($template['key'] ?? null) || preg_match(self::KEY_PATTERN, $template['key']) !== 1) {
             $errors[] = 'template.key: required, lowercase letters, digits and hyphens';
@@ -141,8 +167,13 @@ final class WorkspaceTemplateValidator
             array_push($errors, ...self::listOf($template['documents'], 'template.documents', 0, self::MAX_DOCUMENTS, [self::class, 'documentErrors']));
             array_push($errors, ...self::duplicateKeys($template['documents'], 'template.documents'));
         }
+        if (array_key_exists('pipelines', $template)) {
+            $refs = $partial ? null : ['roles' => self::keysOf($template['roles'] ?? []), 'forms' => self::keysOf($template['forms'] ?? [])];
+            array_push($errors, ...self::listOf($template['pipelines'], 'template.pipelines', 0, self::MAX_PIPELINES, static fn (mixed $pipeline, string $path): array => self::pipelineErrors($pipeline, $path, $refs)));
+            array_push($errors, ...self::duplicateKeys($template['pipelines'], 'template.pipelines'));
+        }
         if (array_key_exists('examples', $template)) {
-            array_push($errors, ...self::exampleErrors($template['examples'], $services));
+            array_push($errors, ...self::exampleErrors($template['examples'], $partial ? null : $services));
         }
         $kinds = [];
         if (array_key_exists('setup', $template)) {
@@ -154,7 +185,7 @@ final class WorkspaceTemplateValidator
                 }
             }
         }
-        if (in_array('services', $kinds, true) && $services === []) {
+        if (!$partial && in_array('services', $kinds, true) && $services === []) {
             $errors[] = 'template.setup: a services step needs the template\'s own services';
         }
         if (array_key_exists('offer', $template)) {
@@ -403,12 +434,62 @@ final class WorkspaceTemplateValidator
     }
 
     /**
-     * Examples: made-up contacts and bookings, marked and removable in one click.
+     * A review route in Flows for one of the template's forms (SDK 1.172):
+     * `{key, name, description?, for: {form}, stages: [{key, name, role, sendBack?}]}`.
+     * Stages run in order; each is a decision by the people holding its role,
+     * and an approval moves on to the next.
      *
-     * @param list<string> $services the template's own service keys
+     * @param array{roles: list<string>, forms: list<string>}|null $refs the template's role and form keys; null when they may come from a parent or the target, so references are checked on the composed template
      * @return list<string>
      */
-    public static function exampleErrors(mixed $examples, array $services): array
+    public static function pipelineErrors(mixed $pipeline, string $path, ?array $refs = null): array
+    {
+        if (!is_array($pipeline) || array_is_list($pipeline)) {
+            return ["{$path}: must be an object"];
+        }
+        $errors = self::unknownKeys($pipeline, ['key', 'name', 'description', 'for', 'stages'], $path);
+        array_push($errors, ...self::keyErrors($pipeline['key'] ?? null, "{$path}.key"));
+        array_push($errors, ...self::textErrors($pipeline['name'] ?? null, "{$path}.name", 80));
+        if (isset($pipeline['description'])) {
+            array_push($errors, ...self::textErrors($pipeline['description'], "{$path}.description", 200));
+        }
+        $for = $pipeline['for'] ?? null;
+        if (!is_array($for) || array_is_list($for) || array_keys($for) !== ['form'] || !is_string($for['form'])) {
+            $errors[] = "{$path}.for: required, {form: the key of one of the template's forms}";
+        } elseif ($refs !== null && !in_array($for['form'], $refs['forms'], true)) {
+            $errors[] = "{$path}.for.form: {$for['form']} is not one of the template's forms";
+        }
+        array_push($errors, ...self::listOf($pipeline['stages'] ?? null, "{$path}.stages", 1, self::MAX_STAGES, static function (mixed $stage, string $p) use ($refs): array {
+            if (!is_array($stage) || array_is_list($stage)) {
+                return ["{$p}: must be an object"];
+            }
+            $errors = self::unknownKeys($stage, ['key', 'name', 'role', 'sendBack'], $p);
+            array_push($errors, ...self::keyErrors($stage['key'] ?? null, "{$p}.key"));
+            array_push($errors, ...self::textErrors($stage['name'] ?? null, "{$p}.name", 80));
+            $role = $stage['role'] ?? null;
+            if (!is_string($role) || preg_match(self::KEY_PATTERN, $role) !== 1) {
+                $errors[] = "{$p}.role: required, the key of one of the template's roles";
+            } elseif ($refs !== null && !in_array($role, $refs['roles'], true)) {
+                $errors[] = "{$p}.role: {$role} is not one of the template's roles";
+            }
+            if (isset($stage['sendBack']) && !is_bool($stage['sendBack'])) {
+                $errors[] = "{$p}.sendBack: true or false";
+            }
+
+            return $errors;
+        }));
+        array_push($errors, ...self::duplicateKeys($pipeline['stages'] ?? null, "{$path}.stages"));
+
+        return $errors;
+    }
+
+    /**
+     * Examples: made-up contacts and bookings, marked and removable in one click.
+     *
+     * @param list<string>|null $services the template's own service keys; null when they may come from a parent or the target (SDK 1.170), so references are not checked here
+     * @return list<string>
+     */
+    public static function exampleErrors(mixed $examples, ?array $services): array
     {
         if (!is_array($examples) || ($examples !== [] && array_is_list($examples))) {
             return ['template.examples: must be an object'];
@@ -447,11 +528,16 @@ final class WorkspaceTemplateValidator
                 }
                 $errors = self::unknownKeys($booking, ['key', 'service', 'contact', 'inDays', 'time'], $path);
                 array_push($errors, ...self::keyErrors($booking['key'] ?? null, "{$path}.key"));
-                if (!in_array($booking['service'] ?? null, $services, true)) {
+                if ($services !== null && !in_array($booking['service'] ?? null, $services, true)) {
                     $errors[] = "{$path}.service: one of the template's services";
                 }
-                if (!in_array($booking['contact'] ?? null, $contacts, true)) {
+                if ($services !== null && !in_array($booking['contact'] ?? null, $contacts, true)) {
                     $errors[] = "{$path}.contact: one of the example contacts";
+                }
+                foreach (['service', 'contact'] as $ref) {
+                    if ($services === null && !is_string($booking[$ref] ?? null)) {
+                        $errors[] = "{$path}.{$ref}: required, a key";
+                    }
                 }
                 $days = $booking['inDays'] ?? null;
                 if (!is_int($days) || $days < 1 || $days > 14) {
@@ -509,6 +595,115 @@ final class WorkspaceTemplateValidator
             return $errors;
         }));
         array_push($errors, ...self::duplicateKeys($setup['steps'] ?? null, 'template.setup.steps', 'id'));
+
+        return $errors;
+    }
+
+    /**
+     * `extends`, `remove`, `hidesParent` and `changes` (SDK 1.170).
+     *
+     * @param array<array-key, mixed> $template
+     * @return list<string>
+     */
+    public static function lineageErrors(array $template): array
+    {
+        $errors = [];
+        $extends = array_key_exists('extends', $template);
+        if ($extends) {
+            array_push($errors, ...self::keyErrors($template['extends'], 'template.extends'));
+            if (($template['extends'] ?? null) === ($template['key'] ?? null)) {
+                $errors[] = 'template.extends: a template cannot build on itself';
+            }
+        }
+        if (array_key_exists('remove', $template)) {
+            $remove = $template['remove'];
+            if (!$extends) {
+                $errors[] = 'template.remove: only a template that extends another removes from it';
+            } elseif (!is_array($remove) || ($remove !== [] && array_is_list($remove))) {
+                $errors[] = 'template.remove: must be an object';
+            } else {
+                array_push($errors, ...self::unknownKeys($remove, self::REMOVABLE, 'template.remove'));
+                foreach ($remove as $list => $keys) {
+                    array_push($errors, ...self::listOf($keys, "template.remove.{$list}", 1, 30, static fn (mixed $key, string $path): array => self::keyErrors($key, $path)));
+                }
+            }
+        }
+        if (array_key_exists('hidesParent', $template)) {
+            if (!$extends) {
+                $errors[] = 'template.hidesParent: only for a template that extends another';
+            } elseif (!is_bool($template['hidesParent'])) {
+                $errors[] = 'template.hidesParent: true or false';
+            }
+        }
+        if (array_key_exists('changes', $template)) {
+            $version = is_int($template['version'] ?? null) ? $template['version'] : 0;
+            array_push($errors, ...self::listOf($template['changes'], 'template.changes', 1, self::MAX_CHANGES, static function (mixed $change, string $path) use ($version): array {
+                if (!is_array($change) || array_is_list($change)) {
+                    return ["{$path}: must be an object"];
+                }
+                $errors = self::unknownKeys($change, ['version', 'summary'], $path);
+                $at = $change['version'] ?? null;
+                if (!is_int($at) || $at < 1 || $at > $version) {
+                    $errors[] = "{$path}.version: a version from 1 to the template's own";
+                }
+                array_push($errors, ...self::textErrors($change['summary'] ?? null, "{$path}.summary", 160));
+
+                return $errors;
+            }));
+            if (is_array($template['changes']) && array_is_list($template['changes'])) {
+                $previous = PHP_INT_MAX;
+                foreach ($template['changes'] as $i => $change) {
+                    $at = is_array($change) && is_int($change['version'] ?? null) ? $change['version'] : null;
+                    if ($at !== null && $at >= $previous) {
+                        $errors[] = "template.changes[{$i}].version: newest first, each version once";
+                    }
+                    $previous = $at ?? $previous;
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Everything wrong with one extension (SDK 1.170): pieces a plugin adds to
+     * another plugin's template, `target` naming it. Only additive parts:
+     * services, roles, forms, documents, pipelines (1.172), examples, guided setup steps and
+     * lines the card lists. Its examples may use the target's services and
+     * contacts; those references are checked on the template core composes.
+     *
+     * @return list<string> each naming its path; empty when valid
+     */
+    public static function extensionErrors(mixed $extension): array
+    {
+        if (!is_array($extension) || array_is_list($extension)) {
+            return ['extension: must be an object'];
+        }
+        $errors = self::unknownKeys($extension, self::EXTENSION_KEYS, 'extension');
+        array_push($errors, ...self::keyErrors($extension['key'] ?? null, 'extension.key'));
+        array_push($errors, ...self::keyErrors($extension['target'] ?? null, 'extension.target'));
+        if (!is_int($extension['version'] ?? null) || $extension['version'] < 1) {
+            $errors[] = 'extension.version: required, a whole number from 1';
+        }
+        if (array_key_exists('setsUp', $extension)) {
+            array_push($errors, ...self::listOf($extension['setsUp'], 'extension.setsUp', 0, 4, static fn (mixed $line, string $path): array => self::textErrors($line, $path, 80)));
+        }
+        foreach (['services' => [self::MAX_SERVICES, 'serviceErrors'], 'roles' => [self::MAX_ROLES, 'roleErrors'], 'forms' => [self::MAX_FORMS, 'formErrors'], 'documents' => [self::MAX_DOCUMENTS, 'documentErrors'], 'pipelines' => [self::MAX_PIPELINES, 'pipelineErrors']] as $list => [$max, $check]) {
+            if (array_key_exists($list, $extension)) {
+                array_push($errors, ...self::listOf($extension[$list], "extension.{$list}", 0, $max, [self::class, $check]));
+                array_push($errors, ...self::duplicateKeys($extension[$list], "extension.{$list}"));
+            }
+        }
+        if (array_key_exists('examples', $extension)) {
+            array_push($errors, ...self::exampleErrors($extension['examples'], null));
+        }
+        if (array_key_exists('setup', $extension)) {
+            $setup = $extension['setup'];
+            if (is_array($setup) && !array_is_list($setup) && array_diff(array_keys($setup), ['steps']) !== []) {
+                $errors[] = 'extension.setup: only steps';
+            }
+            array_push($errors, ...self::setupErrors($setup));
+        }
 
         return $errors;
     }

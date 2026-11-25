@@ -24,6 +24,9 @@ namespace Whity\Sdk;
  * {@see PluginFrontendInterface} screens and are validated the same way: a
  * step that fails validation is dropped, and an onboarding with no valid step
  * is not offered.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginOnboardingInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginOnboardingInterface
 {

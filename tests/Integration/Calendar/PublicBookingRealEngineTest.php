@@ -14,6 +14,7 @@ use Whity\Core\Branding\BrandingService;
 use Whity\Core\Branding\HostResolver;
 use Whity\Core\Branding\TenantHostRepository;
 use Whity\Core\Calendar\BookingReminderJob;
+use Whity\Core\Calendar\BookingReminderSweepJob;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
 use Whity\Core\Calendar\BookingVisitor;
@@ -61,6 +62,8 @@ final class PublicBookingRealEngineTest extends TestCase
     private int $cake;
     /** @var array<string, mixed>|null the visitor's session claims; null: signed out */
     private ?array $claims = null;
+    /** What "now" is for the service and the emails; tests move it (WHIT-1417). */
+    private string $now = self::NOW;
 
     protected function setUp(): void
     {
@@ -88,7 +91,7 @@ final class PublicBookingRealEngineTest extends TestCase
         $calendar = new CalendarRepository($this->pdo);
         $services = new ServiceRepository($this->pdo);
         $bookings = new BookingRepository($this->pdo);
-        $this->service = new BookingService($this->pdo, $calendar, $services, $bookings, $this->settings, null, clock: static fn (): DateTimeImmutable => new DateTimeImmutable(self::NOW, new DateTimeZone('UTC')));
+        $this->service = new BookingService($this->pdo, $calendar, $services, $bookings, $this->settings, null, clock: fn (): DateTimeImmutable => new DateTimeImmutable($this->now, new DateTimeZone('UTC')));
         $this->service->setLinks(new ManageLinks($this->pdo));
         $this->queue = new QueueService(new JobRepository($this->pdo));
         $this->service->setQueue($this->queue);
@@ -107,7 +110,7 @@ final class PublicBookingRealEngineTest extends TestCase
         };
         $tenants = new TenantHostRepository($this->pdo);
         $messenger = new EmailBookingMessenger(new \Whity\Core\Mail\BrandedEmailSender($mailer, new EmailLayout(), $this->settings), $this->settings, $tenants, 'https://app.example.com/booking');
-        $messenger->setClock(static fn (): DateTimeImmutable => new DateTimeImmutable(self::NOW, new DateTimeZone('UTC')));
+        $messenger->setClock(fn (): DateTimeImmutable => new DateTimeImmutable($this->now, new DateTimeZone('UTC')));
         $this->service->setMessenger($messenger);
         $this->feed = new CalendarFeed($this->pdo, $calendar, $bookings);
 
@@ -302,6 +305,28 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertContains('retry-after', array_map('strtolower', array_keys($limited->getHeaders())));
     }
 
+    public function testTheSameBookingSentTwiceIsBookedOnce(): void
+    {
+        $page = ['workspace' => 'example-bakery'];
+        // AP.17: a retry with the same key books nothing more.
+        $first = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['idempotency_key' => 'press-0001-abcd'])), $page);
+        self::assertSame(201, $first->getStatusCode(), $first->getBody());
+        $again = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['starts_at' => '2026-11-16T11:00:00+03:00', 'idempotency_key' => 'press-0001-abcd'])), $page);
+        self::assertSame(409, $again->getStatusCode(), $again->getBody());
+        self::assertSame('already_sent', self::data($again)['details']['code'] ?? self::data($again)['error']['details']['code'] ?? null, $again->getBody());
+        self::assertSame(1, (int) $this->scalar("SELECT COUNT(*) FROM calendar_bookings WHERE tenant_id = 1 AND status <> 'cancelled'"));
+
+        // A key whose booking failed is given back, so the customer can try again.
+        $taken = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['email' => 'other@example.com', 'idempotency_key' => 'press-0002-abcd'])), $page);
+        self::assertSame(409, $taken->getStatusCode(), 'The time is taken.');
+        $retry = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['email' => 'other@example.com', 'starts_at' => '2026-11-16T12:00:00+03:00', 'idempotency_key' => 'press-0002-abcd'])), $page);
+        self::assertSame(201, $retry->getStatusCode(), $retry->getBody());
+
+        // Without a key, or with one that isn't a key, nothing changes.
+        $plain = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['email' => 'third@example.com', 'starts_at' => '2026-11-16T13:00:00+03:00', 'idempotency_key' => 'short'])), $page);
+        self::assertSame(201, $plain->getStatusCode(), $plain->getBody());
+    }
+
     public function testTheLinkShowsMovesAndCancelsAndAnOldLinkStopsWorking(): void
     {
         $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
@@ -484,18 +509,99 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertIsArray($payload);
 
         $reminders = new BookingReminderJob($this->service, $this->queue);
-        // Due 24 hours before 10:00 Amman, which is three hours after "now".
+        // Due 24 hours before 10:00 Amman (07:00 UTC), three hours after "now".
         self::assertSame(['requeued' => true], $reminders->handle($payload), 'not due yet: queued again');
 
-        $this->pdo->exec("UPDATE calendar_bookings SET reminder_due_at = '2026-11-15 03:00:00' WHERE tenant_id = 1");
+        // WHIT-1417 (AP.15): by default two reminders, 24 and 2 hours before.
+        $this->now = '2026-11-15 07:00:00';
         $before = count($this->sent);
         self::assertSame(['result' => 'sent'], $reminders->handle($payload));
         self::assertStringContainsString('Tomorrow: Cake tasting', $this->sent[$before]['subject']);
-        self::assertSame(['result' => 'nothing due'], $reminders->handle($payload), 'a second run sends nothing');
+        self::assertSame(['requeued' => true], $reminders->handle($payload), 'a second run sends nothing: the next one is 2 hours before');
         self::assertCount($before + 1, $this->sent);
+        self::assertSame('2026-11-16 05:00:00', substr((string) $this->scalar('SELECT reminder_due_at FROM calendar_bookings WHERE id = ' . (int) $made['id']), 0, 19));
+
+        $this->now = '2026-11-16 05:00:00';
+        self::assertSame(['result' => 'sent'], $reminders->handle($payload));
+        self::assertStringContainsString('Today: Cake tasting', $this->sent[$before + 1]['subject']);
+        self::assertSame(['result' => 'nothing due'], $reminders->handle($payload), 'both went; nothing more is due');
+        self::assertCount($before + 2, $this->sent);
+        self::assertSame(
+            [[24, 'email', 'sent'], [2, 'email', 'sent']],
+            array_map(static fn (array $r): array => [$r['hours_before'], $r['channel'], $r['outcome']], $this->service->bookingOrFail(1, (int) $made['id'])['reminders']),
+            'each reminder is kept with its channel and outcome (AP.14)',
+        );
 
         $this->service->move(1, (int) $made['id'], new DateTimeImmutable('2026-11-16 12:00:00', new DateTimeZone('UTC')), null, false);
         self::assertSame(['result' => 'moved'], $reminders->handle($payload));
+    }
+
+    public function testTheSweepSendsAReminderTheQueueLostAndOnlyOnce(): void
+    {
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        $delayed = json_decode((string) $this->scalar("SELECT payload FROM jobs WHERE name = '" . BookingReminderJob::NAME . "'"), true);
+        self::assertIsArray($delayed);
+        // The queue loses the delayed job (Redis flushed, a deploy cleared it).
+        $this->pdo->exec('DELETE FROM jobs');
+
+        $sweep = new BookingReminderSweepJob($this->service, $this->queue);
+        self::assertSame(['queued' => 0, 'failed' => 0], $sweep->handle([]), 'nothing is due yet');
+
+        $this->now = '2026-11-15 07:05:00';
+        self::assertSame(['queued' => 1, 'failed' => 0], $sweep->handle([]));
+        $found = $this->pdo->query("SELECT payload, tenant_id FROM jobs WHERE name = '" . BookingReminderJob::NAME . "'");
+        self::assertNotFalse($found);
+        $rows = $found->fetchAll(PDO::FETCH_ASSOC);
+        self::assertCount(1, $rows);
+        self::assertSame(1, (int) $rows[0]['tenant_id'], 'the reminder job is bound to its workspace');
+        $payload = json_decode((string) $rows[0]['payload'], true);
+        self::assertIsArray($payload);
+
+        $reminders = new BookingReminderJob($this->service, $this->queue);
+        $before = count($this->sent);
+        self::assertSame(['result' => 'sent'], $reminders->handle($payload));
+        // The delayed job turns up after all: the reminder is already claimed.
+        self::assertSame(['requeued' => true], $reminders->handle($delayed), 'the next one is not due yet');
+        self::assertSame(['queued' => 0, 'failed' => 0], $sweep->handle([]), 'the sweep finds nothing more');
+        self::assertCount($before + 1, $this->sent, 'one reminder, once');
+
+        // Once the booking has started nothing is sent.
+        $this->now = '2026-11-16 07:10:00';
+        self::assertSame(['queued' => 0, 'failed' => 0], $sweep->handle([]));
+        self::assertSame(['result' => 'too late'], $reminders->handle($payload));
+        self::assertNull($this->scalar('SELECT reminder_due_at FROM calendar_bookings WHERE id = ' . (int) $made['id']));
+    }
+
+    public function testTheReminderAsksImComingAndICantComeOnTheCustomersPage(): void
+    {
+        $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
+        $this->now = '2026-11-15 07:00:00';
+        $before = count($this->sent);
+        self::assertSame('sent', $this->service->sendReminder(1, (int) $made['id'], (string) $made['starts_at']));
+        $text = $this->sent[$before]['text'];
+        self::assertStringContainsString("I'm coming", $text);
+        self::assertSame(1, preg_match('#/booking/([a-f0-9]{64})\?answer=coming#', $text, $m), 'I\'m coming links to the page');
+        $token = $m[1] ?? '';
+        self::assertStringContainsString('/booking/' . $token . '?answer=cancel', $text, 'and so does I can\'t come');
+
+        // The reminder carries a fresh link; the confirmation's no longer works.
+        self::assertSame(404, $this->handler->showBooking(self::request('GET', '/x'), ['token' => (string) $made['manage_token']])->getStatusCode());
+        $shown = self::data($this->handler->showBooking(self::request('GET', '/x'), ['token' => $token]))['data'];
+        self::assertFalse($shown['coming']);
+
+        $coming = $this->handler->coming(self::request('POST', '/x'), ['token' => $token]);
+        self::assertSame(200, $coming->getStatusCode());
+        self::assertTrue(self::data($coming)['data']['coming']);
+        $at = $this->scalar('SELECT confirmed_by_customer_at FROM calendar_bookings WHERE id = ' . (int) $made['id']);
+        self::assertSame('2026-11-15 07:00:00', substr((string) $at, 0, 19));
+        $this->now = '2026-11-15 08:00:00';
+        self::assertSame(200, $this->handler->coming(self::request('POST', '/x'), ['token' => $token])->getStatusCode(), 'pressing it again is fine');
+        self::assertSame('2026-11-15 07:00:00', substr((string) $this->scalar('SELECT confirmed_by_customer_at FROM calendar_bookings WHERE id = ' . (int) $made['id']), 0, 19), 'and changes nothing');
+        self::assertNotNull($this->service->bookingOrFail(1, (int) $made['id'])['confirmed_by_customer_at'], 'the desk sees it');
+
+        // I can't come is the page's cancel; afterwards the link is gone.
+        self::assertSame(200, $this->handler->cancel(self::request('POST', '/x', ['reason' => 'Ill']), ['token' => $token])->getStatusCode());
+        self::assertSame(404, $this->handler->coming(self::request('POST', '/x'), ['token' => $token])->getStatusCode());
     }
 
     public function testSeveralServicesAreBookedTogetherWhenTheWorkspaceAllowsIt(): void

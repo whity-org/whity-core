@@ -13,6 +13,9 @@ use Whity\Sdk\Billing\LicenceSales;
  * slot stamped with this plugin's name. A second plugin offering one is
  * refused with a warning, so the store always talks to exactly one seller and
  * knows which. See {@see LicenceSales}.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginLicenceSalesInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginLicenceSalesInterface
 {

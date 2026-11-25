@@ -47,6 +47,14 @@ const MAX_STROKE_LENGTH = 20000;
 const MAX_APPROVERS = 40;
 const MAX_ITEMS = 8;
 const MAX_QR_VALUE = 512;
+/**
+ * Split points (WHIT-1370). A question, a list of approvals or a notice that
+ * fits on a page still moves whole to the next page (it is kept together);
+ * one taller than a page splits between the parts marked ITEM, and REPEAT
+ * marks a part that prints again above the rest (a table's header row).
+ */
+const ITEM = ' data-flow-item="1"';
+const REPEAT = ' data-flow-repeat="1"';
 /** An SVG path's `d`: commands and numbers only. */
 const PATH_DATA = /^[MmLlHhVvCcSsQqTtZz0-9.,\s-]+$/;
 
@@ -303,41 +311,42 @@ function unit(type, cls, inner, attrs) {
 
 function renderFacts(items, direction) {
   return '<div class="ff-facts">' + items.map((it) =>
-    `<div><span>${t(it.label, direction)}</span><b${it.mono ? ' class="ff-mono"' : ''}>${t(it.value, direction)}</b></div>`).join('') + '</div>';
+    `<div${ITEM}><span>${t(it.label, direction)}</span><b${it.mono ? ' class="ff-mono"' : ''}>${t(it.value, direction)}</b></div>`).join('') + '</div>';
 }
 
 function renderShortAnswer(a, direction) {
   switch (a.kind) {
     case 'text':
-      return `<div class="ff-a${a.mono ? ' ff-mono' : ''}">${a.paragraphs.map((p) => `<p>${t(p, direction)}</p>`).join('')}</div>`
-        + (a.wordCount ? `<div class="ff-wc">${t(a.wordCount, direction)}</div>` : '');
+      return `<div class="ff-a${a.mono ? ' ff-mono' : ''}">${a.paragraphs.map((p) => `<p${ITEM}>${t(p, direction)}</p>`).join('')}</div>`
+        + (a.wordCount ? `<div class="ff-wc"${ITEM}>${t(a.wordCount, direction)}</div>` : '');
     case 'empty':
       return `<div class="ff-a ff-empty">${t(a.text, direction)}</div>`;
     case 'choices':
       return '<div class="ff-ch">' + a.options.map((o) =>
-        `<span class="${o.chosen ? 'ff-on' : 'ff-off'}">${box(o.chosen)}<span dir="auto">${t(o.text, direction)}</span></span>`).join('') + '</div>';
+        `<span class="${o.chosen ? 'ff-on' : 'ff-off'}"${ITEM}>${box(o.chosen)}<span dir="auto">${t(o.text, direction)}</span></span>`).join('') + '</div>';
     case 'yesNo':
       return `<div class="ff-a">${word(a.value, a.word, direction)}</div>`;
     case 'yesNoRows': {
       if (a.style === 'threeColumns') {
         const h = a.headers || {};
         // Cells built from already-escaped text (t) and fixed markup only.
-        const cell = (cls, inner) => '<span' + (cls ? ' class="' + cls + '"' : '') + '>' + inner + '</span>';
+        const cell = (cls, inner, attrs) => '<span' + (cls ? ' class="' + cls + '"' : '') + (attrs || '') + '>' + inner + '</span>';
         const dot = (on) => (on ? '<b class="ff-pick" aria-hidden="true"></b>' : '');
-        const head = ['item', 'yes', 'no', 'na'].map((k) => cell('ff-h', t(h[k] || '', direction))).join('');
-        const rows = a.rows.map((r) => cell('', t(r.text, direction))
+        // The column heads print again above rows continued on a new page.
+        const head = ['item', 'yes', 'no', 'na'].map((k) => cell('ff-h', t(h[k] || '', direction), REPEAT)).join('');
+        const rows = a.rows.map((r) => cell('', t(r.text, direction), ITEM)
           + cell('', dot(r.value === 'yes')) + cell('', dot(r.value === 'no')) + cell('', dot(r.value === 'na'))).join('');
         return '<div class="ff-yn3">' + head + rows + '</div>';
       }
-      return a.rows.map((r) => `<div class="ff-ynr"><span>${t(r.text, direction)}</span>`
+      return a.rows.map((r) => `<div class="ff-ynr"${ITEM}><span>${t(r.text, direction)}</span>`
         + `<b>${r.value === null ? `<span class="ff-empty">${t(r.word || '', direction)}</span>` : word(r.value, r.word || '', direction)}</b></div>`).join('');
     }
     case 'facts':
       return renderFacts(a.items, direction);
     case 'table': {
       const head = a.columns.map((c) => `<th>${t(c, direction)}</th>`).join('');
-      const rows = a.rows.map((r) => `<tr>${r.map((c) => `<td>${t(c, direction)}</td>`).join('')}</tr>`).join('');
-      return `<table class="ff-table"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
+      const rows = a.rows.map((r) => `<tr${ITEM}>${r.map((c) => `<td>${t(c, direction)}</td>`).join('')}</tr>`).join('');
+      return `<table class="ff-table"><thead${REPEAT}><tr>${head}</tr></thead><tbody>${rows}</tbody></table>`;
     }
     default:
       return '';
@@ -351,18 +360,29 @@ function renderShortAnswer(a, direction) {
  * line, and each carries the question's "continued" line, which the paginator
  * prints at the top of a page the answer runs onto (FP.8, engine need 6).
  */
+function continuedLine(block, direction) {
+  // Without the caller's word the paginator writes the document's own
+  // "(continued)" (labels.continued), as a split table's caption does.
+  const word = block.continued
+    ? t(block.continued, direction)
+    : '';
+  const label = block.continued ? '' : ' data-flow-label="continued"';
+  return `<div class="ff-qn ff-qn-continued">${numberCell(block.number)}<span class="ff-qn-text">${t(block.text, direction)} <span class="ff-cont"${label}>${word}</span></span></div>`;
+}
+
 function renderQuestion(block, direction) {
   const a = block.answer;
-  if (block.layout === 'row' && a.kind !== 'table' && !(a.kind === 'text' && a.paragraphs.length > 1)) {
-    return unit('formQuestion', 'ff-q ff-q-row', `<div class="ff-row-q">${questionHead(block, direction)}</div><div class="ff-row-a">${renderShortAnswer(a, direction)}</div>`, ' data-keep-together="1"');
-  }
   const long = a.kind === 'text' && (a.paragraphs.length > 1 || a.paragraphs[0].length > 600);
-  if (!long) {
-    return unit('formQuestion', 'ff-q', questionHead(block, direction) + renderShortAnswer(a, direction), ' data-keep-together="1"');
+  // Kept together while it fits a page; split between its rows, options or
+  // facts when it does not, under its "continued" line (WHIT-1370).
+  const kept = ` data-keep-together="1" data-flow-tail-continued="${escapeHtml(continuedLine(block, direction))}"`;
+  if (block.layout === 'row' && a.kind !== 'table' && !long) {
+    return unit('formQuestion', 'ff-q ff-q-row', `<div class="ff-row-q" data-flow-slot="1">${questionHead(block, direction)}</div><div class="ff-row-a">${renderShortAnswer(a, direction)}</div>`, kept);
   }
-  const continued = block.continued
-    ? `<div class="ff-qn ff-qn-continued">${numberCell(block.number)}<span class="ff-qn-text">${t(block.text, direction)} <span class="ff-cont">${t(block.continued, direction)}</span></span></div>`
-    : '';
+  if (!long) {
+    return unit('formQuestion', 'ff-q', questionHead(block, direction) + renderShortAnswer(a, direction), kept);
+  }
+  const continued = block.continued ? continuedLine(block, direction) : '';
   const carry = continued ? ` data-flow-continued="${escapeHtml(continued)}"` : '';
   let out = unit('formQuestion', 'ff-q ff-q-head', questionHead(block, direction), ' data-keep-with-next="1"');
   for (const p of a.paragraphs) {
@@ -451,7 +471,7 @@ function renderFormBlock(block, direction, renderQrMarkup) {
     case 'formQuestion':
       return renderQuestion(block, direction);
     case 'notice':
-      return unit('notice', 'ff-notice', `${block.label ? `<b>${t(block.label, direction)}</b>` : ''}<div>${t(block.text, direction)}</div>`, ' data-keep-together="1"');
+      return unit('notice', 'ff-notice', `${block.label ? `<b>${t(block.label, direction)}</b>` : ''}<div${ITEM}>${t(block.text, direction)}</div>`, ' data-keep-together="1"');
     case 'signatureRow':
       return renderSignature(block, direction);
     case 'decisionLine': {
@@ -469,13 +489,13 @@ function renderFormBlock(block, direction, renderQrMarkup) {
     }
     case 'approvals': {
       const title = block.title ? `<div class="ff-sub">${t(block.title, direction)}</div>` : '';
-      const nc = block.notCounted ? `<div class="ff-nc">${t(block.notCounted, direction)}</div>` : '';
+      const nc = block.notCounted ? `<div class="ff-nc"${ITEM}>${t(block.notCounted, direction)}</div>` : '';
       if (block.style === 'cards') {
-        const cards = block.rows.map((r) => `<div class="ff-sigcard"><b>${t(r.name, direction)}</b>${r.role ? `<span>${t(r.role, direction)}</span>` : ''}`
+        const cards = block.rows.map((r) => `<div class="ff-sigcard"${ITEM}><b>${t(r.name, direction)}</b>${r.role ? `<span>${t(r.role, direction)}</span>` : ''}`
           + `${word(r.status, r.word, direction)}${r.at ? `<span>${t(r.at, direction)}</span>` : ''}</div>`).join('');
         return unit('approvals', 'ff-approvals', `${title}<div class="ff-cards">${cards}</div>${nc}`, ' data-keep-together="1"');
       }
-      const rows = block.rows.map((r) => `<div class="ff-appr">${word(r.status, r.word, direction)}`
+      const rows = block.rows.map((r) => `<div class="ff-appr"${ITEM}>${word(r.status, r.word, direction)}`
         + `<span>${t(r.name, direction)}${r.role ? `, ${t(r.role, direction)}` : ''}</span><span class="ff-when">${t(r.at || '—', direction)}</span></div>`).join('');
       return unit('approvals', 'ff-approvals', `${title}${rows}${nc}`, ' data-keep-together="1"');
     }

@@ -9,7 +9,7 @@
  * algorithm.
  *
  * Criteria (one point each):
- *  1. Length ≥ 8 characters   (meets the minimum policy)
+ *  1. Length ≥ 12 characters  (meets the minimum policy)
  *  2. Contains an uppercase letter
  *  3. Contains a digit
  *  4. Contains a special character
@@ -19,6 +19,7 @@
  */
 
 import { useTranslation } from '@whity/features/i18n';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 export type StrengthLevel = 'weak' | 'fair' | 'good' | 'strong';
 
@@ -31,7 +32,7 @@ interface Criteria {
 
 function evaluate(password: string): Criteria {
   return {
-    minLength: password.length >= 8,
+    minLength: password.length >= PASSWORD_MIN_LENGTH,
     hasUppercase: /[A-Z]/.test(password),
     hasNumber: /[0-9]/.test(password),
     hasSpecial: /[^A-Za-z0-9]/.test(password),

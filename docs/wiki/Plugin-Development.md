@@ -2253,7 +2253,29 @@ final class CakeOrdersPlugin extends \Whity\Sdk\Manifest\ManifestPlugin
 
 **The manifest is checked as a whole, and refused as a whole.** A role may grant only permissions the manifest declares. A screen must be gated by one of them, and its blocks must pass the block contract. A data type must live in a table declared under `tables` with scope `tenant`, and a limit's key must start with the plugin's lowercase name. Every label needs `en` and `ar`, and an unknown key anywhere is an error, not a silent no-op. When anything fails, the constructor throws `InvalidManifestException` with every error, and the plugin doesn't load. Loading half of it would leave a role granting a permission that was dropped.
 
-**Behaviour stays in PHP, in the same class.** JSON declares no routes, hooks, jobs or migrations. Override the method and call the parent to keep the declared part:
+**More of it is data since SDK 1.163 (D4).** `plugin.json` also takes `settings`, `notifications`, `jobs`, `dashboard`, `onboarding`, `contactFields` and `themes`, each in the shape its PHP interface returns (`PluginSettingsInterface`, `PluginNotificationsInterface`, `PluginDashboardInterface`, `PluginOnboardingInterface`, `PluginContactFieldsInterface`, `PluginThemesInterface`):
+
+```json
+{
+  "settings": {
+    "lead_days": { "type": "int", "default": 2, "min": 0, "max": 30, "label": { "en": "Days of notice", "ar": "أيام الإشعار" } }
+  },
+  "notifications": {
+    "order_ready": { "label": { "en": "Cake order ready", "ar": "طلب الكيك جاهز" }, "emailDefault": true }
+  },
+  "jobs": {
+    "orders.remind": { "class": "CakeOrders\\RemindJob", "schedule": "0 7 * * *" },
+    "orders.export": { "class": "CakeOrders\\ExportJob", "submittable": true }
+  },
+  "themes": ["themes/harbour.json"]
+}
+```
+
+A job's `class` implements `JobInterface` and takes no constructor arguments; `schedule` is a five-field cron expression; `submittable` lets a workspace ask for it. A handler that needs collaborators stays in PHP: override `getJobs()` and call the parent for the rest. `themes` lists theme files inside the plugin, each in the format of `schemas/theme/v1.json`. An onboarding `status` and a dashboard `source` are GET routes, so a subclass adds them in PHP.
+
+**Check it before you install it.** `whity-cli plugin validate <plugin directory>` runs the same check offline, with no database and no running Whity, and also reads each theme file. It prints every problem with its path and exits non-zero; `--json` gives the result to a script.
+
+**Behaviour stays in PHP, in the same class.** JSON declares no routes, hooks or migrations. Override the method and call the parent to keep the declared part:
 
 ```php
 public function getRoutes(): array

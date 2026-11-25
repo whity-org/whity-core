@@ -150,7 +150,7 @@ export default function TenantsPage() {
     },
     {
       accessorKey: 'slug',
-      header: t('tenants.table.slug', 'Slug'),
+      header: t('tenants.table.slug', 'Handle'),
       enableSorting: true,
       enableColumnFilter: true,
     },

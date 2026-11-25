@@ -393,6 +393,24 @@ final class CoreApiSchemas
             ],
         ];
 
+        // POST /api/auth/operator-link — OperatorLinkHandler::open() (WHIT-1350)
+        // Opens the one-time link `whity-cli auth operator-link <email>` printed.
+        $operatorLinkRoute = [
+            'method' => 'POST',
+            'path' => '/api/auth/operator-link',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Sign a platform operator in with a one-time link printed on the server',
+                'tags' => ['auth'],
+                'request' => 'OperatorLinkRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Session issued in the system workspace; next is the page to open', 'OperatorLinkResponse'),
+                    410 => self::errorResponse('The link expired, was already used, or is not for a platform operator'),
+                ],
+            ],
+        ];
+
         // GET /api/auth/select-tenant — AuthHandler::handlePendingSelection()
         // WHIT-672: the choices a pending (cookie) selection may pick from.
         $pendingSelectionRoute = [
@@ -650,6 +668,7 @@ final class CoreApiSchemas
             $loginRoute,
             $login2faRoute,
             $selectTenantRoute,
+            $operatorLinkRoute,
             $pendingSelectionRoute,
             $switchTenantRoute,
             $getMeRoute,
@@ -5307,6 +5326,15 @@ final class CoreApiSchemas
                 'user' => $sessionUser,
             ] + $tokenPair, ['user']),
 
+            // POST /api/auth/operator-link — the one-time link's token (WHIT-1350)
+            'OperatorLinkRequest' => self::object([
+                'token' => self::str(),
+            ], ['token']),
+            'OperatorLinkResponse' => self::object([
+                'user' => $sessionUser,
+                'next' => self::str(),
+            ] + $tokenPair, ['user', 'next']),
+
             // POST /api/auth/switch-tenant — request body (WC-f8164c87)
             'SwitchTenantRequest' => self::object([
                 'tenant_id' => self::int(),
@@ -5491,6 +5519,12 @@ final class CoreApiSchemas
                 'locale' => self::str(),
                 'main_color' => self::str(),
             ], ['name']),
+            // WHIT-1406: a native app turns the one-time code from its loopback
+            // listener into a token-mode session.
+            'NativeSignInExchangeRequest' => self::object([
+                'code' => self::str(),
+                'code_verifier' => self::str(),
+            ], ['code', 'code_verifier']),
             // Creating another workspace while signed in (WHIT-1169).
             'WorkspaceCreateRequest' => self::object([
                 'name' => self::str(),
@@ -6335,6 +6369,19 @@ final class CoreApiSchemas
                 'pay_online' => self::bool() + ['description' => 'This deployment takes payments online'],
                 'card_step' => self::bool() + ['description' => 'A card can be added now and first charged when the trial ends'],
             ], ['plan_key', 'plan_name', 'status', 'trial_ends_at', 'days_left', 'read_only', 'card_added', 'price', 'pay_online', 'card_step']),
+            // 2026-11-22: a workspace paused because its plan expired or was canceled.
+            'WorkspacePauseState' => self::object([
+                'status' => self::str() + ['description' => 'expired or canceled'],
+                'reads_refused' => self::bool() + ['description' => 'The wall refuses reads too, not only changes'],
+                'owners' => [
+                    'type' => 'array',
+                    'description' => 'The owners who can pay, by name',
+                    'items' => self::object(['name' => self::str()], ['name']),
+                ],
+            ], ['status', 'reads_refused', 'owners']),
+            'WorkspacePauseResponse' => self::object([
+                'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspacePauseState']], 'nullable' => true],
+            ], ['data']),
             'WorkspaceTrialResponse' => self::object([
                 'data' => ['allOf' => [['$ref' => '#/components/schemas/WorkspaceTrialState']], 'nullable' => true],
             ], ['data']),
@@ -6354,6 +6401,11 @@ final class CoreApiSchemas
                 'is_per_seat' => self::bool(),
                 'is_per_device' => self::bool(),
                 'is_addon' => self::bool(),
+                // What the plan comes with: -1 is unlimited, true a feature included.
+                'entitlements' => [
+                    'type' => 'object',
+                    'additionalProperties' => ['oneOf' => [['type' => 'boolean'], ['type' => 'integer'], ['type' => 'string']]],
+                ],
             ], ['plan_key', 'name', 'unit_amount', 'currency', 'billing_period', 'is_addon']),
             'PurchasablePlanListResponse' => self::listEnvelope('PurchasablePlan'),
             // A RECEIPT, NOT AN INVOICE THIS DEPLOYMENT ISSUED. A tenant billed
@@ -6418,6 +6470,7 @@ final class CoreApiSchemas
                 'has_access' => self::bool(),
                 'status' => self::str(true),
                 'plan' => self::str(true),
+                'plan_name' => self::str(true),
                 'access_until' => self::str(true),
                 'cancel_at_period_end' => self::bool(),
                 'checkout_status' => self::str(true),
@@ -6693,10 +6746,17 @@ final class CoreApiSchemas
                 // reachable, version mismatch, switched off); `fix` is the
                 // operator's change and is null unless the caller holds
                 // settings:manage in the system tenant.
+                // WHIT-1370: `code` names the reason for the page to word
+                // (`render_unavailable`, `render_refused`, `final_waiting`,
+                // another route finalisation reason, or `not_made`);
+                // `route_id` is the route whose final document this is, to
+                // try again through its final-document/retry.
                 'pdf_pending' => self::object([
                     'reason' => self::str(),
                     'fix' => self::str(true),
-                ], ['reason', 'fix']),
+                    'code' => self::str(),
+                    'route_id' => self::int(true),
+                ], ['reason', 'fix', 'code', 'route_id']),
                 // WHIT-922: the signatures standing on the current version, on
                 // GET /api/documents/{id} only. A signature on an earlier
                 // version is not carried over.
@@ -11124,6 +11184,7 @@ final class CoreApiSchemas
                 'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
                 'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
                 'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
+                'idempotency_key' => self::str() + ['minLength' => 8, 'maxLength' => 64, 'pattern' => '^[A-Za-z0-9_-]{8,64}$', 'description' => 'One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17).'],
             ], ['starts_at', 'name', 'email', 'elapsed_ms']),
             'PublicBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
@@ -11132,6 +11193,7 @@ final class CoreApiSchemas
                 'id' => self::int(),
                 'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
                 'suggested' => self::bool() + ['description' => 'The business suggested this time for the request; the customer can take it.'],
+                'coming' => self::bool() + ['description' => 'The customer already said they are coming (WHIT-1417).'],
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
                 'service' => self::object(['id' => self::int(true), 'name' => SchemaBuilder::ref('LocalizedLabel'), 'duration_minutes' => self::int(true)], ['id', 'name']),
@@ -11166,7 +11228,8 @@ final class CoreApiSchemas
                 'min_notice_minutes' => self::int(),
                 'max_advance_days' => self::int(),
                 'slot_step_minutes' => self::int(),
-                'reminder_hours_before' => self::int() + ['description' => '0 means no reminder.'],
+                'reminder_hours_before' => self::int() + ['description' => 'The first reminder\'s hours before; 0 means none. Kept for older clients: `reminders` lists them all.'],
+                'reminders' => ['type' => 'array', 'items' => self::int(), 'description' => 'Every reminder, as hours before the start, largest first; empty means none (WHIT-1417).'],
                 'payment_hold_minutes' => self::int(),
                 'week_start' => self::str(),
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
@@ -11180,7 +11243,8 @@ final class CoreApiSchemas
                 'min_notice_minutes' => self::int() + ['minimum' => 0, 'maximum' => 43200, 'description' => 'Least time between booking and start, in minutes.'],
                 'max_advance_days' => self::int() + ['minimum' => 1, 'maximum' => 730, 'description' => 'How many days ahead a booking may be made.'],
                 'slot_step_minutes' => self::int() + ['minimum' => 5, 'maximum' => 240, 'description' => 'Free times are offered every this many minutes.'],
-                'reminder_hours_before' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'Send one reminder this many hours before; 0 sends none.'],
+                'reminder_hours_before' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'Older clients: one reminder this many hours before; 0 sends none. Replaces `reminders`.'],
+                'reminders' => ['type' => 'array', 'maxItems' => 3, 'items' => self::int() + ['minimum' => 1, 'maximum' => 168], 'description' => 'Up to three reminders, as hours before the start, all different; empty sends none (WHIT-1417).'],
                 'payment_hold_minutes' => self::int() + ['minimum' => 1, 'maximum' => 1440, 'description' => 'How long a payment step holds a slot.'],
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
@@ -11409,10 +11473,18 @@ final class CoreApiSchemas
                 'room_id' => self::int(true) + ['description' => 'The room it holds.'],
                 'checked_in_at' => self::str(true) + ['description' => 'When the customer arrived.'],
                 'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
-                'reminder_sent_at' => self::str(true),
+                'reminder_sent_at' => self::str(true) + ['description' => 'When the last reminder went.'],
+                'confirmed_by_customer_at' => self::str(true) + ['description' => 'When the customer pressed I\'m coming (WHIT-1417).'],
+                'reminders' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingReminder'), 'description' => 'Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14).'],
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
+            'CalendarBookingReminder' => self::object([
+                'hours_before' => self::int() + ['description' => 'Which reminder: this many hours before the start.'],
+                'channel' => self::str() + ['description' => '`email`, or the text channel\'s key (such as `whatsapp`).'],
+                'outcome' => self::str() + ['enum' => ['sent', 'failed', 'no_address'], 'description' => '`no_address`: the booking has no email, or no phone for a text channel.'],
+                'sent_at' => self::str(true),
+            ], ['hours_before', 'channel', 'outcome', 'sent_at']),
             'CalendarBookingCreateRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service to book. Leave out when sending `services`.'],
                 'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person.'],
@@ -13684,7 +13756,31 @@ final class CoreApiSchemas
             ]),
         ];
 
+        // WHIT-1406: Whity Desktop's sign-in return. The browser signed the
+        // person in through `/start?mode=native`; core sent a one-time code to
+        // the app's loopback listener; the app exchanges it here, token mode
+        // only, with the PKCE verifier. The code is spent on the first attempt.
+        $nativeExchange = [
+            'method' => 'POST',
+            'path' => '/api/auth/sso/native/exchange',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Exchange a native sign-in code for a token-mode session',
+                'description' => 'Send `X-Auth-Mode: token`. Answers like `POST /api/login` in token mode: tokens, or `requires_tenant_selection` with the memberships and a `selection_token` for `POST /api/auth/select-tenant`. An unknown, expired or replayed code, or a wrong verifier, is a generic 401; the code is spent either way.',
+                'tags' => ['sso'],
+                'request' => 'NativeSignInExchangeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Session issued, or a workspace to choose', 'LoginResponse'),
+                    400 => self::errorResponse('Not token mode, or code and code_verifier missing or malformed'),
+                    401 => self::errorResponse('Invalid or expired code'),
+                    429 => self::errorResponse('Too many attempts from this address'),
+                ],
+            ],
+        ];
+
         return [
+            $nativeExchange,
             $ssoWorkspaceShow,
             $ssoWorkspaceCreate,
             $workspaceCreateState,
@@ -15637,6 +15733,18 @@ final class CoreApiSchemas
                 'tags' => ['billing'],
                 'responses' => [
                     200 => self::jsonResponse('The trial of this workspace','WorkspaceTrialResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::ungatedRoute('GET', '/api/billing/pause', [
+                'summary' => 'Whether this workspace is paused because its plan lapsed, and who its owners are',
+                'description' =>
+                    'For every member: when the subscription of this workspace expired or was canceled '
+                    . 'and changes are refused, its status, whether reads are refused too, and the names of its '
+                    . 'owners, so people who cannot pay are told who can. `data` is null when the workspace '
+                    . 'is not paused. Not behind the payment wall.',
+                'tags' => ['billing'],
+                'responses' => [
+                    200 => self::jsonResponse('Whether this workspace is paused', 'WorkspacePauseResponse'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/billing/limits', 'billing:view', [
@@ -19937,7 +20045,7 @@ final class CoreApiSchemas
                 'responses' => [
                     201 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
                     404 => self::errorResponse('This booking page is not available'),
-                    409 => self::errorResponse('That time was just taken'),
+                    409 => self::errorResponse('That time was just taken, or this booking was already sent (`already_sent`)'),
                     422 => self::errorResponse('Missing details, outside the booking window, or refused as spam'),
                     503 => self::errorResponse('The bot check could not be reached'),
                 ] + $limits,
@@ -19985,6 +20093,15 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
                     404 => self::errorResponse('This link is invalid or has expired'),
                     422 => self::errorResponse('No suggested time to take'),
+                ] + $limits,
+            ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/coming', [
+                'summary' => 'The customer says they are coming (public, WHIT-1417); pressing it again changes nothing',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => self::jsonResponse('Noted', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    409 => self::errorResponse('The booking is not confirmed'),
                 ] + $limits,
             ]),
             $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/ics', [
@@ -21007,6 +21124,28 @@ final class CoreApiSchemas
                     404 => self::errorResponse('There is no such template'),
                 ] + self::authErrors(),
             ]),
+            // WHIT-1409 (SDK 1.169).
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/preview', 'settings:write', [
+                'summary' => 'Preview what applying a workspace template would do',
+                'description' => 'Runs the same engine as apply with the same body, as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed. Each item says add, keep (already there), done (an earlier run made it, so it is not made again), left (not ticked) or skip and why.',
+                'tags' => ['platform-ops'],
+                'parameters' => [['name' => 'key', 'in' => 'path', 'required' => true, 'description' => 'The template\'s key (bakery)', 'schema' => ['type' => 'string']]],
+                'request' => 'ApplyWorkspaceTemplateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What applying would make, keep and skip', 'PreviewWorkspaceTemplateResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
+            // WHIT-1413 (SDK 1.170).
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents|pipelines}/{item:[a-z][a-z0-9-]*}/adopt', 'settings:write', [
+                'summary' => 'Use the template\'s version of one item',
+                'description' => 'For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template\'s labels and its missing questions; a role gets the template\'s missing permissions the caller holds; a document gets a new copy beside the workspace\'s; a pipeline (SDK 1.172) gets a new review route, and its form moves to it only while the form still uses the route the template made.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('add when it was changed, keep when it already matched, skip with why', 'AdoptWorkspaceTemplateItemResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
                 'summary' => 'Remove the example contacts and bookings a template added',
                 'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
@@ -21207,6 +21346,7 @@ final class CoreApiSchemas
                 'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
                 'theme' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateTheme')], 'description' => 'The theme the template suggests, when this workspace has it (SDK 1.131)'],
                 'chosen' => self::bool(),
+                'update' => array_merge(SchemaBuilder::ref('WorkspaceTemplateUpdate'), ['nullable' => true, 'description' => 'What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied']),
             ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
             'WorkspaceTemplateListResponse' => self::object([
                 'data' => self::object([
@@ -21225,7 +21365,43 @@ final class CoreApiSchemas
                     'template' => self::str(),
                     'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part were made'],
                     'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                    'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateItem'), 'description' => 'Each item of the template and what happened to it (SDK 1.169)'],
                 ], ['template', 'made', 'skipped']),
+            ], ['data']),
+            'AdoptWorkspaceTemplateItemResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'part' => self::str(),
+                    'key' => self::str(),
+                    'action' => self::str() + ['enum' => ['add', 'keep', 'skip']],
+                    'reason' => self::str(),
+                ], ['template', 'part', 'key', 'action']),
+            ], ['data']),
+            'WorkspaceTemplateUpdate' => self::object([
+                'from' => self::int() + ['description' => 'The template\'s version this workspace applied last'],
+                'to' => self::int() + ['description' => 'The version on offer'],
+                'parts' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str() + ['description' => 'template:{key}, extends:{key} or extension:{plugin}.{key}'],
+                    'from' => self::int() + ['nullable' => true, 'description' => 'Null for a part this workspace never applied, such as a new extension'],
+                    'to' => self::int(),
+                ], ['key', 'from', 'to'])],
+                'changes' => ['type' => 'array', 'items' => self::object(['version' => self::int(), 'summary' => self::str() + ['nullable' => true]], ['version', 'summary'])],
+            ], ['from', 'to', 'parts', 'changes']),
+            'WorkspaceTemplateItem' => self::object([
+                'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents or examples'],
+                'key' => self::str() + ['description' => 'The template\'s key for the item'],
+                'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'changed', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template\'s version, SDK 1.170); left: not ticked; skip: not done, see reason'],
+                'reason' => self::str(),
+            ], ['part', 'key', 'action']),
+            'PreviewWorkspaceTemplateResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'version' => self::int() + ['description' => 'The version on offer'],
+                    'appliedVersion' => self::int() + ['nullable' => true, 'description' => 'The version this workspace applied last, or null when it never applied it'],
+                    'made' => ['type' => 'object', 'additionalProperties' => self::int(), 'description' => 'How many of each part would be made'],
+                    'skipped' => ['type' => 'array', 'items' => self::object(['part' => self::str(), 'key' => self::str(), 'reason' => self::str()], ['part', 'key', 'reason'])],
+                    'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateItem')],
+                ], ['template', 'version', 'appliedVersion', 'made', 'skipped', 'items']),
             ], ['data']),
             'WorkspaceTemplateSetupStatusResponse' => self::object([
                 'data' => self::object([

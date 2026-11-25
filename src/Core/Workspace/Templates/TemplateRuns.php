@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace Whity\Core\Workspace\Templates;
 
 use PDO;
+use Whity\Sdk\Templates\TemplateLedger;
 
 /**
  * Which templates a workspace applied and what each one made (migration 305,
- * WHIT-1194). Every query binds the tenant.
+ * WHIT-1194), and the version of each part a run applied (migration 358,
+ * WHIT-1409). The SDK's template engine reads and writes it as its
+ * {@see TemplateLedger}. Every query binds the tenant.
  */
-final class TemplateRuns
+final class TemplateRuns implements TemplateLedger
 {
     public function __construct(private readonly PDO $db)
     {
@@ -114,15 +117,19 @@ final class TemplateRuns
     /**
      * What a run made, by kind and the template's key for it.
      *
-     * @return array<string, array{ref_id: string, removed: bool}>
+     * @return array<string, array{ref_id: string, removed: bool, fingerprint: ?string}>
      */
     public function items(int $tenantId, int $runId): array
     {
-        $stmt = $this->db->prepare('SELECT kind, item_key, ref_id, removed_at FROM workspace_template_items WHERE tenant_id = ? AND run_id = ?');
+        $stmt = $this->db->prepare('SELECT kind, item_key, ref_id, removed_at, fingerprint FROM workspace_template_items WHERE tenant_id = ? AND run_id = ?');
         $stmt->execute([$tenantId, $runId]);
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $out[$row['kind'] . ':' . $row['item_key']] = ['ref_id' => (string) $row['ref_id'], 'removed' => $row['removed_at'] !== null];
+            $out[$row['kind'] . ':' . $row['item_key']] = [
+                'ref_id' => (string) $row['ref_id'],
+                'removed' => $row['removed_at'] !== null,
+                'fingerprint' => $row['fingerprint'] === null ? null : (string) $row['fingerprint'],
+            ];
         }
 
         return $out;
@@ -167,5 +174,34 @@ final class TemplateRuns
     {
         $stmt = $this->db->prepare('UPDATE workspace_template_items SET removed_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?');
         $stmt->execute([$itemId, $tenantId]);
+    }
+
+    /** SDK 1.170 (migration 359): which version of its manifest entry the item now matches. */
+    public function setFingerprint(int $tenantId, int $runId, string $kind, string $itemKey, string $fingerprint): void
+    {
+        $stmt = $this->db->prepare('UPDATE workspace_template_items SET fingerprint = ? WHERE tenant_id = ? AND run_id = ? AND kind = ? AND item_key = ?');
+        $stmt->execute([$fingerprint, $tenantId, $runId, $kind, $itemKey]);
+    }
+
+    public function recordPart(int $tenantId, int $runId, string $partKey, ?string $pluginName, int $version): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO workspace_template_parts (tenant_id, run_id, part_key, plugin_name, version)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT (run_id, part_key) DO UPDATE SET version = EXCLUDED.version, plugin_name = EXCLUDED.plugin_name, applied_at = CURRENT_TIMESTAMP'
+        );
+        $stmt->execute([$tenantId, $runId, $partKey, $pluginName, $version]);
+    }
+
+    public function parts(int $tenantId, int $runId): array
+    {
+        $stmt = $this->db->prepare('SELECT part_key, version FROM workspace_template_parts WHERE tenant_id = ? AND run_id = ? ORDER BY id');
+        $stmt->execute([$tenantId, $runId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
+            $out[(string) $row['part_key']] = (int) $row['version'];
+        }
+
+        return $out;
     }
 }

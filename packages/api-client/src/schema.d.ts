@@ -1131,6 +1131,90 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/accounting/stock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Show stock in the books
+         * @description Whether stock posts to the books, since when, what the stock is worth at its moving average cost and what the Stock account says. Minor units.
+         */
+        get: operations["get_api_v1_accounting_stock"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Turn stock in the books on or off
+         * @description On by default. Off stops posting stock; on again brings the Stock account to the stock's value with the next stock change, or at once with `/stock/opening`.
+         */
+        patch: operations["patch_api_v1_accounting_stock"];
+        trace?: never;
+    };
+    "/api/v1/accounting/stock/costs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give stock with no cost its cost
+         * @description For an item on hand whose cost is unknown (no purchase price and no priced receipt): sets the cost of one base unit, in the workspace's currency, and posts the stock's value against Opening balances so the Stock account takes it in.
+         */
+        post: operations["post_api_v1_accounting_stock_costs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/stock/opening": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bring stock into the books now
+         * @description Values all stock at its current cost and posts what the Stock account lacks against Opening balances, once. Otherwise it happens with the first stock change.
+         */
+        post: operations["post_api_v1_accounting_stock_opening"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/accounting/stock/waiting": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Stock waiting for a cost
+         * @description Items on hand whose cost is unknown, so they are not in the Stock account, and moves since stock went into the books that posted nothing for want of a cost.
+         */
+        get: operations["get_api_v1_accounting_stock_waiting"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/accounting/suppliers/{id}/statement": {
         parameters: {
             query?: never;
@@ -1741,6 +1825,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/operator-link": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Sign a platform operator in with a one-time link printed on the server */
+        post: operations["post_api_v1_auth_operator_link"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/password/forgot": {
         parameters: {
             query?: never;
@@ -1804,6 +1905,26 @@ export interface paths {
         put?: never;
         /** Select the active tenant after a multi-membership login */
         post: operations["post_api_v1_auth_select_tenant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/sso/native/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a native sign-in code for a token-mode session
+         * @description Send `X-Auth-Mode: token`. Answers like `POST /api/login` in token mode: tokens, or `requires_tenant_selection` with the memberships and a `selection_token` for `POST /api/auth/select-tenant`. An unknown, expired or replayed code, or a wrong verifier, is a generic 401; the code is spent either way.
+         */
+        post: operations["post_api_v1_auth_sso_native_exchange"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2072,6 +2193,26 @@ export interface paths {
          * @description CONFIGURED rails only. Offering one that cannot take money produces a button whose only outcome is an error the customer cannot act on. Each row says what the rail can do — in particular whether it can charge unattended, which is the difference between a subscription that renews itself and one where the customer must push the money every period.
          */
         get: operations["get_api_v1_billing_methods"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/billing/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether this workspace is paused because its plan lapsed, and who its owners are
+         * @description For every member: when the subscription of this workspace expired or was canceled and changes are refused, its status, whether reads are refused too, and the names of its owners, so people who cannot pay are told who can. `data` is null when the workspace is not paused. Not behind the payment wall.
+         */
+        get: operations["get_api_v1_billing_pause"];
         put?: never;
         post?: never;
         delete?: never;
@@ -11352,6 +11493,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/bookings/{token}/coming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** The customer says they are coming (public, WHIT-1417); pressing it again changes nothing */
+        post: operations["post_api_v1_public_bookings_token_coming"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/bookings/{token}/ics": {
         parameters: {
             query?: never;
@@ -14578,6 +14736,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/templates/{key}/items/{part}/{item}/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Use the template's version of one item
+         * @description For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template's labels and its missing questions; a role gets the template's missing permissions the caller holds; a document gets a new copy beside the workspace's; a pipeline (SDK 1.172) gets a new review route, and its form moves to it only while the form still uses the route the template made.
+         */
+        post: operations["post_api_v1_workspace_templates_key_items_part_item_adopt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/workspace/templates/{key}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview what applying a workspace template would do
+         * @description Runs the same engine as apply with the same body, as the caller, but changes nothing and audits nothing: reads go to the workspace, writes are only listed. Each item says add, keep (already there), done (an earlier run made it, so it is not made again), left (not ticked) or skip and why.
+         */
+        post: operations["post_api_v1_workspace_templates_key_preview"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspace/templates/{key}/setup/current/{kind}": {
         parameters: {
             query?: never;
@@ -15453,6 +15651,35 @@ export interface components {
                 after_line?: number;
             } | null;
         };
+        AccountingStockCost: {
+            /** @description The item variant whose stock has no cost yet (from Stock waiting for a cost). */
+            variant_id: number;
+            /** @description The cost of one base unit (a kilogram, a piece), in minor units of the workspace's currency. */
+            unit_cost_minor: number;
+            /** @description YYYY-MM-DD, in an open month. Default: today. */
+            date?: string;
+        };
+        AccountingStockOpening: {
+            /** @description YYYY-MM-DD, in an open month. Default: today. */
+            date?: string;
+        };
+        AccountingStockStatus: {
+            stock_in_books: boolean;
+            /** @description When stock first posted to the books since it was last turned on. */
+            since?: string | null;
+            currency: string;
+            /** @description The stock's value at its moving average cost. */
+            stock_value_minor: number;
+            /** @description What the Stock account says. */
+            stock_account_minor: number;
+            items_without_cost?: number;
+            /** @description Stock changes that posted nothing for want of a cost. */
+            waiting?: number;
+        };
+        AccountingStockSwitch: {
+            /** @description Whether stock posts to the books. */
+            stock_in_books: boolean;
+        };
         AccountingTaxCode: {
             id: number;
             code: string;
@@ -15623,6 +15850,16 @@ export interface components {
                         [key: string]: unknown;
                     };
                 };
+            };
+        };
+        AdoptWorkspaceTemplateItemResponse: {
+            data: {
+                template: string;
+                part: string;
+                key: string;
+                /** @enum {string} */
+                action: "add" | "keep" | "skip";
+                reason?: string;
             };
         };
         Affiliate: {
@@ -16080,6 +16317,8 @@ export interface components {
                     key: string;
                     reason: string;
                 }[];
+                /** @description Each item of the template and what happened to it (SDK 1.169) */
+                items?: components["schemas"]["WorkspaceTemplateItem"][];
             };
         };
         ApprovalStatusResponse: {
@@ -16242,6 +16481,7 @@ export interface components {
                 has_access: boolean;
                 status?: string | null;
                 plan?: string | null;
+                plan_name?: string | null;
                 access_until?: string | null;
                 cancel_at_period_end?: boolean;
                 checkout_status?: string | null;
@@ -16414,7 +16654,12 @@ export interface components {
             checked_in_at?: string | null;
             /** @description When staff suggested this time for a request. */
             suggested_at?: string | null;
+            /** @description When the last reminder went. */
             reminder_sent_at?: string | null;
+            /** @description When the customer pressed I'm coming (WHIT-1417). */
+            confirmed_by_customer_at?: string | null;
+            /** @description Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14). */
+            reminders?: components["schemas"]["CalendarBookingReminder"][];
             /** @description In lists: the room's name, language code => text. */
             room_name?: {
                 [key: string]: string;
@@ -16487,6 +16732,18 @@ export interface components {
             book_anyway?: boolean;
             /** @description Refuse a time outside the person's working hours, without the booking window's notice rules. */
             within_hours?: boolean;
+        };
+        CalendarBookingReminder: {
+            /** @description Which reminder: this many hours before the start. */
+            hours_before: number;
+            /** @description `email`, or the text channel's key (such as `whatsapp`). */
+            channel: string;
+            /**
+             * @description `no_address`: the booking has no email, or no phone for a text channel.
+             * @enum {string}
+             */
+            outcome: "sent" | "failed" | "no_address";
+            sent_at: string | null;
         };
         CalendarBookingServiceChoice: {
             service_id: number;
@@ -16752,8 +17009,10 @@ export interface components {
             min_notice_minutes: number;
             max_advance_days: number;
             slot_step_minutes: number;
-            /** @description 0 means no reminder. */
+            /** @description The first reminder's hours before; 0 means none. Kept for older clients: `reminders` lists them all. */
             reminder_hours_before: number;
+            /** @description Every reminder, as hours before the start, largest first; empty means none (WHIT-1417). */
+            reminders?: number[];
             payment_hold_minutes: number;
             week_start: string;
             weekend_days: string[];
@@ -16774,8 +17033,10 @@ export interface components {
             max_advance_days?: number;
             /** @description Free times are offered every this many minutes. */
             slot_step_minutes?: number;
-            /** @description Send one reminder this many hours before; 0 sends none. */
+            /** @description Older clients: one reminder this many hours before; 0 sends none. Replaces `reminders`. */
             reminder_hours_before?: number;
+            /** @description Up to three reminders, as hours before the start, all different; empty sends none (WHIT-1417). */
+            reminders?: number[];
             /** @description How long a payment step holds a slot. */
             payment_hold_minutes?: number;
             /**
@@ -18291,6 +18552,8 @@ export interface components {
             pdf_pending?: {
                 reason: string;
                 fix: string | null;
+                code: string;
+                route_id: number | null;
             };
             /** @description Who signed the current version, in what capacity and when. Electronic signatures with an audit trail. */
             signatures?: components["schemas"]["DocumentSignature"][];
@@ -22860,6 +23123,10 @@ export interface components {
                 phone: string | null;
             };
         };
+        NativeSignInExchangeRequest: {
+            code: string;
+            code_verifier: string;
+        };
         NavigationItem: {
             id: string;
             label: string;
@@ -22956,6 +23223,24 @@ export interface components {
         };
         OpenApiDocumentResponse: {
             [key: string]: unknown;
+        };
+        OperatorLinkRequest: {
+            token: string;
+        };
+        OperatorLinkResponse: {
+            user: {
+                id: number;
+                email: string;
+                /** @description Your own phone number in E.164, or null (WHIT-1181). */
+                phone?: string | null;
+                role: string;
+                tenant_id: number;
+            };
+            next: string;
+            access_token?: string;
+            refresh_token?: string;
+            token_type?: string;
+            expires_in?: number;
         };
         OrganizationalUnit: {
             id: number;
@@ -23645,6 +23930,25 @@ export interface components {
         PluginUploadResponse: {
             data: components["schemas"]["PluginEntry"];
         };
+        PreviewWorkspaceTemplateResponse: {
+            data: {
+                template: string;
+                /** @description The version on offer */
+                version: number;
+                /** @description The version this workspace applied last, or null when it never applied it */
+                appliedVersion: number | null;
+                /** @description How many of each part would be made */
+                made: {
+                    [key: string]: number;
+                };
+                skipped: {
+                    part: string;
+                    key: string;
+                    reason: string;
+                }[];
+                items: components["schemas"]["WorkspaceTemplateItem"][];
+            };
+        };
         ProfileRelationsResponse: {
             data: {
                 personId: number | null;
@@ -23692,6 +23996,8 @@ export interface components {
             status: "pending_payment" | "requested" | "confirmed" | "cancelled" | "expired";
             /** @description The business suggested this time for the request; the customer can take it. */
             suggested?: boolean;
+            /** @description The customer already said they are coming (WHIT-1417). */
+            coming?: boolean;
             starts_at: string;
             ends_at: string;
             service: {
@@ -23799,6 +24105,8 @@ export interface components {
             elapsed_ms: number;
             /** @description The bot-check token, when the page shows one. */
             bot_token?: string;
+            /** @description One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17). */
+            idempotency_key?: string;
         };
         /** @description The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in. */
         PublicBookingVisitor: {
@@ -24160,6 +24468,9 @@ export interface components {
             is_per_seat?: boolean;
             is_per_device?: boolean;
             is_addon: boolean;
+            entitlements?: {
+                [key: string]: boolean | number | string;
+            };
         };
         PurchasablePlanListResponse: {
             data: components["schemas"]["PurchasablePlan"][];
@@ -27010,6 +27321,19 @@ export interface components {
                 is_owner: boolean;
             };
         };
+        WorkspacePauseResponse: {
+            data: components["schemas"]["WorkspacePauseState"] | null;
+        };
+        WorkspacePauseState: {
+            /** @description expired or canceled */
+            status: string;
+            /** @description The wall refuses reads too, not only changes */
+            reads_refused: boolean;
+            /** @description The owners who can pay, by name */
+            owners: {
+                name: string;
+            }[];
+        };
         WorkspacePlugin: {
             /** @description The name in lower case, used in routes */
             slug: string;
@@ -27091,6 +27415,20 @@ export interface components {
             /** @description The theme the template suggests, when this workspace has it (SDK 1.131) */
             theme?: components["schemas"]["WorkspaceTemplateTheme"] | null;
             chosen: boolean;
+            /** @description What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied */
+            update?: components["schemas"]["WorkspaceTemplateUpdate"];
+        };
+        WorkspaceTemplateItem: {
+            /** @description settings, theme, calendar, services, roles, forms, documents or examples */
+            part: string;
+            /** @description The template's key for the item */
+            key: string;
+            /**
+             * @description add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template's version, SDK 1.170); left: not ticked; skip: not done, see reason
+             * @enum {string}
+             */
+            action: "add" | "keep" | "done" | "changed" | "left" | "skip";
+            reason?: string;
         };
         WorkspaceTemplateListResponse: {
             data: {
@@ -27195,6 +27533,23 @@ export interface components {
             id: string;
             /** @description The theme's name in the reader's language */
             name?: string | null;
+        };
+        WorkspaceTemplateUpdate: {
+            /** @description The template's version this workspace applied last */
+            from: number;
+            /** @description The version on offer */
+            to: number;
+            parts: {
+                /** @description template:{key}, extends:{key} or extension:{plugin}.{key} */
+                key: string;
+                /** @description Null for a part this workspace never applied, such as a new extension */
+                from: number | null;
+                to: number;
+            }[];
+            changes: {
+                version: number;
+                summary: string | null;
+            }[];
         };
         WorkspaceTrialResponse: {
             data: components["schemas"]["WorkspaceTrialState"] | null;
@@ -33219,6 +33574,463 @@ export interface operations {
             };
         };
     };
+    get_api_v1_accounting_stock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Stock in the books */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingStockStatus"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_accounting_stock: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockSwitch"];
+            };
+        };
+        responses: {
+            /** @description Stock in the books */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["AccountingStockStatus"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_stock_costs: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockCost"];
+            };
+        };
+        responses: {
+            /** @description The cost given */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            variant_id: number;
+                            /** @description What the stock on hand is now worth. */
+                            value_minor: number;
+                            entry_id?: number | null;
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_accounting_stock_opening: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AccountingStockOpening"];
+            };
+        };
+        responses: {
+            /** @description What was posted */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            posted: boolean;
+                            entry_id?: number | null;
+                            /** @description What the Stock account was brought up (or down) by. */
+                            amount_minor: number;
+                            /** @description Variants with no cost yet, not valued. */
+                            unknown: number[];
+                        };
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Refused: a duplicate code, a closed month, or already done */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_accounting_stock_waiting: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Waiting */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            items: {
+                                variant_id: number;
+                                item_id: number;
+                                item_name: string;
+                                /** @description In the unit's smallest steps. */
+                                quantity: number;
+                            }[];
+                            moves: {
+                                move_id: number;
+                                variant_id: number;
+                                item_name: string;
+                                quantity: number;
+                                source_type?: string;
+                                source_id?: number | null;
+                                occurred_at?: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_accounting_suppliers_id_statement: {
         parameters: {
             query?: {
@@ -36154,6 +36966,75 @@ export interface operations {
             };
         };
     };
+    post_api_v1_auth_operator_link: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OperatorLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Session issued in the system workspace; next is the page to open */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OperatorLinkResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The link expired, was already used, or is not for a platform operator */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_auth_password_forgot: {
         parameters: {
             query?: never;
@@ -36473,6 +37354,84 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_auth_sso_native_exchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeSignInExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Session issued, or a workspace to choose */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Not token mode, or code and code_verifier missing or malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid or expired code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts from this address */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -37671,6 +38630,71 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PaymentMethodListResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_billing_pause: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether this workspace is paused */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkspacePauseResponse"];
                 };
             };
             /** @description Missing or invalid authentication */
@@ -86472,7 +87496,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description That time was just taken */
+            /** @description That time was just taken, or this booking was already sent (`already_sent`) */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -86852,6 +87876,76 @@ export interface operations {
             };
             /** @description Already cancelled */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_bookings_token_coming: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's email. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Noted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBooking"];
+                    };
+                };
+            };
+            /** @description This link is invalid or has expired */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The booking is not confirmed */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -104726,6 +105820,156 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ApplyWorkspaceTemplateResponse"];
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_items_part_item_adopt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                part: string;
+                item: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description add when it was changed, keep when it already matched, skip with why */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdoptWorkspaceTemplateItemResponse"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_preview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The template's key (bakery) */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApplyWorkspaceTemplateRequest"];
+            };
+        };
+        responses: {
+            /** @description What applying would make, keep and skip */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreviewWorkspaceTemplateResponse"];
                 };
             };
             /** @description Invalid request body */

@@ -233,20 +233,25 @@ final class CoreJobs
                 )),
                 false
             );
+            $reminderBookings = \Whity\Core\Calendar\CalendarServices::bookingService(
+                $pdo,
+                $calendarSettings,
+                null,
+                $coreSender,
+                \Whity\Core\Http\FrontendUrls::fromEnv(),
+                $calendarQueue,
+                $calendarLogger
+            );
             $registry->register(
                 \Whity\Core\Calendar\BookingReminderJob::NAME,
-                new \Whity\Core\Calendar\BookingReminderJob(
-                    \Whity\Core\Calendar\CalendarServices::bookingService(
-                        $pdo,
-                        $calendarSettings,
-                        null,
-                        $coreSender,
-                        \Whity\Core\Http\FrontendUrls::fromEnv(),
-                        $calendarQueue,
-                        $calendarLogger
-                    ),
-                    $calendarQueue
-                ),
+                new \Whity\Core\Calendar\BookingReminderJob($reminderBookings, $calendarQueue),
+                false
+            );
+            // WHIT-1417 (AP.14): every 5 minutes, any due reminder the queue
+            // lost is queued again. Internal: only schedule:run queues it.
+            $registry->register(
+                \Whity\Core\Calendar\BookingReminderSweepJob::NAME,
+                new \Whity\Core\Calendar\BookingReminderSweepJob($reminderBookings, $calendarQueue),
                 false
             );
 

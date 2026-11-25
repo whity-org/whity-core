@@ -144,4 +144,58 @@ describe('ManageBookingScreen', () => {
     expect(screen.queryByTestId('manage-take')).toBeNull();
     expect(screen.getByTestId('manage-cancel')).toBeInTheDocument();
   });
+
+  describe('from the reminder (WHIT-1417)', () => {
+    afterEach(() => window.history.replaceState(null, '', '/'));
+
+    it('makes I’m coming the main button, and the press answers', async () => {
+      window.history.replaceState(null, '', `/booking/${OLD}?answer=coming`);
+      const calls: string[] = [];
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        calls.push(`${init?.method ?? 'GET'} ${url}`);
+        if (url === `/api/v1/public/bookings/${OLD}`) return respond(200, { data: { ...booking, coming: false } });
+        if (url === `/api/v1/public/bookings/${OLD}/coming`) return respond(200, { data: { ...booking, coming: true, workspace: undefined, time_zone: undefined } });
+        return respond(404, { error: 'This link is invalid or has expired' });
+      });
+
+      render(<ManageBookingScreen token={OLD} />);
+      const coming = await screen.findByTestId('manage-coming');
+      expect(coming).toHaveTextContent('I’m coming');
+      expect(screen.getByTestId('manage-cancel')).toHaveTextContent('I can’t come');
+      // Opening the link answered nothing.
+      expect(calls).toEqual([`GET /api/v1/public/bookings/${OLD}`]);
+
+      fireEvent.click(coming);
+      expect(await screen.findByTestId('manage-notice')).toHaveTextContent('Thank you. Example Bakery knows you’re coming.');
+      expect(calls).toContain(`POST /api/v1/public/bookings/${OLD}/coming`);
+      expect(screen.queryByTestId('manage-coming')).toBeNull();
+      expect(screen.getByTestId('manage-ics')).toHaveTextContent('Add to my calendar');
+    });
+
+    it('opens the cancel dialog for I can’t come, and cancels only on the press', async () => {
+      window.history.replaceState(null, '', `/booking/${OLD}?answer=cancel`);
+      const calls: string[] = [];
+      fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+        calls.push(`${init?.method ?? 'GET'} ${url}`);
+        if (url === `/api/v1/public/bookings/${OLD}`) return respond(200, { data: booking });
+        if (url === `/api/v1/public/bookings/${OLD}/cancel`) return respond(200, { data: { ...booking, status: 'cancelled' } });
+        return respond(404, { error: 'This link is invalid or has expired' });
+      });
+
+      render(<ManageBookingScreen token={OLD} />);
+      expect(await screen.findByTestId('manage-cancel-dialog')).toHaveTextContent('Cancel your booking?');
+      expect(calls).toEqual([`GET /api/v1/public/bookings/${OLD}`]);
+      fireEvent.click(screen.getByTestId('manage-cancel-confirm'));
+      await waitFor(() => expect(calls).toContain(`POST /api/v1/public/bookings/${OLD}/cancel`));
+    });
+
+    it('says so when they already answered', async () => {
+      window.history.replaceState(null, '', `/booking/${OLD}?answer=coming`);
+      fetchMock.mockImplementation(() => respond(200, { data: { ...booking, coming: true } }));
+
+      render(<ManageBookingScreen token={OLD} />);
+      expect(await screen.findByTestId('manage-coming-said')).toHaveTextContent('You told us you’re coming.');
+      expect(screen.queryByTestId('manage-coming')).toBeNull();
+    });
+  });
 });

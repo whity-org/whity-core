@@ -71,8 +71,9 @@ function toMotion(value: unknown): MotionMode {
 
 const INIT_SCRIPT = `try{var d=document.documentElement;if(localStorage.getItem(${JSON.stringify(TEXT_SIZE_STORAGE_KEY)})==='larger')d.dataset.textSize='larger';var m=localStorage.getItem(${JSON.stringify(MOTION_STORAGE_KEY)});if(m==='calm'||m==='off')d.dataset.motion=m;if(localStorage.getItem(${JSON.stringify(CONTRAST_STORAGE_KEY)})==='high')d.dataset.contrast='high'}catch(e){}`;
 
-export function DisplayPreferencesInitScript() {
-  return <script dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />;
+/** `nonce`: this request's CSP nonce (READINESS CE-12), from the root layout. */
+export function DisplayPreferencesInitScript({ nonce }: { nonce?: string } = {}) {
+  return <script nonce={nonce} dangerouslySetInnerHTML={{ __html: INIT_SCRIPT }} />;
 }
 
 export function DisplayPreferencesProvider({ children }: { children: ReactNode }) {

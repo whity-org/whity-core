@@ -62,7 +62,8 @@ function draftOf(s: CalendarSettings): Draft {
     minNotice: String(s.min_notice_minutes),
     maxAdvance: String(s.max_advance_days),
     slotStep: String(s.slot_step_minutes),
-    reminder: String(s.reminder_hours_before),
+    // WHIT-1417: every reminder, such as "24, 2".
+    reminder: (s.reminders ?? (s.reminder_hours_before > 0 ? [s.reminder_hours_before] : [])).join(', '),
     hold: String(s.payment_hold_minutes),
     weekStart: s.week_start,
     weekend: [...s.weekend_days].sort(),
@@ -103,7 +104,7 @@ export default function CalendarSettingsPage() {
     if (current.minNotice !== saved.minNotice) changes.push(t('settings.minNotice', 'Least notice'));
     if (current.maxAdvance !== saved.maxAdvance) changes.push(t('settings.maxAdvance', 'How far ahead'));
     if (current.slotStep !== saved.slotStep) changes.push(t('settings.slotStep', 'Free times every'));
-    if (current.reminder !== saved.reminder) changes.push(t('settings.reminder', 'Reminder'));
+    if (current.reminder !== saved.reminder) changes.push(t('settings.reminders', 'Reminders'));
     if (current.hold !== saved.hold) changes.push(t('settings.hold', 'Payment hold'));
     if (current.weekStart !== saved.weekStart) changes.push(t('settings.weekStart', 'First day of the week'));
     if (current.weekend.join(',') !== saved.weekend.join(',')) changes.push(t('settings.weekend', 'Weekend'));
@@ -117,11 +118,17 @@ export default function CalendarSettingsPage() {
     };
     const minNotice = whole(current.minNotice, 0, 43200);
     const maxAdvance = whole(current.maxAdvance, 1, 730);
-    const reminder = whole(current.reminder, 0, 168);
+    const reminderParts = current.reminder.split(',').map((part) => part.trim()).filter((part) => part !== '');
+    const reminderHours = reminderParts.map((part) => whole(part, 1, 168));
+    const reminder =
+      reminderHours.length <= 3 && reminderHours.every((n) => n !== null) && new Set(reminderHours).size === reminderHours.length
+        ? (reminderHours as number[])
+        : null;
     const hold = whole(current.hold, 1, 1440);
     if (minNotice === null) return setProblem(t('settings.error.minNotice', 'Least notice must be from 0 to 43200 minutes (30 days).'));
     if (maxAdvance === null) return setProblem(t('settings.error.maxAdvance', 'How far ahead must be from 1 to 730 days.'));
-    if (reminder === null) return setProblem(t('settings.error.reminder', 'The reminder must be from 0 to 168 hours before.'));
+    if (reminder === null)
+      return setProblem(t('settings.error.reminders', 'Reminders must be up to three different hours from 1 to 168, separated by commas, such as 24, 2.'));
     if (hold === null) return setProblem(t('settings.error.hold', 'The payment hold must be from 1 to 1440 minutes.'));
 
     const body: CalendarSettingsRequest = {
@@ -132,7 +139,7 @@ export default function CalendarSettingsPage() {
       min_notice_minutes: minNotice,
       max_advance_days: maxAdvance,
       slot_step_minutes: Number(current.slotStep),
-      reminder_hours_before: reminder,
+      reminders: reminder,
       payment_hold_minutes: hold,
       week_start: current.weekStart as CalendarSettingsRequest['week_start'],
       weekend_days: current.weekend as CalendarSettingsRequest['weekend_days'],
@@ -297,11 +304,13 @@ export default function CalendarSettingsPage() {
                 <ChangedField changed={current.reminder !== saved.reminder}>
                   <Input
                     id="settings-reminder"
-                    type="number"
-                    min={0}
-                    max={168}
-                    label={t('settings.reminderLabel', 'Reminder, hours before')}
-                    helperText={t('settings.reminderHint', 'One email to the customer. 0 sends none.')}
+                    inputMode="numeric"
+                    dir="ltr"
+                    label={t('settings.remindersLabel', 'Reminders, hours before')}
+                    helperText={t(
+                      'settings.remindersHint',
+                      'Up to three, separated by commas, such as 24, 2. Each goes by email, and by WhatsApp or SMS when connected. Leave empty to send none.'
+                    )}
                     value={current.reminder}
                     onChange={(e) => update({ reminder: e.target.value })}
                   />

@@ -31,6 +31,14 @@ use Whity\Core\Settings\SettingsService;
  * A service that needs a room (design 3.3) also takes that room's lock,
  * AFTER the people's, and the room's live bookings count as busy time.
  *
+ * THE DATABASE TOO (migration 360, design section 39, AP.11)
+ * On PostgreSQL every live booking's people and rooms are also written to
+ * `calendar_holds` by triggers, and an exclusion constraint refuses two that
+ * overlap, whoever writes them. The locks above stay: they give the friendly
+ * reason. {@see self::locked()} checks the constraint before it returns and
+ * turns a refusal into the same 409; Book anyway marks only the person's hold
+ * as allowed to overlap (`overlap_ok`), never a room's.
+ *
  * SEVERAL SERVICES (WHIT-1173)
  * With `calendar.multi_service_booking` on, one booking may hold several
  * services back to back, done by one person or each by their own. Such a
@@ -359,33 +367,43 @@ final class BookingService
                 }
             }
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
-            $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest, $bookAnyway, $checkHours, &$why): ?int {
-                $why = $this->whyNotFree($tenantId, $candidate, $service, $settings, $start, $now, null, $checkHours, $bookAnyway);
-                if ($why !== null) {
-                    return null;
-                }
+            try {
+                $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest, $bookAnyway, $checkHours, &$why): ?int {
+                    $why = $this->whyNotFree($tenantId, $candidate, $service, $settings, $start, $now, null, $checkHours, $bookAnyway);
+                    if ($why !== null) {
+                        return null;
+                    }
 
-                return $this->bookings->insert($tenantId, [
-                    'service_id' => $service['id'],
-                    'profile_id' => $candidate,
-                    'customer_profile_id' => $request['customer_profile_id'],
-                    'customer_name' => $request['customer_name'],
-                    'customer_email' => $request['customer_email'],
-                    'customer_phone' => $request['customer_phone'],
-                    'customer_note' => $request['customer_note'],
-                    'starts_at' => $start,
-                    'ends_at' => $end,
-                    'block' => $block,
-                    'status' => $asRequest ? BookingRepository::STATUS_REQUESTED : ($hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED),
-                    'hold_expires_at' => $hold,
-                    'source' => $request['source'],
-                    'price_minor' => $service['price_minor'],
-                    'currency' => $service['currency'],
-                    'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
-                    'created_by_profile_id' => $request['created_by_profile_id'],
-                    'room_id' => $service['room_id'] ?? null,
-                ]);
-            }, $room);
+                    return $this->bookings->insert($tenantId, [
+                        'service_id' => $service['id'],
+                        'profile_id' => $candidate,
+                        'customer_profile_id' => $request['customer_profile_id'],
+                        'customer_name' => $request['customer_name'],
+                        'customer_email' => $request['customer_email'],
+                        'customer_phone' => $request['customer_phone'],
+                        'customer_note' => $request['customer_note'],
+                        'starts_at' => $start,
+                        'ends_at' => $end,
+                        'block' => $block,
+                        'status' => $asRequest ? BookingRepository::STATUS_REQUESTED : ($hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED),
+                        'hold_expires_at' => $hold,
+                        'source' => $request['source'],
+                        'price_minor' => $service['price_minor'],
+                        'currency' => $service['currency'],
+                        'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
+                        'created_by_profile_id' => $request['created_by_profile_id'],
+                        'room_id' => $service['room_id'] ?? null,
+                        'overlap_ok' => $bookAnyway && $this->personClashes($tenantId, $candidate, $service, $start, $now, null),
+                    ]);
+                }, $room);
+            } catch (CalendarRejectedException $e) {
+                // The database refused it (AP.11): try the next person.
+                if (!HoldConflicts::isHeld($e)) {
+                    throw $e;
+                }
+                $why = is_string($e->extra['reason'] ?? null) ? $e->extra['reason'] : null;
+                $id = null;
+            }
             if ($id !== null) {
                 return $this->created($tenantId, $id, $quote, $requirement, $hold, $step, $asRequest, $notify);
             }
@@ -465,37 +483,49 @@ final class BookingService
                 }
             }
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
-            $id = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $plan, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
-                foreach ($parts as $k => $part) {
-                    $why = $this->whyNotFree($tenantId, $part['profile_id'], $plan['services'][$k], $settings, $part['starts_at'], $now, null, $checkHours, $bookAnyway);
-                    if ($why !== null) {
-                        return null;
+            try {
+                $id = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $plan, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
+                    $overlapOk = false;
+                    foreach ($parts as $k => $part) {
+                        $why = $this->whyNotFree($tenantId, $part['profile_id'], $plan['services'][$k], $settings, $part['starts_at'], $now, null, $checkHours, $bookAnyway);
+                        if ($why !== null) {
+                            return null;
+                        }
+                        $overlapOk = $overlapOk || ($bookAnyway && $this->personClashes($tenantId, $part['profile_id'], $plan['services'][$k], $part['starts_at'], $now, null));
                     }
-                }
-                $id = $this->bookings->insert($tenantId, [
-                    'service_id' => $parts[0]['service_id'],
-                    'profile_id' => $parts[0]['profile_id'],
-                    'customer_profile_id' => $request['customer_profile_id'],
-                    'customer_name' => $request['customer_name'],
-                    'customer_email' => $request['customer_email'],
-                    'customer_phone' => $request['customer_phone'],
-                    'customer_note' => $request['customer_note'],
-                    'starts_at' => $start,
-                    'ends_at' => $end,
-                    'block' => self::span($parts),
-                    'status' => $asRequest ? BookingRepository::STATUS_REQUESTED : ($hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED),
-                    'hold_expires_at' => $hold,
-                    'source' => $request['source'],
-                    'price_minor' => $total,
-                    'currency' => $plan['currency'],
-                    'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
-                    'created_by_profile_id' => $request['created_by_profile_id'],
-                    'room_id' => $parts[0]['room_id'],
-                ]);
-                $this->bookings->insertItems($tenantId, $id, $parts);
+                    $id = $this->bookings->insert($tenantId, [
+                        'service_id' => $parts[0]['service_id'],
+                        'profile_id' => $parts[0]['profile_id'],
+                        'customer_profile_id' => $request['customer_profile_id'],
+                        'customer_name' => $request['customer_name'],
+                        'customer_email' => $request['customer_email'],
+                        'customer_phone' => $request['customer_phone'],
+                        'customer_note' => $request['customer_note'],
+                        'starts_at' => $start,
+                        'ends_at' => $end,
+                        'block' => self::span($parts),
+                        'status' => $asRequest ? BookingRepository::STATUS_REQUESTED : ($hold !== null ? BookingRepository::STATUS_PENDING_PAYMENT : BookingRepository::STATUS_CONFIRMED),
+                        'hold_expires_at' => $hold,
+                        'source' => $request['source'],
+                        'price_minor' => $total,
+                        'currency' => $plan['currency'],
+                        'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
+                        'created_by_profile_id' => $request['created_by_profile_id'],
+                        'room_id' => $parts[0]['room_id'],
+                        'overlap_ok' => $overlapOk,
+                    ]);
+                    $this->bookings->insertItems($tenantId, $id, $parts);
 
-                return $id;
-            });
+                    return $id;
+                });
+            } catch (CalendarRejectedException $e) {
+                // The database refused it (AP.11): choose again.
+                if (!HoldConflicts::isHeld($e)) {
+                    throw $e;
+                }
+                $why = is_string($e->extra['reason'] ?? null) ? $e->extra['reason'] : null;
+                $id = null;
+            }
             if ($id !== null) {
                 return $this->created($tenantId, $id, $quote, $requirement, $hold, $step, $asRequest, $notify);
             }
@@ -698,7 +728,8 @@ final class BookingService
             if ($why !== null) {
                 return false;
             }
-            $this->bookings->move($tenantId, $bookingId, $to, $start, $end, $block, $isRequest ? null : $this->reminderDue($start, $settings, $now));
+            $overlapOk = $bookAnyway && $this->personClashes($tenantId, $to, $service, $start, $now, $bookingId);
+            $this->bookings->move($tenantId, $bookingId, $to, $start, $end, $block, $isRequest ? null : $this->reminderDue($start, $settings, $now), $overlapOk);
 
             return true;
         }, $this->roomLock($tenantId, $service));
@@ -765,13 +796,15 @@ final class BookingService
 
         $why = null;
         $moved = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $bookingId, $parts, $services, $settings, $start, $now, $enforceHours, $withinHours, $isRequest, $bookAnyway, &$why): bool {
+            $overlapOk = false;
             foreach ($parts as $k => $part) {
                 $why = $this->whyNotFree($tenantId, $part['profile_id'], $services[$k], $settings, $part['starts_at'], $now, $bookingId, $enforceHours || $withinHours, $bookAnyway);
                 if ($why !== null) {
                     return false;
                 }
+                $overlapOk = $overlapOk || ($bookAnyway && $this->personClashes($tenantId, $part['profile_id'], $services[$k], $part['starts_at'], $now, $bookingId));
             }
-            $this->bookings->move($tenantId, $bookingId, $parts[0]['profile_id'], $start, $parts[count($parts) - 1]['ends_at'], self::span($parts), $isRequest ? null : $this->reminderDue($start, $settings, $now));
+            $this->bookings->move($tenantId, $bookingId, $parts[0]['profile_id'], $start, $parts[count($parts) - 1]['ends_at'], self::span($parts), $isRequest ? null : $this->reminderDue($start, $settings, $now), $overlapOk);
             $this->bookings->moveItems($tenantId, $bookingId, $parts);
 
             return true;
@@ -910,7 +943,7 @@ final class BookingService
 
             return $done;
         }
-        $done = $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $row, $service, $settings, $start, $paymentRef): bool {
+        $done = $this->settleHeld(fn (): bool => $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $row, $service, $settings, $start, $paymentRef): bool {
             if ($this->whyNotFree($tenantId, (int) $row['profile_id'], $service, $settings, $start, $this->now(), $bookingId, false) !== null) {
                 return false;
             }
@@ -922,7 +955,7 @@ final class BookingService
                 BookingRepository::STATUS_CONFIRMED,
                 ['payment_ref' => mb_substr($paymentRef, 0, 255)],
             );
-        }, $this->roomLock($tenantId, $service));
+        }, $this->roomLock($tenantId, $service)));
         if (!$done) {
             return false;
         }
@@ -958,7 +991,7 @@ final class BookingService
             }
         }
 
-        return $this->underLocks($tenantId, $people, $rooms, function () use ($tenantId, $bookingId, $checks, $settings, $paymentRef): bool {
+        return $this->settleHeld(fn (): bool => $this->underLocks($tenantId, $people, $rooms, function () use ($tenantId, $bookingId, $checks, $settings, $paymentRef): bool {
             foreach ($checks as [$person, $service, $at]) {
                 if ($this->whyNotFree($tenantId, $person, $service, $settings, $at, $this->now(), $bookingId, false) !== null) {
                     return false;
@@ -972,7 +1005,26 @@ final class BookingService
                 BookingRepository::STATUS_CONFIRMED,
                 ['payment_ref' => mb_substr($paymentRef, 0, 255)],
             );
-        });
+        }));
+    }
+
+    /**
+     * A late payment whose time the database finds taken (AP.11) is simply
+     * not confirmed, as when the service's own check finds it taken.
+     *
+     * @param callable(): bool $confirm
+     */
+    private function settleHeld(callable $confirm): bool
+    {
+        try {
+            return $confirm();
+        } catch (CalendarRejectedException $e) {
+            if (!HoldConflicts::isHeld($e)) {
+                throw $e;
+            }
+
+            return false;
+        }
     }
 
     /** A payment step gives up on a held booking: cancel it and free its time. */
@@ -1055,6 +1107,8 @@ final class BookingService
         $booking = BookingRepository::toApi($row);
         $booking['service'] = $this->services->find($tenantId, (int) $row['service_id']);
         $booking['staff_name'] = $this->calendar->displayName((int) $row['profile_id']);
+        // WHIT-1417 (AP.14): every reminder sent, with its channel and outcome.
+        $booking['reminders'] = $this->bookings->reminderLog($tenantId, $id);
         // WHIT-1173: a booking of several services reads as one to everything
         // that shows a booking's service (the emails, reminders, calendar
         // files, the customer's page): their names joined, the whole length
@@ -1076,9 +1130,16 @@ final class BookingService
     }
 
     /**
-     * Send a booking's reminder if it is still due (the queued job's work).
-     * Returns what happened, or `['due' => …]` when it is not due yet and the
-     * job must be queued again.
+     * Send a booking's reminder if it is still due (the queued job's and the
+     * sweep's work). Returns what happened, or `['due' => …]` when it is not
+     * due yet and the job must be queued again.
+     *
+     * WHIT-1417 (AP.14, AP.15): a booking has several reminders
+     * (`calendar.reminders`, 24 and 2 hours before by default).
+     * `reminder_due_at` is always the next one; sending it moves the booking
+     * on to the one after, in the same statement that claims it, so the
+     * queued job and the sweep never both send it. Each channel's outcome is
+     * kept in `calendar_booking_reminders` for the desk.
      *
      * @return string|array{due: DateTimeImmutable}
      */
@@ -1088,31 +1149,118 @@ final class BookingService
         if ($row === null || $row['status'] !== BookingRepository::STATUS_CONFIRMED) {
             return 'not on';
         }
-        if (Interval::toApi(Interval::fromDb((string) $row['starts_at'])) !== $startsAt) {
+        $start = Interval::fromDb((string) $row['starts_at']);
+        if (Interval::toApi($start) !== $startsAt) {
             return 'moved';
         }
-        if ($row['reminder_sent_at'] !== null || $row['reminder_due_at'] === null) {
+        if ($row['reminder_due_at'] === null) {
             return 'nothing due';
         }
         $due = Interval::fromDb((string) $row['reminder_due_at']);
-        if ($due->getTimestamp() > $this->now()->getTimestamp() + 60) {
+        $now = $this->now();
+        if ($due->getTimestamp() > $now->getTimestamp() + 60) {
             return ['due' => $due];
         }
+        if ($start <= $now) {
+            // Too late to remind anyone; stop it being found again.
+            $this->bookings->claimReminder($tenantId, $bookingId, $due, null, $now);
+
+            return 'too late';
+        }
+        $next = $this->reminderDue($start, $this->settingsFor($tenantId), $now);
         // Claimed before sending, so two workers never both send it.
-        if (!$this->bookings->markReminded($tenantId, $bookingId, $this->now())) {
+        if (!$this->bookings->claimReminder($tenantId, $bookingId, $due, $next, $now)) {
             return 'already sent';
         }
+        $hoursBefore = (int) round(($start->getTimestamp() - $due->getTimestamp()) / 3600);
         $booking = $this->bookingOrFail($tenantId, $bookingId);
-        $this->tell('remind', $tenantId, $booking);
+        $email = trim((string) ($booking['customer']['email'] ?? ''));
+        $phone = trim((string) ($booking['customer']['phone'] ?? ''));
+        if ($this->links !== null && ($email !== '' || $phone !== '')) {
+            // A fresh link for I'm coming and I can't come; the reminder is now
+            // the customer's latest message, so it carries the link that works.
+            $booking['manage_token'] = $this->links->issue($tenantId, $bookingId, $start);
+            if ($this->manageUrlBase !== '') {
+                $booking['manage_url'] = rtrim($this->manageUrlBase, '/') . '/' . $booking['manage_token'];
+            }
+        }
+
+        $emailed = BookingRepository::REMINDER_NO_ADDRESS;
+        if ($email !== '') {
+            try {
+                if ($this->messenger instanceof ReportsReminderDelivery) {
+                    $emailed = $this->messenger->remindReported($tenantId, $booking);
+                } else {
+                    $this->messenger->remind($tenantId, $booking);
+                    $emailed = BookingRepository::REMINDER_SENT;
+                }
+            } catch (Throwable $e) {
+                \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not send the reminder email', $e);
+                $emailed = BookingRepository::REMINDER_FAILED;
+            }
+        }
+        $this->logReminder($tenantId, $bookingId, $hoursBefore, 'email', $emailed, $now);
         // C4: and by text on every channel a plugin adds (design 3.3: WhatsApp
         // is paid), through the one way Whity messages customers.
         try {
-            ($this->textReminders ??= BookingTextReminders::fromApp($this->settings))->remind($tenantId, $booking);
+            $texts = ($this->textReminders ??= BookingTextReminders::fromApp($this->settings))->remind($tenantId, $booking);
+            foreach ($texts as $channel => $outcome) {
+                $this->logReminder($tenantId, $bookingId, $hoursBefore, $channel, $outcome, $now);
+            }
         } catch (Throwable $e) {
             error_log('[calendar] the text reminders failed: ' . $e->getMessage());
         }
 
+        if ($next !== null && $this->queue !== null) {
+            try {
+                BookingReminderJob::schedule($this->queue, $tenantId, $bookingId, $startsAt, $next, $now);
+            } catch (Throwable $e) {
+                // The sweep sends it anyway.
+                \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not queue the next reminder', $e);
+            }
+        }
+
         return 'sent';
+    }
+
+    /**
+     * Reminders that are due and unsent, in every workspace, for the sweep
+     * (WHIT-1417, AP.14).
+     *
+     * @return list<array{tenant_id: int, id: int, starts_at: string}>
+     */
+    public function dueReminders(int $limit = 500): array
+    {
+        return array_map(
+            static fn (array $r): array => ['tenant_id' => $r['tenant_id'], 'id' => $r['id'], 'starts_at' => Interval::toApi(Interval::fromDb($r['starts_at']))],
+            $this->bookings->dueReminders($this->now(), $limit),
+        );
+    }
+
+    /**
+     * The customer pressed I'm coming on their page (WHIT-1417, AP.15).
+     * Pressing it again changes nothing.
+     *
+     * @return array<string, mixed>
+     */
+    public function confirmByCustomer(int $tenantId, int $bookingId): array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if ($row['status'] !== BookingRepository::STATUS_CONFIRMED) {
+            throw new CalendarRejectedException('This booking is not confirmed, so there is nothing to answer.', 409);
+        }
+        $this->bookings->confirmByCustomer($tenantId, $bookingId, $this->now());
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    private function logReminder(int $tenantId, int $bookingId, int $hoursBefore, string $channel, string $outcome, DateTimeImmutable $now): void
+    {
+        try {
+            $this->bookings->logReminder($tenantId, $bookingId, $hoursBefore, $channel, $outcome, $now);
+        } catch (Throwable $e) {
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not keep the reminder\'s outcome', $e);
+        }
     }
 
     /**
@@ -1215,6 +1363,20 @@ final class BookingService
     }
 
     /**
+     * Whether the person is busy then, ignoring Book anyway: such a booking
+     * is written with `overlap_ok`, so the database lets it overlap (AP.11).
+     * Only asked when staff chose Book anyway.
+     *
+     * @param array<string, mixed> $service
+     */
+    private function personClashes(int $tenantId, int $profileId, array $service, DateTimeImmutable $start, DateTimeImmutable $now, ?int $exceptBookingId): bool
+    {
+        $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
+
+        return Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $this->busyFor($tenantId, $profileId, $block->start->modify('-1 day'), $block->end->modify('+1 day'), $now, $exceptBookingId));
+    }
+
+    /**
      * The check made INSIDE the lock: null when the time is free, otherwise
      * why not (design 3.5, CV.9): the room is taken, the person is busy, or
      * it is outside their hours. `$bookAnyway` lets a busy PERSON through
@@ -1306,14 +1468,18 @@ final class BookingService
         }
     }
 
+    /** The next reminder still ahead of `$now`, or null (WHIT-1417: there may be several). */
     private function reminderDue(DateTimeImmutable $start, CalendarSettings $settings, DateTimeImmutable $now): ?DateTimeImmutable
     {
-        if ($settings->reminderHoursBefore <= 0) {
-            return null;
+        $next = null;
+        foreach ($settings->reminderHours as $hours) {
+            $due = $start->modify('-' . $hours . ' hours');
+            if ($due > $now && ($next === null || $due < $next)) {
+                $next = $due;
+            }
         }
-        $due = $start->modify('-' . $settings->reminderHoursBefore . ' hours');
 
-        return $due > $now ? $due : null;
+        return $next;
     }
 
     /** @return list<int> */
@@ -1374,6 +1540,12 @@ final class BookingService
     private function locked(array $locks, array $rooms, callable $work): mixed
     {
         $own = !$this->db->inTransaction();
+        $postgres = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
+        if ($postgres && $own) {
+            // Outside the transaction, so each expiry commits and is announced
+            // on its own, whatever this write then does.
+            $this->expireLapsedHolds($locks, $rooms);
+        }
         if ($own) {
             $this->db->beginTransaction();
         }
@@ -1384,7 +1556,13 @@ final class BookingService
             foreach ($rooms as [$tenantId, $roomId]) {
                 $this->rooms()->lock($tenantId, $roomId);
             }
+            if ($postgres && !$own) {
+                $this->expireLapsedHolds($locks, $rooms);
+            }
             $result = $work();
+            if ($postgres) {
+                $this->checkHolds();
+            }
             if ($own) {
                 $this->db->commit();
             }
@@ -1395,6 +1573,51 @@ final class BookingService
                 $this->db->rollBack();
             }
             throw $e;
+        }
+    }
+
+    /**
+     * The database's own check that no two bookings overlap (migration 360,
+     * AP.11). The constraint is deferred, because a booking of several
+     * services is written in steps; here it is checked at once, so a refusal
+     * comes back as the usual 409 from the write that caused it rather than
+     * from a commit somewhere above.
+     *
+     * The application's locks and re-read make this a second line: it fires
+     * only when something wrote a booking without them.
+     */
+    private function checkHolds(): void
+    {
+        try {
+            $this->db->exec('SET CONSTRAINTS ' . HoldConflicts::CONSTRAINT . ' IMMEDIATE');
+            $this->db->exec('SET CONSTRAINTS ' . HoldConflicts::CONSTRAINT . ' DEFERRED');
+        } catch (\PDOException $e) {
+            throw HoldConflicts::fromPdo($e) ?? $e;
+        }
+    }
+
+    /**
+     * Payment holds whose time ran out still hold their rows until something
+     * expires them. Expire the ones on these people and rooms first, so the
+     * database's check agrees with the busy time the service reads (which
+     * already skips them).
+     *
+     * @param list<array{0: int, 1: int}> $locks
+     * @param list<array{0: int, 1: int}> $rooms
+     */
+    private function expireLapsedHolds(array $locks, array $rooms): void
+    {
+        $byTenant = [];
+        foreach ($locks as [$tenantId, $profileId]) {
+            $byTenant[$tenantId]['person'][] = $profileId;
+        }
+        foreach ($rooms as [$tenantId, $roomId]) {
+            $byTenant[$tenantId]['resource'][] = $roomId;
+        }
+        foreach ($byTenant as $tenantId => $holders) {
+            foreach (HoldConflicts::lapsed($this->db, $tenantId, $holders['person'] ?? [], $holders['resource'] ?? [], $this->now()) as $bookingId) {
+                $this->expireHold($tenantId, $bookingId);
+            }
         }
     }
 

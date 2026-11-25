@@ -11,7 +11,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { Alert, AlertDescription } from '@whity/ui/alert';
 import { useTranslation } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
+import { useOptionalAuth } from '@/lib/auth-context';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
+import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
  * Invitation landing page (WHIT-417). This is where the link a tenant
@@ -56,6 +58,7 @@ function AcceptInvitationInner() {
   const token = searchParams.get('token');
   const branding = useBranding();
   const t = useTranslation('auth');
+  const auth = useOptionalAuth();
 
   const [status, setStatus] = useState<Status>(token ? 'loading' : 'error');
   const [invitation, setInvitation] = useState<InvitationPreview | null>(null);
@@ -113,8 +116,8 @@ function AcceptInvitationInner() {
     }
 
     if (invitation.requiresPassword) {
-      if (password.length < 8) {
-        setError(t('acceptInvitation.error.tooShort', 'Password must be at least 8 characters'));
+      if (password.length < PASSWORD_MIN_LENGTH) {
+        setError(t('acceptInvitation.error.tooShort', 'Password must be at least 12 characters'));
         return;
       }
       if (password !== confirmPassword) {
@@ -131,6 +134,8 @@ function AcceptInvitationInner() {
       });
 
       if (response.status === 200) {
+        // Signed in already: the new workspace joins the switcher in every tab.
+        if (auth?.user) void auth.sessionChanged({ here: false });
         setStatus('accepted');
         return;
       }

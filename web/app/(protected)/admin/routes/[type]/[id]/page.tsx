@@ -30,6 +30,8 @@ import { useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { api } from '@/lib/api/client';
 import { useDirection } from '@/lib/direction-context';
+import { ContentDirection } from '@whity/ui/content-direction';
+import { contentLanguage } from '@whity/ui/localized-text';
 import { useToast } from '@/lib/toast-context';
 import { RouteActPanel } from '@/components/documents/route-act-panel';
 import type { DocumentRoute, RouteRecipient } from '@/components/documents/routing-wire';
@@ -185,6 +187,8 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
   const answers = form === null || Array.isArray(form.data) ? {} : form.data;
   const fieldByKey = new Map((form?.fields ?? []).map((field) => [field.field_key, field]));
   const labelOf = (key: string) => text(fieldByKey.get(key)?.label, preferArabic) || key;
+  // WHIT-1379: the answers read in the form's language and direction, not the interface's.
+  const content = contentLanguage((form?.fields ?? []).map((field) => field.label), preferArabic ? 'ar' : 'en');
 
   return (
     <div className="space-y-6">
@@ -211,33 +215,35 @@ export default function RouteSubjectPage({ params }: { params: Promise<{ type: s
             )}
           </CardHeader>
           <CardContent>
-            <dl className="space-y-4">
-              {form.fields.map((field) => {
-                const files = form.files.filter((file) => file.field_key === field.field_key);
-                const routeId = view.routes[0]?.id;
-                return (
-                  <div key={field.field_key} className="space-y-0.5">
-                    <dt className="text-sm font-medium">{labelOf(field.field_key)}</dt>
-                    <dd className="text-sm text-muted-foreground">
-                      {field.field_type === 'file' && files.length > 0 && routeId !== undefined ? (
-                        <span className="flex flex-col items-start gap-2 pt-1">
-                          {files.map((file) => (
-                            <Button key={file.id} asChild variant="outline" className="h-auto min-h-10 max-w-full whitespace-normal break-all text-start">
-                              <a href={`/api/v1/routes/${routeId}/files/${file.id}`} download>
-                                {t('subject.download', 'Download {name}', { name: file.filename ?? t('subject.attachedFile', 'attached file') })}
-                              </a>
-                            </Button>
-                          ))}
-                        </span>
-                      ) : (
-                        answerText(field, answers[field.field_key], preferArabic, t('subject.yes', 'Yes'), t('subject.no', 'No')) ||
-                        t('subject.noAnswer', 'No answer')
-                      )}
-                    </dd>
-                  </div>
-                );
-              })}
-            </dl>
+            <ContentDirection content={content}>
+              <dl className="space-y-4">
+                {form.fields.map((field) => {
+                  const files = form.files.filter((file) => file.field_key === field.field_key);
+                  const routeId = view.routes[0]?.id;
+                  return (
+                    <div key={field.field_key} className="space-y-0.5">
+                      <dt className="text-sm font-medium">{labelOf(field.field_key)}</dt>
+                      <dd className="text-sm text-muted-foreground">
+                        {field.field_type === 'file' && files.length > 0 && routeId !== undefined ? (
+                          <span className="flex flex-col items-start gap-2 pt-1">
+                            {files.map((file) => (
+                              <Button key={file.id} asChild variant="outline" className="h-auto min-h-10 max-w-full whitespace-normal break-all text-start">
+                                <a href={`/api/v1/routes/${routeId}/files/${file.id}`} download>
+                                  {t('subject.download', 'Download {name}', { name: file.filename ?? t('subject.attachedFile', 'attached file') })}
+                                </a>
+                              </Button>
+                            ))}
+                          </span>
+                        ) : (
+                          answerText(field, answers[field.field_key], preferArabic, t('subject.yes', 'Yes'), t('subject.no', 'No')) ||
+                          t('subject.noAnswer', 'No answer')
+                        )}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </ContentDirection>
           </CardContent>
         </Card>
       )}
@@ -593,7 +599,7 @@ function finalReason(t: (key: string, fallback?: string) => string, reason: stri
     case 'template_unpublished':
       return t('subject.final.reason.templateUnpublished', 'The template for the final document has not been published.');
     case 'render_refused':
-      return t('subject.final.reason.renderRefused', 'The template could not be made into a PDF. Check its content.');
+      return t('subject.final.reason.renderRefused', 'Whity could not lay out the PDF. Try again; if it happens again, tell your workspace administrator.');
     case 'refused_by_plugin':
       return t('subject.final.reason.refusedByPlugin', 'An add-on stopped the final document from being made.');
     case 'gave_up':

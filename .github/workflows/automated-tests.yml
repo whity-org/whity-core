@@ -1568,7 +1568,10 @@ jobs:
 
       - name: Run a throwaway whity_render container
         run: |
+          # The production compose's restrictions (READINESS CO-25), so this
+          # job proves Chromium prints with no capabilities as the image's user.
           docker run -d --name whity_render_ci \
+            --cap-drop ALL --security-opt no-new-privileges:true \
             -e RENDER_SHARED_SECRET=ci_render_shared_secret_min_32_chars_zz \
             -p 18130:8130 \
             whity-render:ci
@@ -1895,12 +1898,30 @@ jobs:
       # (WHIT-674): a 422 naming the unit and the page, never a bare 500.
       - name: Flowing render refuses an unpaginatable document with 422 and the reason
         run: |
-          python3 -c "import json; items=['A long instruction line that wraps across the narrow page more than once, so thirty of them cannot fit on one page of A5 at this size.']*30; print(json.dumps({'page':{'preset':'a5'},'content':[{'type':'paragraph','text':'Before'},{'type':'list','title':'Too long','items':items}]}))" > /tmp/flow-toolong.json
+          # A heading is never split, so one longer than an A5 page still
+          # cannot be laid out. (A list of that length used to be the example;
+          # since WHIT-1370 a list, like every block with items, splits.)
+          python3 -c "import json; text=' '.join(['A heading that goes on and on']*120); print(json.dumps({'page':{'preset':'a5'},'content':[{'type':'paragraph','text':'Before'},{'type':'heading','level':1,'text':text}]}))" > /tmp/flow-toolong.json
           status=$(curl -sS -o /tmp/flow-toolong.out -w '%{http_code}' -X POST http://127.0.0.1:18130/render/flow -H 'Content-Type: application/json' -H 'X-Render-Secret: ci_render_shared_secret_min_32_chars_zz' --data @/tmp/flow-toolong.json)
           cat /tmp/flow-toolong.out; echo
           test "$status" = "422"
-          grep -q '"unit":"list"' /tmp/flow-toolong.out
+          grep -q '"unit":"heading"' /tmp/flow-toolong.out
           grep -q 'taller than a page' /tmp/flow-toolong.out
+
+      # WHIT-1370: AAU IRB's application was refused whole because one question
+      # (twenty Yes / No rows) was taller than a page. A long answer, a tall
+      # table row, long lists and a tall image must print, in both directions.
+      - name: Flowing render splits blocks taller than a page (RTL and LTR)
+        run: |
+          for dir in ltr rtl; do
+            node render-service/scripts/generate-flow-tall-blocks-fixture.js --direction "$dir" --out "/tmp/flow-tall-$dir.json"
+            status=$(curl -sS -o "/tmp/flow-tall-$dir.pdf" -w '%{http_code}' -X POST http://127.0.0.1:18130/render/flow -H 'Content-Type: application/json' -H 'X-Render-Secret: ci_render_shared_secret_min_32_chars_zz' --data @"/tmp/flow-tall-$dir.json")
+            echo "tall blocks ($dir): HTTP ${status}"
+            if [ "$status" != "200" ]; then cat "/tmp/flow-tall-$dir.pdf"; echo; exit 1; fi
+            head -c 5 "/tmp/flow-tall-$dir.pdf" | grep -q '%PDF-'
+          done
+          docker cp render-service/scripts/. whity_render_ci:/app/scripts
+          docker exec whity_render_ci node scripts/check-flow-tall-blocks.js
 
       - name: Flowing render round-trip (LTR)
         run: |
@@ -2023,6 +2044,16 @@ jobs:
       # refresh). node:test with type stripping: no runner to install.
       - name: Type check and unit tests (@whity/api-client)
         working-directory: packages/api-client
+        run: |
+          npm run typecheck
+          npm test
+
+      # SDK 1.165 (D8): the plugin frontend package. Its type check is also the
+      # check that the block types match the contract generated from the PHP SDK
+      # (test/contract.test.ts); tests/Sdk/PluginSdkPackageTest keeps the
+      # generated contract itself current.
+      - name: Type check and unit tests (@whity/plugin-sdk)
+        working-directory: packages/plugin-sdk
         run: |
           npm run typecheck
           npm test

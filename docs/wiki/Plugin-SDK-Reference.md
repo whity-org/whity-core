@@ -33,12 +33,16 @@ $ctx->themes()->current()['light']['primary'] ?? null;   // 1.125: Theme\Workspa
 $ctx->database()->select('keyhub_orders', ['status' => 'open']);   // 1.151: Database\WorkspaceTables, held to the workspace
 $ctx->log()->warning('Provider answered late', ['ms' => 4200]);    // 1.152: Log\PluginLog, scrubbed
 $ctx->errors()->report($caught);                                    // 1.152: Log\ErrorReporter, scrubbed
+$ctx->contacts()->findByField('keyhub.supplier_code', 'DK-0042');   // 1.161: Contacts\WorkspaceContacts
+$ctx->timeOff()->byExternalRef('keyhub.leave:123');                 // 1.161: Calendar\WorkspaceTimeOff
+$ctx->away()->at($profileId, $nowUtc);                              // 1.161: Delegation\WorkspaceAway
+$ctx->bookings()->confirmPaid($bookingId, $paymentRef);             // 1.161: Calendar\WorkspaceBookings
 $ctx->workspaceId();                          // null outside a workspace
 ```
 
 - **Declare what you use (1.151).** With `Contribute\PluginCapabilitiesInterface` the context gives only the services you list (`Context\Service`) and `database()` reaches only your listed tables; anything else throws `Context\ServiceNotDeclared` or `Database\TableRefused`. `log()` and `errors()` need no declaration.
 
-- **The workspace comes from the context (D2).** Every store acts in the workspace the request or job runs in, and none takes a workspace, so none can name another.
+- **The workspace comes from the context (D2).** Every store acts in the workspace the request or job runs in, and none takes a workspace, so none can name another. Since 1.161 that includes contacts, time off, away and bookings: `$ctx->contacts()`, `timeOff()`, `away()` and `bookings()` are the services below without their `$tenantId` argument. Prefer them; the explicit services stay for host code and move to `Whity\Sdk\Host\` when 2.0 comes.
 - **A missing service fails when you use it.** A service this host doesn't provide throws `Context\ServiceUnavailable` (an `SdkException`) when you ask for it, not when you load.
 - **The context is bound at every entry point** (web, CLI, `queue:work`, `events:relay`): since WHIT-1247 each one boots the web kernel's own wiring, so a job or an async listener reaches every service a route does. `tests/Core/Plugin/PluginServiceBindingsTest` checks this.
 
@@ -60,15 +64,16 @@ These are the factories `PluginContext` uses. They keep working through SDK 2.0.
 
 | Service | What for | Workspace | Since |
 |---|---|---|---|
-| `Contacts\Contacts` | List, get, find by field, create and update contacts as the acting person; refusals throw `ContactRejected`. | argument | 1.119 |
-| `Calendar\TimeOff` | Put time off on a person's calendar, idempotent by your reference; refusals throw `TimeOffRejected`. | argument | 1.120 |
-| `Delegation\Away` | Is a person away at a moment, and who stands in. | argument | 1.120 |
-| `Calendar\Bookings`, `Calendar\CalendarEvents` | Confirm or release a pending booking after payment; mirror external busy events. | argument | 1.98 |
+| `Contacts\Contacts` | List, get, find by field, create and update contacts as the acting person; refusals throw `ContactRejected`. From a plugin, use `$ctx->contacts()` (`Contacts\WorkspaceContacts`, 1.161). | argument | 1.119 |
+| `Calendar\TimeOff` | Put time off on a person's calendar, idempotent by your reference; refusals throw `TimeOffRejected`. From a plugin, use `$ctx->timeOff()` (`Calendar\WorkspaceTimeOff`, 1.161). | argument | 1.120 |
+| `Delegation\Away` | Is a person away at a moment, and who stands in. From a plugin, use `$ctx->away()` (`Delegation\WorkspaceAway`, 1.161). | argument | 1.120 |
+| `Calendar\Bookings`, `Calendar\CalendarEvents` | Confirm or release a pending booking after payment; mirror external busy events. From a plugin, settle bookings with `$ctx->bookings()` (`Calendar\WorkspaceBookings`, 1.161). | argument | 1.98 |
 | `Documents\Documents`, `Documents\Templates` | Issue (one, many, preflight) and read templates as the acting person. A plugin's own documents go through `PluginDocuments`. | current | 1.56, 1.82 |
 | `Render\DocumentRenderer` | Render a `FlowDocument` to PDF. | current | 1.41 |
 | `Agents\Agents` | The workspace's agents and their activity. | current | 1.75 |
 | `Mcp\McpConnections` | The workspace's MCP connections. | current | 1.79 |
 | `Setup\WorkspaceSetup` | Call core routes as the acting person during a guided setup. | current | 1.108 |
+| `Templates\TemplateLedger` | What applying workspace templates made, read and written by `Templates\TemplateEngine`; core keeps it in the database, `Templates\MemoryLedger` in memory for a dry run or a template's tests ([Plugin-Workspace-Templates](Plugin-Workspace-Templates.md)). | current | 1.169 |
 | `Messaging\CustomerMessages` | Send a customer a message through the workspace's channels. | argument | 1.99 |
 | `Mail\WorkspaceEmails`, `Mail\BillingEmails` | Send a workspace-branded email; billing emails for a billing plugin. | argument | 1.100, 1.102 |
 | `Rbac\PermissionResolver`, `Rbac\ResourceScope` | Ask the same permission question the host's middleware answers, and what a person reaches. | argument | 1.22, 1.74 |
@@ -137,6 +142,8 @@ $entry = $books->ledger()->post(new EntryRequest(
 | `Accounting\Taxes` | The tax codes, the code for an item's tax category on a date, and a line's net and tax (`compute()`). | current | 1.155 |
 | `Accounting\Payments` | Money a customer paid: `recordReceived(PaymentRequest)` (posted at once, settling an invoice when named, a provider's fee to fees), `allocate()`, `recordTransfer()` (a provider's payout to the bank), and reads. Writes only through `$ctx->accounting()->payments()`, acting as a person with `payments:write`; `externalRef` (Whity Pay's payment id) records once. | current | 1.156 |
 | `Accounting\Invoices` (bills), `Payments::recordMade()` | Supplier bills: `createDraft(['kind' => 'purchase', ...])` with the supplier's own `supplierNumber`, posted by `issue()`, credited by `credit()`, acting with `bills:write`; `recordMade()` pays a supplier and settles the bill named. | current | 1.157 |
+| `tenant.handle_changed` | A workspace's @handle changed; the old one still leads to it for 90 days. A plugin that stored the handle updates it (design section 36). | current | 1.160 |
+| `Contribute\WorkspaceAccountingExport`, `Inventory\StockPosting`, `StockPostingMove` | Export stock to a set of books: `keepsStock($workspaceId)` is asked first (false: no call at all), then `record(StockPosting)` gets each posted stock batch, with its moves' places, virtual roles, branches and values at core's moving average cost, inside the stock transaction; throw to refuse it. One is bound; core accounting is the default. | current | 1.159 |
 | `Accounting\Invoice::$claimantProfileId`, `accounting.expense.claimed` | An expense claim is a bill from the person who paid; `claimantProfileId` says who. The event fires when a person files one. | current | 1.158 |
 | `Contribute\WorkspaceEInvoicing` | Report issued invoices to a tax authority (JoFotara first): `country()`, `isOn()`, `submit()` answering an `EInvoiceResult`. One is bound in the container; it runs after commit and never blocks issuing. | current | 1.155 |
 
@@ -145,6 +152,8 @@ $entry = $books->ledger()->post(new EntryRequest(
 ## Contribution points: what a plugin declares
 
 Implement the interface next to `PluginInterface`. Each one is optional, and the host skips plugins that don't implement it. A declaration the host refuses is dropped with a logged reason, and the plugin keeps loading unless the page says otherwise. `Manifest\ManifestPlugin` answers some of them from `plugin.json`.
+
+**Use the `Contribute\` names (1.161, D6).** Every contribution point below also exists as `Whity\Sdk\Contribute\<same name>`, the name it keeps in 2.0: `Contribute\PluginDashboardInterface`, `Contribute\PluginSettingsInterface`, `Contribute\PluginTablesInterface` (was `Tenant\`), and so on. The two names are one type (`class_alias`), so implementing either passes every check, and the old names, marked `@deprecated`, keep working through 2.0.x. Two change more than their namespace: `PluginMcpInterface` is `Contribute\PluginMcpPromptsInterface`, because it declares prompts only, and `Testing\TenantIsolationConformanceTestCase` is `Testing\WorkspaceIsolationConformanceTestCase`. `PluginHomeCardInterface` and `PluginThemeInterface` are deprecated outright and get no new name. `tests/Sdk/ContributeAliasesTest.php` fails when a new contribution point has no `Contribute\` name.
 
 | Interface | Declares | More |
 |---|---|---|
@@ -157,6 +166,7 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginDashboardInterface`, `PluginHomeCardInterface` | Dashboard setup points and widgets; the older single home card (deprecated 1.124, D5: use a `stat` widget) | [Plugin-Dashboard](Plugin-Dashboard.md) |
 | `PluginOnboardingInterface` | A guided setup | sdk/README |
 | `PluginWorkspaceTemplatesInterface` | Workspace templates | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
+| `Contribute\PluginWorkspaceTemplateExtensionsInterface` | Pieces added to another plugin's workspace template (1.170) | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
 | `PluginWorkspaceLifecycleInterface` | Called when the plugin is turned on or off in a workspace | Workspace-Plugins |
 | `PluginInstallLifecycleInterface` | Called once when the plugin is installed and once per upgrade, after its migrations (1.152) | [Plugin-Development](Plugin-Development.md) |
 | `Contribute\PluginCapabilitiesInterface` | The context services and own tables the plugin uses (1.151) | [Plugin-Development](Plugin-Development.md) |

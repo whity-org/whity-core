@@ -32,6 +32,11 @@ final class FormPrintout
     /** FP.3: more options than this always print the chosen only. */
     public const ALL_OPTIONS_MAX = 8;
     /** A run of this many Yes / No / N/A questions prints as one list. */
+    /**
+     * Whity Render's line between a short answer (one unit with its question)
+     * and a long one that flows (render-service/src/flow/form.js renderQuestion).
+     */
+    public const LONG_ANSWER_CHARS = 600;
     private const YES_NO_RUN = 3;
     private const NA_WORDS = ['na', 'n/a', 'n.a.', 'not applicable', 'not_applicable', 'لا ينطبق'];
     private const YES_WORDS = ['yes', 'نعم', 'true'];
@@ -739,7 +744,7 @@ final class FormPrintout
         }
         $block['answer'] = $this->answer($field, $answer, $block);
         if ($this->style['questions'] === 'twoColumns' && !in_array($block['answer']['kind'], ['table', 'facts'], true)
-            && !($block['answer']['kind'] === 'text' && count($block['answer']['paragraphs']) > 1)) {
+            && !self::isLongText($block['answer'])) {
             $block['layout'] = 'row';
         }
 
@@ -1100,6 +1105,25 @@ final class FormPrintout
         }
 
         return $paths === [] ? null : ['viewBox' => [$w, $h], 'paths' => $paths];
+    }
+
+    /**
+     * A long text answer prints stacked and flows across pages under its
+     * "continued" line (FP.8): more than one paragraph, or one longer than
+     * Whity Render's {@see self::LONG_ANSWER_CHARS}. In two columns such an
+     * answer was one row that is never split, and an answer longer than a page
+     * refused the whole printout (WHIT-1370).
+     *
+     * @param array<string, mixed> $answer
+     */
+    public static function isLongText(array $answer): bool
+    {
+        if (($answer['kind'] ?? null) !== 'text' || !is_array($answer['paragraphs'] ?? null)) {
+            return false;
+        }
+
+        return count($answer['paragraphs']) > 1
+            || mb_strlen((string) ($answer['paragraphs'][0] ?? '')) > self::LONG_ANSWER_CHARS;
     }
 
     /** Words as a reader counts them: runs of letters and digits, in any script. */

@@ -983,7 +983,10 @@ final class Invoices
             if ($row === null || $row['archived_at'] !== null || DbBool::of($row['is_group'])) {
                 throw AccountingRejectedException::field($field, $field . '.account is not an account here that takes lines');
             }
-            if (!in_array($row['type'], ['expense', 'asset'], true) || in_array($row['role'], ['receivable', 'bank', 'cash', 'sales_tax_input', 'cheques_to_collect', 'provider_clearing'], true)) {
+            // Goods received, not yet billed is allowed: a bill for goods already
+            // received clears what the receipt put there (A4a; matching is A4b).
+            $received = $row['role'] === 'goods_received_not_billed';
+            if (!$received && (!in_array($row['type'], ['expense', 'asset'], true) || in_array($row['role'], ['receivable', 'bank', 'cash', 'sales_tax_input', 'cheques_to_collect', 'provider_clearing'], true))) {
                 throw AccountingRejectedException::field($field, $field . '.account must be a cost or an asset bought, such as equipment');
             }
 

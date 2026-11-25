@@ -91,6 +91,9 @@ namespace Whity\Sdk;
  * for a meter — exactly as core does for its own. A declared limit nothing
  * checks is a line on a pricing screen that gates nothing, which is worse than
  * not selling it, because somebody is paying.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginEntitlementsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginEntitlementsInterface
 {

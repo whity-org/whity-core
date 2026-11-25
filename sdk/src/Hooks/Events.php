@@ -23,7 +23,10 @@ use Whity\Sdk\PluginNamespace;
  * - Notification hooks (`*.created` / `*.updated` / `*.deleted` and the
  *   `*.async` variants): listeners observe; async variants are queued.
  *
- * The full catalogue, with each event's kind, is in docs/wiki/HOOK_SYSTEM.md.
+ * Each event's kind, documented payload keys, `.async` twin and the SDK minor
+ * it arrived in are in {@see EventCatalogue} (SDK 1.164), which
+ * docs/wiki/HOOK_SYSTEM.md's tables are generated from. A new constant here
+ * needs an entry there.
  *
  * Any listener can be OBSERVE-ONLY (SDK 1.89): subscribe with
  * `['callback' => $fn, 'observe' => true]`. The host ignores what it returns,
@@ -144,6 +147,15 @@ final class Events
     public const TENANT_DELETING = 'tenant.deleting';
     public const TENANT_DELETED = 'tenant.deleted';
     public const TENANT_DELETED_ASYNC = 'tenant.deleted.async';
+    /**
+     * A workspace's @handle changed (design section 36, HD.4). The old one
+     * still leads to the workspace for 90 days; a plugin that stored the
+     * handle (in a link, a webhook address) should update it.
+     *
+     * Payload: `id` (the workspace), `old_handle` (null when it had none),
+     * `new_handle`, `by_profile_id` (null for an operator script).
+     */
+    public const TENANT_HANDLE_CHANGED = 'tenant.handle_changed';
 
     // ---- roles ----
     public const ROLE_CREATING = 'role.creating';

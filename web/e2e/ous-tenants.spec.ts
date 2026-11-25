@@ -186,13 +186,13 @@ test.describe('Tenants (system admin)', () => {
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByText('Create New Tenant')).toBeVisible();
 
-    // Typing the Name auto-fills the Slug (lowercased, hyphenated).
+    // Typing the Name auto-fills the Handle (lowercased, hyphenated).
     await dialog.getByLabel('Name').fill('Acme Widgets Co');
-    await expect(dialog.getByLabel('Slug')).toHaveValue('acme-widgets-co');
+    await expect(dialog.getByLabel('Handle')).toHaveValue('acme-widgets-co');
 
     // Overwrite with an invalid slug (spaces/uppercase) and submit: the zod
     // regex rejects it with a field error and nothing is created.
-    await dialog.getByLabel('Slug').fill('Invalid Slug!');
+    await dialog.getByLabel('Handle').fill('Invalid Slug!');
     await dialog.getByRole('button', { name: 'Create Tenant' }).click();
     await expect(
       dialog.getByText('Slug must contain only lowercase letters, numbers, and hyphens')

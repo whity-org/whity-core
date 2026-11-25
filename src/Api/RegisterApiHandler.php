@@ -14,6 +14,8 @@ use Whity\Core\Hooks\HookManager;
 use Whity\Core\Identity\MembershipRepository;
 use Whity\Core\Identity\NullEmailVerificationProvider;
 use Whity\Core\PasswordPolicy;
+use Whity\Core\Tenant\HandleRules;
+use Whity\Core\Tenant\Handles;
 use Whity\Core\RateLimit\ClientIp;
 use Whity\Core\RateLimit\RateLimits;
 use Whity\Core\Store\SharedStoreInterface;
@@ -156,10 +158,26 @@ final class RegisterApiHandler
                 return $limited;
             }
             $password    = $checked->value('password');
+            try {
+                PasswordPolicy::refuseBreached($password);
+            } catch (\InvalidArgumentException) {
+                // READINESS CE-7: a breached or common new password.
+                return Response::error(PasswordPolicy::BREACHED_MESSAGE, 422, ['password' => 'breached']);
+            }
             $tenantName  = $checked->value('tenant_name');
             $displayName = $checked->value('display_name');
 
-            $slug = self::slugify($tenantName);
+            // The workspace's @handle (design section 36, HD.3): suggested
+            // from the name, Arabic letters written in Latin ones; a handle
+            // that can't be used (reserved, taken) becomes a `ws-` one its
+            // owner may change later. Only a name with no letters or digits
+            // at all is refused.
+            $slug = HandleRules::suggest($tenantName);
+            if ($slug === '' && preg_match('/[\p{L}\p{N}]/u', $tenantName) === 1) {
+                $slug = HandleRules::generate();
+            } elseif ($slug !== '' && (new Handles($this->db))->problem($slug) !== null) {
+                $slug = HandleRules::generate();
+            }
             if ($slug === '') {
                 return FieldValidator::refusal('Workspace name must contain letters or numbers', [
                     'tenant_name' => Messages::problem(Messages::INVALID, [
@@ -225,10 +243,11 @@ final class RegisterApiHandler
                     return Response::error('An account with this email already exists', 409);
                 }
 
-                // Reject a taken workspace name or slug.
+                // Reject a taken workspace name. A taken handle never gets
+                // here: it was swapped for a `ws-` one above.
                 // Registration provisions a NEW tenant for an unauthenticated caller; the tenants table is the tenant registry itself, not a tenant-scoped resource
-                $tenantStmt = $this->db->prepare('SELECT 1 FROM tenants WHERE name = :name OR slug = :slug LIMIT 1');
-                $tenantStmt->execute([':name' => $tenantName, ':slug' => $slug]);
+                $tenantStmt = $this->db->prepare('SELECT 1 FROM tenants WHERE name = :name LIMIT 1');
+                $tenantStmt->execute([':name' => $tenantName]);
                 if ($tenantStmt->fetchColumn() !== false) {
                     if ($ownTx && $this->db->inTransaction()) {
                         $this->db->rollBack();
@@ -445,14 +464,6 @@ final class RegisterApiHandler
         }
         $this->db->prepare($sql)->execute($params);
         return (int) $this->db->lastInsertId();
-    }
-
-    /** Lowercase, hyphenate, and trim a workspace name into a URL-safe slug. */
-    private static function slugify(string $name): string
-    {
-        $slug = strtolower(trim($name));
-        $slug = (string) preg_replace('/[^a-z0-9]+/', '-', $slug);
-        return trim($slug, '-');
     }
 
     private static function localPart(string $email): string

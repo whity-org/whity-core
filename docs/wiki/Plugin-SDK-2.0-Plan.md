@@ -1,6 +1,8 @@
-# Plugin SDK 2.0 plan (0.2.31 → public beta 0.2.40)
+# Plugin SDK 2.0 plan (0.2.31 → 2.0.0 at 0.2.40)
 
 Status: **plan**, built from the owner's decisions of 19 Nov 2026 on the [streamline proposal](Plugin-SDK-Streamline-Proposal.md) (D1–D11). Ticket WHIT-1242. The SDK lane keeps this page current: when a release ships, its row says so.
+
+**Public beta moved (owner, 24 Nov 2026, WHIT-1385):** the plan below is unchanged and SDK 2.0.0 still ships at 0.2.40. The public beta itself now comes after 0.2.50, not at 0.2.40. Where this page or the proposal says "at the beta", read it as "by 2.0.0".
 
 ## The rules this plan follows
 
@@ -19,7 +21,7 @@ Status: **plan**, built from the owner's decisions of 19 Nov 2026 on the [stream
 | **0.2.31** | 1.124 | `PluginContext::for($this)` (D3), giving settings, secrets, files, notify, jobs, audit, documents, http and the workspace id; a binding test at each entry point (web, CLI, `queue:work`, `events:relay`) and the missing bindings it finds; `submission.reviewed` fired or retired. Already shipped in 0.2.31: 1.122 (#2161, #2151) and 1.123 (#2165). | #2151 done | Themes: `PluginThemesInterface`, `PluginThemeInterface` deprecated (TH lane). Inventory phase 1, if it reaches the SDK. |
 | **0.2.32** | 1.125 | `Whity\Sdk\Contribute\*` aliases for all 43 contribution points, plus workspace-named aliases (D6); `sdk/CHANGELOG.md` replaces the `Sdk.php` ledger, with the coverage and collision scripts moved to read it (D7, with the CI lane); `PluginContext` gets typed accessors for the explicit-`$tenantId` services (contacts, timeOff, away, bookings) | **#1914** directory readers (Members, Units); **#1910** read form submissions; **#2137** routing rule kind config schema | Inventory services in `PluginContext` form (§D2 note below) |
 | **0.2.33** | 1.126 | `plugin.json` schema part 1: settings, notifications, jobs, dashboard, onboarding, contact fields, themes (D4); `whity plugin validate` in the CLI | **#1683** entitlements, meters, `requiredEntitlement`; **#1686** logger, error reporting, rate limits, lifecycle callbacks | |
-| **0.2.34** | 1.127 | Event catalogue metadata (kind, payload keys, async twin, since), generated into HOOK_SYSTEM.md; renamed events fire under both names | **#1681** record-page tabs, sections and actions (designed in 0.2.32); **#1680** people readers and picker blocks, on #1914 | |
+| **0.2.34** | 1.127 | Event catalogue metadata (kind, payload keys, async twin, since), generated into HOOK_SYSTEM.md. **Shipped as 1.164 (WHIT-1390).** Renaming events, and firing them under both names, waits until 2.0 is decided (owner, 24 Nov 2026); the catalogue has an empty `renamedFrom` field ready for it | **#1681** record-page tabs, sections and actions (designed in 0.2.32); **#1680** people readers and picker blocks, on #1914 | |
 | **0.2.35** | 1.128 | `@whity/plugin-sdk` npm 1.128 (D8): block types generated from `BlockContract`, a typed builder, the plugin route client, `fetchAllPages`, one `LocalizedText`, test helpers. The web app and desktop template import it and their copies go. Unused `@whity/ui`/`@whity/features` subpaths become private. | **#1728** route subjects and a `Routes` service | |
 | **0.2.36** | 1.129 | `Page` for every new list method; `NoWorkspaceInScope`; a `reason` on every `*Rejected`; `plugin.json` schema part 2 (MCP, agents, roles, data types, the rest) | **#1688** and **#1693** designs approved (isolated origin; least-privilege capabilities) | |
 | **0.2.37** | 1.130 | **2.0 freeze.** Every 2.0 name exists in 1.x. Every first-party plugin (Whity Pay, Appointments, Salons, Front Office, WorkspaceTemplates, store, theme-creator, demos) moves to the new names, one PR each, with no deprecation notice left in its test run | (catch-up) | |

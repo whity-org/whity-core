@@ -24,7 +24,7 @@ const { FlowLayoutError } = require('./errors');
  *   rather than an omission — see the note at the bottom of this file.
  */
 
-const { getBrowser } = require('../renderer');
+const { getBrowser, lockDownPage } = require('../renderer');
 const { normaliseFlowDocument } = require('./document');
 const { buildFlowHtml } = require('./html');
 
@@ -56,6 +56,7 @@ async function renderFlowToPdf(payload) {
 async function renderHtmlToPdf(html) {
   const browser = await getBrowser();
   const page = await browser.newPage();
+  await lockDownPage(page);
   const timings = {};
   const startedAt = Date.now();
   try {

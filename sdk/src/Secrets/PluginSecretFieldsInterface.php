@@ -20,6 +20,9 @@ namespace Whity\Sdk\Secrets;
  * The plugin reads the value with {@see SecretStore::get()}.
  *
  * OPTIONAL. Plugins that do not implement it are untouched.
+ *
+ * @deprecated 1.161 Use {@see \Whity\Sdk\Contribute\PluginSecretFieldsInterface}, the same type under the name it keeps in 2.0 (D6).
+ *             This name keeps working through 2.0.x.
  */
 interface PluginSecretFieldsInterface
 {

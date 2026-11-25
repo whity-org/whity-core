@@ -374,8 +374,14 @@ class EnforceTenantIsolation
         // Any single segment, so a mistyped link reaches the router and gets
         // its 404 instead of a 401 that would suggest signing in.
         '#^/api/v1/public/bookings/[^/]+$#',
-        '#^/api/v1/public/bookings/[^/]+/(slots|move|cancel|accept|ics)$#',
+        '#^/api/v1/public/bookings/[^/]+/(slots|move|cancel|accept|coming|ics)$#',
         '#^/api/v1/public/calendar/feeds/[^/]+$#',
+        // WHIT-1415 (READINESS CE-21): a customer opening a quote link. The
+        // 256-bit token names its quote and tenant and the handler rate-limits
+        // by address. Any single segment, like bookings above, so a mistyped
+        // link gets its 404 rather than a 401 asking them to sign in.
+        '#^/api/v1/public/quotes/[^/]+$#',
+        '#^/api/v1/public/quotes/[^/]+/(accept|decline)$#',
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
 

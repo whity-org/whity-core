@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace Whity\Sdk\Context;
 
 use Whity\Sdk\Audit\AuditTrail;
+use Whity\Sdk\Calendar\WorkspaceBookings;
+use Whity\Sdk\Calendar\WorkspaceTimeOff;
+use Whity\Sdk\Contacts\WorkspaceContacts;
 use Whity\Sdk\Database\WorkspaceTables;
+use Whity\Sdk\Delegation\WorkspaceAway;
 use Whity\Sdk\Documents\PluginDocumentStore;
 use Whity\Sdk\Http\Outbound\AddressPolicy;
 use Whity\Sdk\Http\Outbound\HttpClient;
@@ -109,4 +113,28 @@ interface PluginScope
      * tagged (SDK 1.152, #1686). Needs no declaration.
      */
     public function errors(): ErrorReporter;
+
+    /**
+     * Core's contacts in this workspace (SDK 1.161, D2): {@see \Whity\Sdk\Contacts\Contacts}
+     * without the workspace argument.
+     */
+    public function contacts(): WorkspaceContacts;
+
+    /**
+     * Time off on core's calendar in this workspace (SDK 1.161, D2):
+     * {@see \Whity\Sdk\Calendar\TimeOff} without the workspace argument.
+     */
+    public function timeOff(): WorkspaceTimeOff;
+
+    /**
+     * Whether a person in this workspace is away, and who stands in (SDK 1.161, D2):
+     * {@see \Whity\Sdk\Delegation\Away} without the workspace argument.
+     */
+    public function away(): WorkspaceAway;
+
+    /**
+     * Settle a held booking in this workspace (SDK 1.161, D2):
+     * {@see \Whity\Sdk\Calendar\Bookings} without the workspace argument.
+     */
+    public function bookings(): WorkspaceBookings;
 }
