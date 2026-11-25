@@ -13,7 +13,7 @@ The brand is being rebuilt one stage at a time. A stage is locked before the nex
 8. Files and templates: locked 28 Oct 2026
 9. Final guideline: locked 28 Oct 2026
 
-Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026) · Appointments you can rely on (decided 25 Nov 2026)
+Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026) · Appointments you can rely on (decided 25 Nov 2026) · Customer area (decided 25 Nov 2026)
 
 ## Stage 1 · Logo (locked 28 Oct 2026)
 
@@ -1127,7 +1127,7 @@ The owner, 25 November 2026: "we want FTA rates and better appointment system, s
 | AP.8 | Where it shows | Dashboard widget "Appointments"; a flag on the booking ("Missed 2 of the last 5", always in words); one line on the customer record; Reports › Appointments with CSV; each staff member's own rate; `GET /api/v1/calendar/attendance` and the `calendar.attendance.marked` event |
 | AP.9 | Who sees the rates | `calendar:reports`, granted by capability to roles with `calendar:manage`. Every staff member sees their own rate. The flag is visible with `calendar:read` (Q7) |
 | AP.10 | Policies | Over `calendar.no_show_window_months` (default 12): the flag is on at 2 misses. A deposit after N misses and approving their online bookings after N misses are switches, off by default. Never a silent block; the customer is told what to do next. `calendar:manage` can clear a customer's count, and the clearing is recorded (Q5) |
-| AP.11 | No double bookings | `calendar_holds` takes one row per person or resource a booking or busy event uses, over its time with buffers, with a Postgres `btree_gist` exclusion on exclusive rows. The row locks stay for friendly messages; the database refuses any overlapping pair whoever writes, and a refusal becomes the usual 409. Book anyway makes only the person's row non-exclusive; resources are always exclusive (Q8) |
+| AP.11 | No double bookings | `calendar_holds` takes one row per person or resource a booking uses, over its time with buffers, with a Postgres `btree_gist` exclusion on exclusive rows. The row locks stay for friendly messages; the database refuses any overlapping pair of bookings whoever writes, and a refusal becomes the usual 409. Book anyway makes only the person's row non-exclusive; resources are always exclusive (Q8). **Owner (25 Nov 2026): "Yes, change it (Recommended)".** Time off and busy events stay guarded by the row locks and the re-check; time off over bookings comes in M6 (AP.17) |
 | AP.12 | Existing overlaps | The backfill copies overlaps already in the data as non-exclusive and lists them with `whity-cli calendar:overlaps`. Nothing is changed automatically |
 | AP.13 | Holds | A payment hold's row carries `expires_at`. Writers clear expired rows for the same holders before inserting, and the expiry job removes them |
 | AP.14 | Reminders always go out | The delayed job stays, and a sweep every 5 minutes sends any due, unsent reminder through the same claimed send. Every send is kept with its channel and outcome, and the desk sees it |
@@ -1148,6 +1148,37 @@ The owner, 25 November 2026: "we want FTA rates and better appointment system, s
 | AP.29 | Running late | A late customer is marked with minutes, and nothing moves. A staff member behind lists the rest of their day pushed by that amount, marking what can't move; Move and tell them asks first, then tells each customer. Nothing moves without that click |
 | AP.30 | Phone and Arabic | Under 640px the desk is the List with 48px rows, Check in on the row and the rest in a sheet, Add walk-in on its plane, 17px text. Every string has Arabic; Western digits for times, rates and amounts; ranges written "من 10:00 إلى 10:30". Messages are in the customer's language |
 | AP.31 | Screens without cards | The desk, reports, waitlist, visit record and plans are built as core screens from `TplCalendarStaff`, `TplCalendarWeek` and the Pw cards until the brand team's cards arrive (Q14) |
+
+## Customer area (decided 25 November 2026)
+
+The owner, 25 November 2026: "for lms student facing pages is very big point for whity and can be generalized for lot's of applications". Specified in section 41 (`41-customer-area.md`, WHIT-1414): a signed-in place in the workspace's brand where a customer sees their bookings, bills and messages, and plugins add tabs through `Contribute\PluginCustomerScreensInterface`. Answered the same day: **"Accept all (Recommended)"**, so every question in section 41 §16 stands as recommended.
+
+| # | Decision | Choice |
+| --- | --- | --- |
+| CA.1 | Address | `/@handle` is the front door; a signed-in customer goes to Home, everyone else sees the workspace page with Sign in; tabs at `/@handle/home`, `/bookings`, `/bills`, `/messages`, `/account`, plugin screens at `/@handle/x/{id}`; the handle never decides access |
+| CA.2 | Brand | The workspace's logo, name and main colour on every screen, from the public-page brand; "Built on Whity" only at the foot of Account, removable for free |
+| CA.3 | Own domain | Later (CA6): the area at the root of the workspace's own host once sign-in works there; `/@handle` redirects |
+| CA.4 | Install | A manifest per workspace (`/@handle/` scope), named and iconed as the workspace (PW.11) |
+| CA.5 | Sign-in | `/@handle/sign-in` in the workspace's brand; Whity ID only on Whity Cloud (BM.12); the install's own methods when self-hosted; return to the page asked for |
+| CA.6 | Joining | Join in one tap when sign-up is open, Ask to join with approval, a plain message when off; staff can Invite to their account from a contact in any mode |
+| CA.7 | Staff as customers | The area always shows the person as a customer of the workspace in the address, capped, own records only; "Open the team app" when they are staff |
+| CA.8 | Links stay | Token links keep working without an account; emails add "See it in your account" |
+| CA.9 | Whose records | Records whose `contact_id` is a contact with `profile_id` = the person; contacts link at join, by invitation, by hand, or automatically on a verified email or phone only |
+| CA.10 | Customer API | `/api/v1/customer-area/{handle}/…`, every query filtered in core by tenant and the person's contacts; another customer's id answers 404 |
+| CA.11 | Desktop navigation | Top bar: logo and name, tabs, account menu; no sidebar; More after 6 tabs |
+| CA.12 | Phone navigation | Phone tab bar, up to 5; above 5: Home, 3 tabs, More (Account first) |
+| CA.13 | When a tab shows | Only with a reason: Bookings when booking is on or they have one; Bills when they have a document; Messages when chat is on or they have a conversation; plugin tabs when they hold the permission; the workspace can hide core tabs except Home and Account |
+| CA.14 | Home | Waiting for you, Next booking, latest message, plugin cards, quick actions; plain empty state |
+| CA.15 | Bills | One list of quotes, invoices, receipts, credit notes and orders with a Kind filter; Pay now only with a payment plugin, How to pay otherwise |
+| CA.16 | Messages | The customer's own conversations, signed in, using the public chat parts; agents still go through approvals |
+| CA.17 | Plugin screens | `Contribute\PluginCustomerScreensInterface::getCustomerScreens()`: `placement` tab, home or page; `screen` blocks or embed; a customer-grade `requiredPermission`; optional `count` and `fullScreen` |
+| CA.18 | Plugin own records | Deny by default: only routes declared `customer: true` with a customer-grade permission are callable from the area; core hands the plugin the customer's contacts (`Http\CustomerCall`); the test kit's isolation check must pass for Verified plugins; frame tokens are bound to the customer audience |
+| CA.19 | Plugin Home cards | Plugins add Home cards by `placement: home` and one-customer "Waiting for you" items through `CustomerAreaNotifier` |
+| CA.20 | Phone layout | PW rules: bottom bar, 17px rows of 48px, filters as sheets, actions in a bottom bar, full-screen frames under a slim Close bar |
+| CA.21 | Arabic | i18n domain `customer`; customer's language, else the workspace's, else the browser's; Western digits; mirrored bar |
+| CA.22 | Settings | Settings › Customer area: on or off, tabs and order, plugin screens, welcome line, How to pay, Preview as a customer, the address and QR |
+| CA.23 | Words | Staff say "Customer area" (منطقة العملاء); customers see the business's name and "Your account" (حسابك); tabs Home, Bookings, Bills, Messages, Account |
+| CA.24 | Price | Core and free on every plan and self-hosted; customers who sign in count on Whity Cloud's customer meter (BM.3); taking money online needs a payment plugin (BM.16) |
 
 ## Workspace templates as plugins (decided 25 November 2026)
 

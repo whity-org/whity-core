@@ -31,6 +31,8 @@ class CliRunner
         'audit:seal' => 'Whity\Cli\Commands\AuditCommand',
         'audit:verify' => 'Whity\Cli\Commands\AuditCommand',
         'calendar:copy-salons' => 'Whity\Cli\Commands\CalendarCopySalonsCommand',
+        // WHIT-1412: bookings that overlap another (design section 39, AP.12).
+        'calendar:overlaps' => 'Whity\Cli\Commands\CalendarOverlapsCommand',
         // WHIT-1318: account balances recomputed from the ledger, and its hash chain checked.
         'accounting:rebuild-balances' => 'Whity\Cli\Commands\AccountingRebuildBalancesCommand',
         'accounting:verify-chain' => 'Whity\Cli\Commands\AccountingVerifyChainCommand',

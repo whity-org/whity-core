@@ -64,6 +64,8 @@ final class PublicBookingApiHandler
 {
     private const OPEN_PER_EMAIL_MAX = 3;
     private const MIN_FILL_MS = 3000;
+    /** AP.17: how long a key the page sent for one press of Book is remembered. */
+    private const IDEMPOTENCY_SECONDS = 600;
     private const MAX_RANGE_DAYS = 14;
     private const SYSTEM_TENANT_ID = 0;
     private const NOT_FOUND = 'This booking page is not available';
@@ -260,22 +262,41 @@ final class PublicBookingApiHandler
                 return Response::error('You already have several bookings coming up here. Cancel one first, or contact the business.', 422, ['field' => 'email', 'code' => 'too_many_open_bookings']);
             }
 
-            $booking = $this->booking->book($tenantId, [
-                'items' => $many ?? [],
-                'same_person' => ServiceChoices::samePerson($body['same_person'] ?? null),
-                'service_id' => $serviceId,
-                'profile_id' => $profileId,
-                'starts_at' => $start,
-                'customer_profile_id' => null,
-                'customer_name' => $name,
-                'customer_email' => $email,
-                'customer_phone' => $phone,
-                'customer_note' => $note,
-                'source' => BookingRepository::SOURCE_PUBLIC,
-                'created_by_profile_id' => null,
-                'enforce_hours' => true,
-                'public' => true,
-            ]);
+            // AP.17: the page sends one key per Book press, so a request sent
+            // twice (a retry on a slow network) books once. Claimed here, and
+            // given back when the booking fails, so the customer can try again.
+            $claim = null;
+            $key = $body['idempotency_key'] ?? null;
+            if (is_string($key) && preg_match('/^[A-Za-z0-9_-]{8,64}$/', $key) === 1) {
+                $claim = 'cal:idem:' . $tenantId . ':' . hash('sha256', $key);
+                if ($this->store->increment($claim, self::IDEMPOTENCY_SECONDS) > 1) {
+                    return Response::error('We already have this booking. Check your email for the details.', 409, ['code' => 'already_sent']);
+                }
+            }
+
+            try {
+                $booking = $this->booking->book($tenantId, [
+                    'items' => $many ?? [],
+                    'same_person' => ServiceChoices::samePerson($body['same_person'] ?? null),
+                    'service_id' => $serviceId,
+                    'profile_id' => $profileId,
+                    'starts_at' => $start,
+                    'customer_profile_id' => null,
+                    'customer_name' => $name,
+                    'customer_email' => $email,
+                    'customer_phone' => $phone,
+                    'customer_note' => $note,
+                    'source' => BookingRepository::SOURCE_PUBLIC,
+                    'created_by_profile_id' => null,
+                    'enforce_hours' => true,
+                    'public' => true,
+                ]);
+            } catch (\Throwable $e) {
+                if ($claim !== null) {
+                    $this->store->delete($claim);
+                }
+                throw $e;
+            }
             RateLimits::publicBookingPerWorkspaceDay()->record($this->store, 'cal:ws-day:' . $tenantId);
 
             // With a payment step (SDK 1.98) the booking is held and the page
