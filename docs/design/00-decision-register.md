@@ -13,7 +13,7 @@ The brand is being rebuilt one stage at a time. A stage is locked before the nex
 8. Files and templates: locked 28 Oct 2026
 9. Final guideline: locked 28 Oct 2026
 
-Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026) · Appointments you can rely on (proposed 25 Nov 2026)
+Later versions: 2.1 P2 components · 2.2 Document editor · 2.3 Plugin store (locked 31 Oct 2026; S.9–S.12 added 2 Nov) · 2.4 Home (locked 2 Nov 2026) · 2.5 Page patterns and People (locked 2 Nov 2026) · 2.6 Forms (locked 2 Nov 2026) · 2.7 Ease of use and Documents and routing (locked 2 Nov 2026) · 2.8 AI and agents (locked 2 Nov 2026) · 2.9 Workspace, billing and settings (locked 2 Nov 2026) · 3.6 Themes (decided 19 Nov 2026) · Accounting in core (decided 21 Nov 2026) · Everything in core, pay for seats, volume and outside services (decided 21 Nov 2026) · My workspaces and @handles (decided 22 Nov 2026) · Appointments you can rely on (decided 25 Nov 2026)
 
 ## Stage 1 · Logo (locked 28 Oct 2026)
 
@@ -1112,11 +1112,11 @@ The owner, 22 November 2026: "as a normal user they need a manage workspaces/org
 | MW.6 | Deleting | Any owner, after an export or a ticked "I don't need a copy", the typed handle and an identity check; 14 days Closing (owners only, read-only, Keep the workspace); then purged with a tombstone row; renewal off at once, cancelled at the end, no refund; backups age out within 30 days; Whity's invoices and the audit log stay |
 | MW.7 | Switcher | Manage workspaces as the last item; @handle under each name; Closing shown and only owners may enter |
 
-## Appointments you can rely on (proposed 25 November 2026)
+## Appointments you can rely on (decided 25 November 2026)
 
-The owner, 25 November 2026: "we want FTA rates and better appointment system, something we can rely on for general audiences like clinics, dentists, salons, etc...". The owner chose four areas: reliability first, clinic features, online booking and the front desk. Specified in section 39 (`39-appointments.md`, WHIT-1408). **Proposed, waiting for the owner's answers to section 39 §13.** AP.1 (version 3.1) stands. Everything here is core and free (BM, 21 November 2026), except the outside integrations it uses: WhatsApp, SMS, calendar sync and the Whity Pay gateway.
+The owner, 25 November 2026: "we want FTA rates and better appointment system, something we can rely on for general audiences like clinics, dentists, salons, etc...". The owner chose four areas: reliability first, clinic features, online booking and the front desk. Specified in section 39 (`39-appointments.md`, WHIT-1408). Decided by the owner on 25 November 2026: **"Accept all"**, so every recommendation in section 39 §13 stands, including clinical visit records (Q10) and offering a freed time to the whole waitlist at once (Q12). AP.1 (version 3.1) stands. Everything here is core and free (BM, 21 November 2026), except the outside integrations it uses: WhatsApp, SMS, calendar sync and the Whity Pay gateway.
 
-| # | Decision | Proposed |
+| # | Decision | Choice |
 | --- | --- | --- |
 | AP.2 | Words | "Didn't come" for the mark and "No-show rate" for the rate (Arabic لم يحضر, نسبة عدم الحضور). "FTA" only in help text; the API name is `no_show`. Never shown to the customer (Q1) |
 | AP.3 | Attendance | Each booking has `attendance` (`attended` or `no_show`) and, when cancelled, `cancel_kind` (`early`, `late`, `business`). Check in, a walk-in handover and Mark as came set `attended`. Every change records who and when and is audited; agents only propose |

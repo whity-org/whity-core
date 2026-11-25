@@ -1,6 +1,6 @@
 # 39 · Appointments you can rely on: no-shows, resources, clinics and the front desk
 
-**Status: proposed, 25 November 2026 (WHIT-1408). Waiting for the owner's answers to section 13. Nothing here is built yet.** The register rows are AP.2–AP.31 (section "Appointments you can rely on"). AP.1 (version 3.1) stays as it is.
+**Status: decided by the owner on 25 November 2026 (WHIT-1408): "Accept all", every question in section 13 as recommended, including clinical visit records (Q10) and offering a freed time to the whole waitlist at once (Q12).** The register rows are AP.2–AP.31 (section "Appointments you can rely on"). AP.1 (version 3.1) stays as it is.
 
 The owner, 25 November 2026: "we want FTA rates and better appointment system, something we can rely on for general audiences like clinics, dentists, salons, etc...". FTA is "failed to attend", which most businesses call a no-show. The owner chose four focus areas, in this order:
 
@@ -345,7 +345,7 @@ M1 and M2 touch no screens except one line on the booking. M3 onward each get En
 
 ## 13. Questions for the owner
 
-Each has a recommendation. "Accept all" takes every recommendation.
+Each has a recommendation. **Answered 25 November 2026: "Accept all"**, so every recommendation below is the decision.
 
 1. **What do we call it on screen?** **Recommended:** "No-show" for the rate and "Didn't come" for the mark (Arabic "عدم الحضور" / "لم يحضر"). "FTA" appears only in the API name `no_show` and in help text ("also called FTA or DNA"). Plain words are easier for salons, and clinics know "no-show".
 2. **Who marks a no-show?** **Recommended:** staff mark it, helped by the Did they come? list. End-of-day automatic marking is a workspace switch, off by default. A forgotten Check in would otherwise turn into a false no-show against a real customer.
