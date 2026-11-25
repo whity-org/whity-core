@@ -6,7 +6,7 @@ namespace Tests\Sdk\Sync;
 
 use DemoCatalog\DemoCatalogPlugin;
 use PHPUnit\Framework\TestCase;
-use Whity\Sdk\Sync\PluginSyncResourcesInterface;
+use Whity\Sdk\Contribute\PluginSyncResourcesInterface;
 
 require_once dirname(__DIR__, 3) . '/plugins/DemoCatalog/DemoCatalogPlugin.php';
 

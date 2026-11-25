@@ -11,6 +11,7 @@ use DemoCatalog\Migrations\CreateDemoCatalogItemNotesTable;
 use DemoCatalog\Migrations\CreateDemoCatalogItemsTable;
 use DemoCatalog\Migrations\GrantDemoCatalogPermissionsToAdmin;
 use DemoCatalog\Migrations\RetireDemoCatalogChangeSeqTable;
+use Whity\Sdk\Contribute\PluginSyncResourcesInterface;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\Http\Request;
 use Whity\Sdk\Http\Response;
@@ -20,7 +21,6 @@ use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginRequirementsInterface;
 use Whity\Sdk\Rbac\PluginResourceTypesInterface;
 use Whity\Sdk\Settings\PluginSettingsInterface;
-use Whity\Sdk\Sync\PluginSyncResourcesInterface;
 use Whity\Sdk\Tenant\PluginTablesInterface;
 
 /**

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Whity\Sdk\Sync;
+namespace Whity\Sdk\Contribute;
 
 /**
  * Optional (SDK 1.173, WHIT-1422): which of your routes speak the sync wire
@@ -19,7 +19,7 @@ namespace Whity\Sdk\Sync;
  * Each entry is the path you registered the resource's routes under, as
  * written in {@see \Whity\Sdk\PluginInterface::getRoutes()} (`/api/...`,
  * without the version prefix). Behind that path must stand a
- * {@see SyncController} over a {@see SyncableResource}: `GET` with
+ * {@see \Whity\Sdk\Sync\SyncController} over a {@see \Whity\Sdk\Sync\SyncableResource}: `GET` with
  * `?updatedSince=<cursor>` is the changes feed, `POST` creates idempotently
  * on `clientUuid`, `PATCH` and `DELETE` on `{path}/{id}` take `If-Match`.
  * The desktop PHP host serves the same plugin on the device, so the path is

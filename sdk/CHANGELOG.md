@@ -8,7 +8,7 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 
 ## 1.173
 
-DESKTOP DATA SYNC: `Sync\PluginSyncResourcesInterface`, optional, names the route paths a plugin serves through `Sync\SyncController` (`getSyncResources()` returns `/api/...` paths such as `/api/demo-catalog/items`). Whity Desktop runs the same plugin on the person's computer and relays each declared resource both ways between the device and the workspace through the sync wire contract the controller already speaks: the changes feed, idempotent create on `clientUuid`, optimistic update and delete, tombstones; a row changed on both ends is parked for a person to resolve. On the server the declaration does nothing. DemoCatalog declares its items (whity-desktop ADR 0001, decision 4) (WHIT-1422).
+DESKTOP DATA SYNC: `Contribute\PluginSyncResourcesInterface`, optional, names the route paths a plugin serves through `Sync\SyncController` (`getSyncResources()` returns `/api/...` paths such as `/api/demo-catalog/items`). Whity Desktop runs the same plugin on the person's computer and relays each declared resource both ways between the device and the workspace through the sync wire contract the controller already speaks: the changes feed, idempotent create on `clientUuid`, optimistic update and delete, tombstones; a row changed on both ends is parked for a person to resolve. On the server the declaration does nothing. DemoCatalog declares its items (whity-desktop ADR 0001, decision 4) (WHIT-1422).
 
 Purely additive: one new optional interface. No existing interface changes.
 
