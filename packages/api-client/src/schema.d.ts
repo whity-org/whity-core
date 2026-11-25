@@ -23970,6 +23970,8 @@ export interface components {
             elapsed_ms: number;
             /** @description The bot-check token, when the page shows one. */
             bot_token?: string;
+            /** @description One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17). */
+            idempotency_key?: string;
         };
         /** @description The account of the signed-in visitor (WHIT-1179), or null when nobody is signed in. */
         PublicBookingVisitor: {
@@ -87250,7 +87252,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description That time was just taken */
+            /** @description That time was just taken, or this booking was already sent (`already_sent`) */
             409: {
                 headers: {
                     [name: string]: unknown;

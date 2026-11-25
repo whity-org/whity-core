@@ -11178,6 +11178,7 @@ final class CoreApiSchemas
                 'website' => self::str() + ['description' => 'Leave empty. A hidden field people never fill.'],
                 'elapsed_ms' => self::int() + ['description' => 'Milliseconds the page was open before sending.'],
                 'bot_token' => self::str() + ['description' => 'The bot-check token, when the page shows one.'],
+                'idempotency_key' => self::str() + ['minLength' => 8, 'maxLength' => 64, 'pattern' => '^[A-Za-z0-9_-]{8,64}$', 'description' => 'One new key for each press of Book. The same key again within 10 minutes is refused with 409 `already_sent` instead of booking twice (AP.17).'],
             ], ['starts_at', 'name', 'email', 'elapsed_ms']),
             'PublicBookingMoveRequest' => self::object([
                 'starts_at' => self::str() + ['description' => 'A free time, ISO 8601 with an offset.'],
@@ -20003,7 +20004,7 @@ final class CoreApiSchemas
                 'responses' => [
                     201 => self::jsonResponse('Booked', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
                     404 => self::errorResponse('This booking page is not available'),
-                    409 => self::errorResponse('That time was just taken'),
+                    409 => self::errorResponse('That time was just taken, or this booking was already sent (`already_sent`)'),
                     422 => self::errorResponse('Missing details, outside the booking window, or refused as spam'),
                     503 => self::errorResponse('The bot check could not be reached'),
                 ] + $limits,

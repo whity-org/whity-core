@@ -65,6 +65,8 @@ final class CoreTables
         'calendar_booking_services' => '302_create_calendar_booking_services.php',
         // WHIT-1334: the walk-in queue at the front desk (design section 35).
         'calendar_walkins' => '338_create_calendar_walkins.php',
+        // WHIT-1412: what each live booking holds, kept by triggers (design section 39, AP.11).
+        'calendar_holds' => '360_create_calendar_holds.php',
         'calendar_commission_rates' => '340_create_calendar_commission_rates.php',
         'calendar_commission_closes' => '342_create_calendar_commission_closes.php',
         'calendar_commission_close_lines' => '342_create_calendar_commission_closes.php',
