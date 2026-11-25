@@ -27,6 +27,7 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Avatar } from '@whity/ui/avatar';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
+import { ConfirmAction } from '@whity/ui/confirm-action';
 import { Icon } from '@whity/ui/icon';
 import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import {
@@ -56,6 +57,7 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
   const [editing, setEditing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [inviting, setInviting] = useState(false);
 
   const [changed, setChanged] = useState<Contact | null>(null);
   const { data, loading, error, forbidden, refetch } = useFetch(async () => {
@@ -106,6 +108,21 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
       setProblem(contactErrorText(e));
     } finally {
       setBusy(false);
+    }
+  };
+
+  // WHIT-1428 (design section 41 Q4): email the contact a link to their account.
+  const invite = async () => {
+    setBusy(true);
+    setProblem(null);
+    try {
+      const sent = await contactsApi.invite(contact.id);
+      toast.addToast(t('contacts.invite.sent', 'Invitation sent to {email}.', { email: sent.email }), 'success');
+    } catch (e) {
+      setProblem(contactErrorText(e));
+    } finally {
+      setBusy(false);
+      setInviting(false);
     }
   };
 
@@ -184,7 +201,33 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
             </a>
           </Button>
         )}
+        {/* WHIT-1428 (design section 41 Q4): their own account in the customer area. */}
+        {canWrite && !contact.archived && contact.email !== '' && contact.profile_id === null && (
+          <Button variant="outline" loading={busy} onClick={() => setInviting(true)} data-testid="contact-invite">
+            <Icon name="mail" />
+            {t('contacts.invite', 'Invite to their account')}
+          </Button>
+        )}
+        {contact.profile_id !== null && (
+          <span className="text-sm text-muted-foreground" data-testid="contact-has-account">
+            {t('contacts.hasAccount', 'Has an account')}
+          </span>
+        )}
       </div>
+      <ConfirmAction
+        open={inviting}
+        onOpenChange={setInviting}
+        title={t('contacts.invite.title', 'Invite {name} to their account?', { name: contact.name })}
+        description={t(
+          'contacts.invite.body',
+          'We email {email} a link to their account, where they see their bookings, bills and messages with you. The link works for 7 days.',
+          { email: contact.email }
+        )}
+        confirmLabel={t('contacts.invite.send', 'Send the invitation')}
+        cancelLabel={t('contacts.invite.cancel', 'Not now')}
+        variant="default"
+        onConfirm={invite}
+      />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="space-y-3 rounded-lg border border-border p-5">

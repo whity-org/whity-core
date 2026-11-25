@@ -28344,6 +28344,129 @@
                 ]
             }
         },
+        "/api/v1/contacts/{id}/invite": {
+            "post": {
+                "operationId": "post_api_v1_contacts_id_invite",
+                "summary": "Invite a contact to their account in the customer area (WHIT-1428)",
+                "tags": [
+                    "contacts"
+                ],
+                "description": "Emails the contact a link to their account. Accepting makes a customer membership with the role customers get (Settings \u203a Sign-up) and links this contact, whatever the public sign-up mode. Takes no body.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Sent",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "result": {
+                                                    "type": "string"
+                                                },
+                                                "email": {
+                                                    "type": "string"
+                                                },
+                                                "expires_in_days": {
+                                                    "type": "integer"
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Archived, no email, already has an account, the customer area is off, or no customer role is chosen",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many invitations",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/contacts/{id}/restore": {
             "post": {
                 "operationId": "post_api_v1_contacts_id_restore",
@@ -131539,6 +131662,13 @@
                                 "nullable": true
                             },
                             "role_name": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "customer_account": {
+                                "type": "boolean"
+                            },
+                            "customer_area_path": {
                                 "type": "string",
                                 "nullable": true
                             }

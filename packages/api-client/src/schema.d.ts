@@ -4160,6 +4160,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/contacts/{id}/invite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Invite a contact to their account in the customer area (WHIT-1428)
+         * @description Emails the contact a link to their account. Accepting makes a customer membership with the role customers get (Settings › Sign-up) and links this contact, whatever the public sign-up mode. Takes no body.
+         */
+        post: operations["post_api_v1_contacts_id_invite"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/contacts/{id}/restore": {
         parameters: {
             query?: never;
@@ -23061,6 +23081,8 @@ export interface components {
                 password_sign_in: boolean;
                 inviter_name: string | null;
                 role_name: string | null;
+                customer_account?: boolean;
+                customer_area_path?: string | null;
             };
         };
         InvitationRevokedResponse: {
@@ -49708,6 +49730,97 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_contacts_id_invite: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sent */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data?: {
+                            result?: string;
+                            email?: string;
+                            expires_in_days?: number;
+                        };
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Archived, no email, already has an account, the customer area is off, or no customer role is chosen */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many invitations */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

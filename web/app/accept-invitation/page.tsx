@@ -13,6 +13,7 @@ import { useTranslation } from '@whity/features/i18n';
 import { api } from '@/lib/api/client';
 import { useOptionalAuth } from '@/lib/auth-context';
 import { SsoLoginButtons } from '@/components/sso-login-buttons';
+import { isCustomerAreaPath, rememberCustomerAreaReturn } from '@/lib/customer-area-return';
 import { PASSWORD_MIN_LENGTH } from '@/lib/password-policy';
 
 /**
@@ -67,6 +68,7 @@ function AcceptInvitationInner() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const previewStarted = useRef(false);
+  const [areaPath, setAreaPath] = useState<string | null>(null);
 
   // The preview fetch is declared INSIDE the effect and guarded by a ref, the
   // same shape verify-email/page.tsx uses: it keeps every setState indirect
@@ -99,6 +101,13 @@ function AcceptInvitationInner() {
           inviterName: typeof data?.inviter_name === 'string' ? data.inviter_name : null,
           roleName: typeof data?.role_name === 'string' ? data.role_name : null,
         });
+        // WHIT-1428: an invitation to a customer's account lands on its Home,
+        // also after a sign-in provider's round trip.
+        const path = typeof data?.customer_area_path === 'string' && isCustomerAreaPath(data.customer_area_path) ? data.customer_area_path : null;
+        if (path !== null) {
+          setAreaPath(path);
+          rememberCustomerAreaReturn(path);
+        }
         setStatus('form');
       } catch {
         setStatus('error');
@@ -313,7 +322,9 @@ function AcceptInvitationInner() {
                 </AlertDescription>
               </Alert>
               <Button asChild className="w-full">
-                <Link href="/login">{t('acceptInvitation.continue', 'Continue to sign in')}</Link>
+                <Link href={areaPath !== null ? `/login?next=${encodeURIComponent(areaPath)}` : '/login'}>
+                  {t('acceptInvitation.continue', 'Continue to sign in')}
+                </Link>
               </Button>
             </div>
           )}

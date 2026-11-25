@@ -81,7 +81,31 @@ final class EmailContent
         public readonly ?array $leadLine = null,
         /** A quoted block (a reply's text): a line on its start side, line breaks kept. */
         public readonly ?string $quote = null,
+        /**
+         * WHIT-1428 (design section 41, CA.8): "See it in your account", a soft
+         * line with one link to the customer's own page in the customer area.
+         * Sent only to someone who has an account there; the token link stays.
+         *
+         * @var array{label: string, url: string}|null
+         */
+        public readonly ?array $accountLink = null,
     ) {
+    }
+
+    /**
+     * The same email with the customer area link, or unchanged without one.
+     *
+     * @param array{label: string, url: string}|null $link
+     */
+    public function withAccountLink(?array $link): self
+    {
+        if ($link === null) {
+            return $this;
+        }
+        $args = get_object_vars($this);
+        $args['accountLink'] = $link;
+
+        return new self(...$args);
     }
 
     /** Whether a usable call-to-action button is present. */

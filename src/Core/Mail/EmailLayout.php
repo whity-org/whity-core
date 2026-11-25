@@ -162,6 +162,12 @@ final class EmailLayout
                 . self::esc($c->linkLine['before']) . $link . self::esc($c->linkLine['after']) . '</p>';
         }
 
+        $accountUrl = $c->accountLink !== null ? self::safeUrl($c->accountLink['url']) : null;
+        if ($c->accountLink !== null && $accountUrl !== null) {
+            $body .= '<p class="soft" style="margin:0 0 16px;font-size:17px;line-height:1.6;color:' . self::SOFT . '">'
+                . '<a href="' . self::esc($accountUrl) . '" style="color:' . $brand . '">' . self::esc($c->accountLink['label']) . '</a></p>';
+        }
+
         if ($c->smallNote !== null && $c->smallNote !== '') {
             $body .= '<p class="soft" style="margin:0 0 16px;font-size:15px;line-height:1.6;color:' . self::SOFT . '">'
                 . self::esc($c->smallNote) . '</p>';
@@ -279,6 +285,10 @@ HTML;
         if ($c->linkLine !== null) {
             $url = self::safeUrl($c->linkLine['url']);
             $lines[] = $c->linkLine['before'] . $c->linkLine['label'] . ($url !== null ? ' (' . $url . ')' : '') . $c->linkLine['after'];
+            $lines[] = '';
+        }
+        if ($c->accountLink !== null && ($accountUrl = self::safeUrl($c->accountLink['url'])) !== null) {
+            $lines[] = $c->accountLink['label'] . ': ' . $accountUrl;
             $lines[] = '';
         }
         if ($c->smallNote !== null && $c->smallNote !== '') {

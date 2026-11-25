@@ -5910,7 +5910,13 @@ $salesQuotesHandler = new \Whity\Api\SalesQuotesApiHandler(
     $brandingService,
     static fn (int $tenantId): string => (new \Whity\Core\Branding\TenantHostRepository($db->getPdo()))->findNameById($tenantId) ?? '',
     // WHIT-1323: sending a quote emails it to the customer (EM.1 "Money").
-    new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService),
+    (static function () use ($brandedEmailSender, $settingsService, $db, $frontendUrls): \Whity\Core\Sales\TradingEmails {
+        $emails = new \Whity\Core\Sales\TradingEmails($brandedEmailSender, $settingsService);
+        // WHIT-1428: "See it in your account" for customers who have one.
+        $emails->setAccountLinks(new \Whity\Core\CustomerArea\CustomerAreaLinks($db->getPdo(), $settingsService, new \Whity\Core\Branding\TenantHostRepository($db->getPdo()), $frontendUrls->base()));
+
+        return $emails;
+    })(),
     // WHIT-1341: a quote prints through the document themes, its QR opening the public page.
     new \Whity\Core\Sales\Print\QuoteDocuments(
         $db->getPdo(),
@@ -6795,6 +6801,20 @@ $router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/m
 $router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/messages/{id:\d+}',                  [$customerAreaHandler, 'sendMessage'],       null);
 $router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/account',                            [$customerAreaHandler, 'account'],           null);
 $router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/leave',                              [$customerAreaHandler, 'leave'],             null);
+// Invite to their account (WHIT-1428, design section 41 Q4): staff invite a
+// contact to the customer area, whatever the public sign-up mode.
+$contactInviteHandler = new \Whity\Api\ContactInviteApiHandler(
+    $contactRepository,
+    $invitationService,
+    new \Whity\Core\CustomerArea\CustomerAccountInviteMailer($brandedEmailSender, $invitationUrlBase),
+    $signupSettings,
+    $customerSafeRoles,
+    $settingsService,
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger,
+    static fn (int $tenantId): ?string => $brandingHostRepo->findNameById($tenantId),
+);
+$router->register('POST', '/api/contacts/{id:\d+}/invite', [$contactInviteHandler, 'invite'], null, null, CorePermissions::CONTACTS_WRITE);
 // Settings › Customer area (CA.22), in the session's own workspace.
 $customerAreaSettingsHandler = new \Whity\Api\CustomerAreaSettingsApiHandler(
     $settingsService,
