@@ -7,7 +7,7 @@ namespace Database\Migrations;
 use Whity\Database\Database;
 
 /**
- * CreateWorkspaceTemplateParts (SDK 1.169, WHIT-1409; design section 39
+ * CreateWorkspaceTemplateParts (SDK 1.169, WHIT-1409; design section 40
  * §2.4): which version of each part a template run applied.
  *
  * A run applies its template, and later minors add the templates it builds

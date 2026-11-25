@@ -20,7 +20,7 @@ use Whity\Sdk\Setup\WorkspaceSetup;
  * Give it {@see DryRunWorkspaceSetup} and a {@see MemoryLedger} over the real
  * ledger and it plans without changing anything: that is the preview.
  *
- * The rules, which every run keeps (design section 39 §2.4):
+ * The rules, which every run keeps (design section 40 §2.4):
  * 1. **Adds, never overwrites.** A setting is set only while the workspace
  *    keeps the default; booking rules the first time only; hours only for a
  *    person who has none; an item already there by name or key is kept.
