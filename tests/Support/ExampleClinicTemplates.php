@@ -76,6 +76,36 @@ final class ExampleClinicTemplates
         ];
     }
 
+    /**
+     * The clinic with a doctor and an intake review: reception checks, then
+     * a doctor approves (SDK 1.172, WHIT-1419).
+     *
+     * @return array<string, mixed>
+     */
+    public static function clinicWithReview(int $version = 1, string $approveLabel = 'Doctor approves'): array
+    {
+        $clinic = self::clinic($version);
+        $clinic['roles'][] = ['key' => 'doctor', 'name' => self::t('Doctor', 'طبيب'), 'permissions' => ['calendar:read']];
+        $clinic['pipelines'] = [self::intakeReview($approveLabel)];
+
+        return $clinic;
+    }
+
+    /** @return array<string, mixed> */
+    public static function intakeReview(string $approveLabel = 'Doctor approves'): array
+    {
+        return [
+            'key' => 'intake-review',
+            'name' => self::t('Intake review', 'مراجعة الاستقبال'),
+            'description' => self::t('Reception checks each intake, then a doctor approves it.', 'يدقق الاستقبال كل نموذج ثم يعتمده الطبيب.'),
+            'for' => ['form' => 'patient-intake'],
+            'stages' => [
+                ['key' => 'reception', 'name' => self::t('Reception checks', 'تدقيق الاستقبال'), 'role' => 'reception'],
+                ['key' => 'doctor', 'name' => self::t($approveLabel, 'اعتماد الطبيب'), 'role' => 'doctor', 'sendBack' => false],
+            ],
+        ];
+    }
+
     /** @return array<string, mixed> */
     public static function patientFile(int $version = 1): array
     {

@@ -20,7 +20,7 @@ use Whity\Sdk\Setup\WorkspaceSetup;
  * core's own real-engine test runs every official template against Postgres.
  *
  * Rows are public arrays by kind (`services`, `roles`, `forms`, `documents`,
- * `contacts`, `bookings`), keyed by id, so a test can act as the person:
+ * `routes` (review routes in Flows, 1.172), `contacts`, `bookings`), keyed by id, so a test can act as the person:
  * delete one, rename one, then apply again.
  */
 final class FakeWorkspace implements WorkspaceSetup
@@ -48,6 +48,9 @@ final class FakeWorkspace implements WorkspaceSetup
 
     /** @var array<int, array<string, mixed>> */
     public array $documents = [];
+
+    /** @var array<int, array<string, mixed>> review routes in Flows, with their `steps` (SDK 1.172) */
+    public array $routes = [];
 
     /** @var array<int, array<string, mixed>> */
     public array $contacts = [];
@@ -106,6 +109,7 @@ final class FakeWorkspace implements WorkspaceSetup
             'roles' => $this->roles,
             'forms' => $this->forms,
             'documents' => $this->documents,
+            'routes' => $this->routes,
             'contacts' => $this->contacts,
             'bookings' => $this->bookings,
         ];
@@ -149,6 +153,12 @@ final class FakeWorkspace implements WorkspaceSetup
             'POST /api/forms/{id}/fields' => $this->addField($id, $body),
             'PATCH /api/forms/{id}/fields/{id}' => $this->patchField($id, $second, $body),
             'POST /api/forms/{id}/publish' => $this->update('forms', $id, ['published' => true]),
+            'GET /api/forms/{id}' => isset($this->forms[$id]) ? self::answer(200, ['data' => $this->forms[$id]]) : self::answer(404, ['error' => 'Not found']),
+            // Only a form's route is changed through here by a template.
+            'PATCH /api/forms/{id}' => $this->update('forms', $id, array_intersect_key($body, ['route_template_id' => true])),
+            'GET /api/document-route-templates' => self::answer(200, ['data' => array_values($this->routes)]),
+            'POST /api/document-route-templates' => $this->createRoute($body),
+            'PUT /api/document-route-templates/{id}/graph' => $this->update('routes', $id, ['steps' => is_array($body['steps'] ?? null) ? $body['steps'] : [], 'edges' => is_array($body['edges'] ?? null) ? $body['edges'] : []]),
             'POST /api/document-sources' => $this->create('documents', $body),
             'GET /api/contacts' => self::answer(200, ['data' => array_values($this->contacts)]),
             'POST /api/contacts' => $this->create('contacts', $body),
@@ -226,7 +236,22 @@ final class FakeWorkspace implements WorkspaceSetup
             }
         }
 
-        return $this->create('forms', $body + ['fields' => [], 'published' => false]);
+        return $this->create('forms', $body + ['fields' => [], 'published' => false, 'route_template_id' => null]);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array{status: int, body: mixed}
+     */
+    private function createRoute(array $body): array
+    {
+        foreach ($this->routes as $route) {
+            if (($route['name'] ?? null) === ($body['name'] ?? null)) {
+                return self::answer(409, ['error' => 'A route template with that name already exists.']);
+            }
+        }
+
+        return $this->create('routes', $body + ['steps' => [], 'edges' => []]);
     }
 
     /**

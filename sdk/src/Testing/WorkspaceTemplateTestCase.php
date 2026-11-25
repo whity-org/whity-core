@@ -136,7 +136,7 @@ abstract class WorkspaceTemplateTestCase extends TestCase
         $this->applyTemplate($new, $workspace, $ledger);
         $after = $workspace->snapshot();
 
-        foreach (['services', 'roles', 'forms', 'documents', 'contacts', 'bookings'] as $kind) {
+        foreach (['services', 'roles', 'forms', 'documents', 'routes', 'contacts', 'bookings'] as $kind) {
             foreach ($before[$kind] as $id => $row) {
                 self::assertArrayHasKey($id, $after[$kind], "The upgrade deleted {$kind} #{$id}");
                 self::assertEquals($row, $after[$kind][$id], "The upgrade overwrote {$kind} #{$id}");

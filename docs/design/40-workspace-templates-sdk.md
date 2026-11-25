@@ -127,6 +127,8 @@ As §2.2. The composed manifest is checked again after merging, so a child canno
 
 A pipeline is a review route in Flows (document route templates, section 23) made for one of the template's forms or documents. Each stage names a role from the template (`role`) or a permission (`permission`); people are never named. Applying makes the route template through `POST /api/document-route-templates` and `PUT .../{id}/graph` as the person, and attaches it to the form. The person needs `route_templates:write`, or the pipeline is skipped with the reason. **Owner, 25 Nov (Q1): "Review routes now"**; Taskaat boards come later, through Taskaat (T.3).
 
+Built in WHIT-1419 (SDK 1.172) with two differences from the above: a pipeline is for a **form** only (documents are routed when they are issued, and have no route of their own to attach), and a stage names a template **role** only (Flows routes by role, user group or named people, never by permission, and naming people is ruled out). A form that already has a route keeps it. "Use the template's version" of a pipeline makes a new route beside the old one and moves the form only while it still uses the template's route. The routes are on core's template-only list (`HostWorkspaceSetup::TEMPLATE_ROUTES`), not `WorkspaceSetup::ROUTES`, like roles and documents.
+
 ## 4. Where templates live: one plugin per template
 
 - **Start blank stays in core** and is the only template core ships.

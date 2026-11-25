@@ -1,6 +1,6 @@
 # @whity/plugin-sdk
 
-What a Whity plugin's frontend needs, in one package versioned with the PHP SDK (`whity/plugin-sdk`): the same version number, so `1.170.0` here matches SDK 1.170.
+What a Whity plugin's frontend needs, in one package versioned with the PHP SDK (`whity/plugin-sdk`): the same version number, so `1.172.0` here matches SDK 1.172.
 
 - **The block contract**, generated from the PHP SDK: every block type, its child slots and its props (`BLOCK_CONTRACT`, `BLOCK_TYPES`, `MAX_DEPTH`, `MAX_NODES`, `FLOW_MAX_NODES`), and `SDK_VERSION`.
 - **The block types**: `Block` and one interface per block type (`HeadingBlock`, `DataTableBlock`, …), as the host serves them.

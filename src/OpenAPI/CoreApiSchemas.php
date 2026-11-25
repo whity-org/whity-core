@@ -21137,9 +21137,9 @@ final class CoreApiSchemas
                 ] + self::authErrors(),
             ]),
             // WHIT-1413 (SDK 1.170).
-            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents}/{item:[a-z][a-z0-9-]*}/adopt', 'settings:write', [
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents|pipelines}/{item:[a-z][a-z0-9-]*}/adopt', 'settings:write', [
                 'summary' => 'Use the template\'s version of one item',
-                'description' => 'For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template\'s labels and its missing questions; a role gets the template\'s missing permissions the caller holds; a document gets a new copy beside the workspace\'s.',
+                'description' => 'For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template\'s labels and its missing questions; a role gets the template\'s missing permissions the caller holds; a document gets a new copy beside the workspace\'s; a pipeline (SDK 1.172) gets a new review route, and its form moves to it only while the form still uses the route the template made.',
                 'tags' => ['platform-ops'],
                 'responses' => [
                     200 => self::jsonResponse('add when it was changed, keep when it already matched, skip with why', 'AdoptWorkspaceTemplateItemResponse'),

@@ -47,6 +47,12 @@ final class HostWorkspaceSetup implements WorkspaceSetup
         'GET /api/forms/{id}/fields',
         'POST /api/forms/{id}/fields',
         'PATCH /api/forms/{id}/fields/{fieldId}',
+        // SDK 1.172 (WHIT-1419): a template's pipelines become review routes
+        // in Flows, attached to a form that has none yet.
+        'GET /api/forms/{id}',
+        'PATCH /api/forms/{id}',
+        'POST /api/document-route-templates',
+        'PUT /api/document-route-templates/{id}/graph',
     ];
 
     /** @param list<string> $extraRoutes */

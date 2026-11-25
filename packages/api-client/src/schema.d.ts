@@ -14747,7 +14747,7 @@ export interface paths {
         put?: never;
         /**
          * Use the template's version of one item
-         * @description For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template's labels and its missing questions; a role gets the template's missing permissions the caller holds; a document gets a new copy beside the workspace's.
+         * @description For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template's labels and its missing questions; a role gets the template's missing permissions the caller holds; a document gets a new copy beside the workspace's; a pipeline (SDK 1.172) gets a new review route, and its form moves to it only while the form still uses the route the template made.
          */
         post: operations["post_api_v1_workspace_templates_key_items_part_item_adopt"];
         delete?: never;
