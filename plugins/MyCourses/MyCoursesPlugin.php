@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace MyCourses;
 
 use MyCourses\Migrations\CreateMyCoursesEnrolmentsTable;
+use MyCourses\Migrations\GrantMyCoursesPermissionsToAdmin;
 use PDO;
 use Whity\Sdk\Contribute\PluginCustomerScreensInterface;
 use Whity\Sdk\Frontend\FrameBridge;
@@ -174,7 +175,7 @@ final class MyCoursesPlugin implements PluginInterface, PluginRequirementsInterf
 
     public function getMigrations(): array
     {
-        return [CreateMyCoursesEnrolmentsTable::class];
+        return [CreateMyCoursesEnrolmentsTable::class, GrantMyCoursesPermissionsToAdmin::class];
     }
 
     // ---- Customer routes: scoped by CustomerCall ----
