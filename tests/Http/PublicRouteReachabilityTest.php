@@ -48,6 +48,10 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'a student redeeming an activation code' => ['/api/v1/public/licensing/redeem'];
         yield 'a customer opening a quote link' => ['/api/v1/public/quotes/' . str_repeat('a', 64)];
         yield 'a customer accepting a quote' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/accept'];
+        yield 'a customer opening their area' => ['/api/v1/customer-area/example-bakery'];
+        yield 'a customer opening their bills' => ['/api/v1/customer-area/example-bakery/bills'];
+        yield 'a customer moving a booking' => ['/api/v1/customer-area/example-bakery/bookings/12/move'];
+        yield 'a customer reading a conversation' => ['/api/v1/customer-area/example-bakery/messages/7'];
         yield 'a customer declining a quote' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/decline'];
     }
 
@@ -94,6 +98,9 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'a tenant starting a payment' => ['/api/v1/billing/invoices/7/pay'];
         yield 'the operator plan catalogue' => ['/api/v1/plans'];
         yield 'the operator promotion catalogue' => ['/api/v1/promotions'];
+        yield 'anything else under a customer area' => ['/api/v1/customer-area/example-bakery/admin'];
+        yield 'deeper than a customer area booking' => ['/api/v1/customer-area/example-bakery/bookings/12/move/again'];
+        yield 'the customer area settings' => ['/api/v1/settings/customer-area'];
         yield 'anything else under a quote link' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/revise'];
         yield 'the staff quotes list' => ['/api/v1/sales/quotes'];
     }

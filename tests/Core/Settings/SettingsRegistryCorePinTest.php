@@ -258,6 +258,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             'accounting.invoice_payment_terms_days',
             'accounting.prices_include_tax',
             'accounting.bill_route_template_id',
+            'customer_area.enabled',
+            'customer_area.hidden_tabs',
+            'customer_area.tab_order',
+            'customer_area.welcome_en',
+            'customer_area.welcome_ar',
+            'customer_area.how_to_pay_en',
+            'customer_area.how_to_pay_ar',
         ];
     }
 
@@ -528,6 +535,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             'accounting.invoice_payment_terms_days' => '0',
             'accounting.prices_include_tax' => 'false',
             'accounting.bill_route_template_id' => '0',
+            'customer_area.enabled' => 'true',
+            'customer_area.hidden_tabs' => '[]',
+            'customer_area.tab_order' => '[]',
+            'customer_area.welcome_en' => '',
+            'customer_area.welcome_ar' => '',
+            'customer_area.how_to_pay_en' => '',
+            'customer_area.how_to_pay_ar' => '',
         ];
     }
 

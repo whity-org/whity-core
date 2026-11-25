@@ -125,6 +125,6 @@ test('the Caddy matcher lists page and file prefixes, never the forwarders or th
       { path: '/:slug', kind: 'page' },
     ],
   }, ['_next']);
-  assert.match(out, /^@whity path \/_next \/_next\/\* \/admin \/admin\/\* \/login \/login\/\* \/sw\.js \/sw\.js\/\*$/m);
+  assert.match(out, /^@whity path \/@\* \/_next \/_next\/\* \/admin \/admin\/\* \/login \/login\/\* \/sw\.js \/sw\.js\/\*$/m);
   assert.doesNotMatch(out, /\/api|\/mcp| \/ /);
 });

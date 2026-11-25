@@ -157,6 +157,18 @@ final class RateLimits
         return RateLimitRule::keyed('public_booking.slots', 240, self::HOUR);
     }
 
+    /** Reading one's own customer area, per person or address (WHIT-1416, CA.10). */
+    public static function customerAreaReadPerPerson(): RateLimitRule
+    {
+        return RateLimitRule::keyed('customer_area.read', 600, self::HOUR);
+    }
+
+    /** Acting in one's own customer area (join, move, cancel, answer, write), per person (WHIT-1416). */
+    public static function customerAreaWritePerPerson(): RateLimitRule
+    {
+        return RateLimitRule::keyed('customer_area.write', 60, self::HOUR);
+    }
+
     /** Opening a customer's quote link, per address (WHIT-1321). */
     public static function publicQuoteViewPerAddress(): RateLimitRule
     {

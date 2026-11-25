@@ -56,6 +56,7 @@ export const SETTING_KEYWORDS: Readonly<Record<string, string>> = {
   sso: 'single sign-on sso google microsoft oidc saml الدخول الموحد',
   signup: 'sign-up sign up register registration join التسجيل تسجيل انضمام',
   'customer-signup': 'sign-up sign up customers register join invite التسجيل العملاء انضمام دعوة',
+  'customer-area': 'customer area portal account clients patients students منطقة العملاء بوابة حساب',
   devices: 'licensed devices licence license الأجهزة المرخصة ترخيص',
   'audit-logs': 'audit log history who changed activity سجل التدقيق السجل من غير',
   messages: 'messages chat web chat replies الرسائل المحادثة ردود',

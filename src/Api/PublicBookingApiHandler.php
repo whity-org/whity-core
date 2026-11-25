@@ -455,7 +455,7 @@ final class PublicBookingApiHandler
      * @param array<string, mixed> $booking
      * @return array<string, mixed>
      */
-    private static function forCustomer(array $booking): array
+    public static function forCustomer(array $booking): array
     {
         $service = is_array($booking['service'] ?? null) ? $booking['service'] : [];
 
@@ -589,7 +589,7 @@ final class PublicBookingApiHandler
     }
 
     /** @return array<string, string> */
-    private static function query(Request $request): array
+    public static function query(Request $request): array
     {
         $query = [];
         $qs = parse_url($request->getPath(), PHP_URL_QUERY);
@@ -619,7 +619,7 @@ final class PublicBookingApiHandler
      * @param array<string, string> $q
      * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}
      */
-    private static function range(array $q): array
+    public static function range(array $q): array
     {
         $from = Interval::fromApi($q['from'] ?? null);
         $to = Interval::fromApi($q['to'] ?? null);

@@ -564,6 +564,18 @@
       "since": "0.2.30"
     },
     {
+      "path": "/admin/settings/customer-area",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "website-settings"
+      ],
+      "settings_ids": [
+        "customer-area"
+      ],
+      "since": "0.2.32"
+    },
+    {
       "path": "/admin/settings/customer-signup",
       "kind": "page",
       "area": "protected",
@@ -1591,6 +1603,102 @@
       "nav_ids": [],
       "settings_ids": [],
       "since": "0.2.7"
+    },
+    {
+      "path": "/w/:handle",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/account",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/bills",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/bills/invoices/:id",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/bills/quotes/:id",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/bills/receipts/:id",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/bookings",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/bookings/:id",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/home",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/messages",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/messages/:id",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
+      "path": "/w/:handle/sign-in",
+      "kind": "page",
+      "area": "public",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
     },
     {
       "path": "/web-build",

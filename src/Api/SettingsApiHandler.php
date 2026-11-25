@@ -105,6 +105,7 @@ final class SettingsApiHandler
      *   settings.tab.owners = Owners
      *   settings.tab.signup = Sign-up
      *   settings.tab.customer_signup = Sign-up
+     *   settings.tab.customer_area = Customer area
      *   settings.tab.sso = Single sign-on
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
@@ -181,6 +182,8 @@ final class SettingsApiHandler
         // above is the operator's and system-tenant only; this one is every other
         // workspace's, so the two never show together.
         ['id' => 'customer-signup', 'href' => '/admin/settings/customer-signup', 'label' => 'Sign-up', 'requiredPermission' => CorePermissions::SIGNUP_MANAGE, 'workspaceOnly' => true],
+        // WHIT-1416: the workspace's customer area at /@handle (design section 41, CA.22).
+        ['id' => 'customer-area', 'href' => '/admin/settings/customer-area', 'label' => 'Customer area', 'requiredPermission' => CorePermissions::SETTINGS_READ, 'workspaceOnly' => true],
         ['id' => 'sso', 'href' => '/admin/settings/sso', 'label' => 'Single sign-on', 'requiredPermission' => CorePermissions::AUTH_PROVIDERS_MANAGE],
         ['id' => 'email', 'href' => '/admin/settings/email', 'label' => 'Email', 'requiredPermission' => CorePermissions::SETTINGS_MANAGE, 'systemTenantOnly' => true],
         // Email-domain policy (WC-ac35b6cf): follows the route's own permission,

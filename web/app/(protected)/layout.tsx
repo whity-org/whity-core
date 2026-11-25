@@ -12,6 +12,7 @@ import { PhoneNav } from '@/components/shell/phone-nav';
 import { DataTableLabels } from '@/components/shell/data-table-labels';
 import { PushOffer } from '@/components/pwa/push-offer';
 import { AppSwitchSheet } from '@/components/pwa/app-switch-sheet';
+import { CustomerAreaReturn } from '@/components/customer-area/customer-area-return';
 
 /**
  * The standard app shell: sidebar + a padded, max-width content column; on a
@@ -28,6 +29,8 @@ export default function ProtectedLayout({
 }>) {
   return (
     <AuthGate>
+      {/* WHIT-1416: back to the customer area page sign-in started from. */}
+      <CustomerAreaReturn />
       {/* `fixed inset-0` (not `h-screen`, which is only a same-magnitude
           *coincidence* with the viewport, not a binding to it) takes the shell
           out of document flow entirely: it always exactly covers the viewport

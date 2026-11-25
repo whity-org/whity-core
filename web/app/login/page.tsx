@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { isCustomerAreaPath } from '@/lib/customer-area-return';
 import { useAuth } from '@/lib/auth-context';
 import { continueSignupPlugin } from '@/lib/signup-plugin';
 import { api } from '@/lib/api/client';
@@ -108,7 +109,8 @@ function formatBackupCode(raw: string): string {
 /**
  * Where a sign-in started from a form's public link goes back to (#2355):
  * `?form=<public slug>&next=/forms/<id>`. Only those exact shapes are taken,
- * so the page can't be made to send anyone elsewhere.
+ * so the page can't be made to send anyone elsewhere. A customer area page,
+ * `?next=/@handle/...`, is the other shape (WHIT-1416).
  */
 interface ReturnTo {
   form: string | null;
@@ -121,7 +123,8 @@ function readReturnTo(search: string): ReturnTo {
   const next = params.get('next');
   return {
     form: form !== null && /^[0-9a-f]{64}$/i.test(form) ? form.toLowerCase() : null,
-    next: next !== null && /^\/forms\/[1-9][0-9]{0,9}$/.test(next) ? next : null,
+    // WHIT-1416: or back to a workspace's customer area, `/@handle/...`.
+    next: next !== null && (/^\/forms\/[1-9][0-9]{0,9}$/.test(next) || isCustomerAreaPath(next)) ? next : null,
   };
 }
 
