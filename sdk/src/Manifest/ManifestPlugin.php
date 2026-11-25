@@ -13,6 +13,8 @@ use Whity\Sdk\Contribute\PluginOnboardingInterface;
 use Whity\Sdk\Contribute\PluginScheduledJobsInterface;
 use Whity\Sdk\Contribute\PluginSettingsInterface;
 use Whity\Sdk\Contribute\PluginThemesInterface;
+use Whity\Sdk\Contribute\PluginWorkspaceTemplateExtensionsInterface;
+use Whity\Sdk\Contribute\PluginWorkspaceTemplatesInterface;
 use Whity\Sdk\JobInterface;
 use Whity\Sdk\DataType\PluginDataTypesInterface;
 use Whity\Sdk\PluginAgentPresetsInterface;
@@ -80,7 +82,9 @@ abstract class ManifestPlugin implements
     PluginDashboardInterface,
     PluginOnboardingInterface,
     PluginContactFieldsInterface,
-    PluginThemesInterface
+    PluginThemesInterface,
+    PluginWorkspaceTemplatesInterface,
+    PluginWorkspaceTemplateExtensionsInterface
 {
     /** The file name the manifest is read from, next to the subclass. */
     public const FILE_NAME = 'plugin.json';
@@ -333,23 +337,56 @@ abstract class ManifestPlugin implements
      */
     public function getThemes(): array
     {
+        return $this->readJsonFiles('themes', $this->manifest->themeFiles());
+    }
+
+    /**
+     * The workspace templates `workspaceTemplates` lists (SDK 1.170), read
+     * from the plugin's directory. The host checks each and drops one that
+     * fails.
+     *
+     * @throws InvalidManifestException when a file can't be read or isn't JSON
+     */
+    public function getWorkspaceTemplates(): array
+    {
+        return $this->readJsonFiles('workspaceTemplates', $this->manifest->workspaceTemplateFiles());
+    }
+
+    /**
+     * The template extensions `workspaceTemplateExtensions` lists (SDK
+     * 1.170), read from the plugin's directory.
+     *
+     * @throws InvalidManifestException when a file can't be read or isn't JSON
+     */
+    public function getWorkspaceTemplateExtensions(): array
+    {
+        return $this->readJsonFiles('workspaceTemplateExtensions', $this->manifest->workspaceTemplateExtensionFiles());
+    }
+
+    /**
+     * @param list<string> $files
+     * @return list<array<string, mixed>>
+     * @throws InvalidManifestException
+     */
+    private function readJsonFiles(string $key, array $files): array
+    {
         $dir = dirname($this->manifestPath());
-        $themes = [];
+        $out = [];
         $problems = [];
-        foreach ($this->manifest->themeFiles() as $i => $file) {
+        foreach ($files as $i => $file) {
             $raw = @file_get_contents($dir . DIRECTORY_SEPARATOR . $file);
-            $theme = is_string($raw) ? json_decode($raw, true) : null;
-            if (!is_array($theme)) {
-                $problems[] = "themes[{$i}]: {$file} can't be read as JSON";
+            $decoded = is_string($raw) ? json_decode($raw, true) : null;
+            if (!is_array($decoded)) {
+                $problems[] = "{$key}[{$i}]: {$file} can't be read as JSON";
                 continue;
             }
-            $themes[] = $theme;
+            $out[] = $decoded;
         }
         if ($problems !== []) {
             throw new InvalidManifestException($this->manifestPath(), $problems);
         }
 
         /** @var list<array<string, mixed>> */
-        return $themes;
+        return $out;
     }
 }

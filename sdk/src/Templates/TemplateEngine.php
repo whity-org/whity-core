@@ -33,6 +33,14 @@ use Whity\Sdk\Setup\WorkspaceSetup;
  * 5. **Each part fails alone.** What could not be done is reported, the rest
  *    still happens.
  *
+ * Since SDK 1.170 (WHIT-1413) a run records the version of every part of a
+ * composed template ({@see TemplateComposer}), and each item remembers a
+ * fingerprint of the manifest entry it was made from. An item an earlier run
+ * made whose entry has since changed is reported `changed` and left alone;
+ * {@see self::adopt()} applies the template's version to that one item when
+ * the person asks (decision WT.2, WT.3). An update adds no examples once the
+ * person removed them.
+ *
  * The manifest must already be valid ({@see \Whity\Sdk\Manifest\WorkspaceTemplateValidator}).
  */
 final class TemplateEngine
@@ -51,6 +59,19 @@ final class TemplateEngine
 
     /** A service the template offers but does not tick: left for the guided setup. */
     public const LEFT = 'left';
+
+    /** Made by an earlier run, and the template has changed it since: left as it is, "Use the template's version" offered (SDK 1.170). */
+    public const CHANGED = 'changed';
+
+    /** The kinds an item can be adopted for, by the manifest list they come from. */
+    public const ADOPTABLE = ['services' => 'service', 'roles' => 'role', 'forms' => 'form', 'documents' => 'document'];
+
+    private int $tenantId = 0;
+
+    private int $runId = 0;
+
+    /** Did this workspace apply every part at the version on offer (so items without a fingerprint can take today's). */
+    private bool $sameVersions = false;
 
     /** @var list<array{part: string, key: string, reason: string}> */
     private array $skipped = [];
@@ -84,11 +105,24 @@ final class TemplateEngine
         $this->made = [];
         $this->items = [];
         $key = (string) $template['key'];
-        $firstTime = $this->ledger->find($tenantId, $key) === null;
+        $existing = $this->ledger->find($tenantId, $key);
+        $firstTime = $existing === null;
+        $recorded = $existing === null ? [] : $this->ledger->parts($tenantId, (int) $existing['id']);
+        $parts = TemplateComposer::parts($template);
+        $this->sameVersions = $recorded !== [];
+        foreach ($parts as $part) {
+            if (($recorded[$part['key']] ?? null) !== $part['version']) {
+                $this->sameVersions = false;
+            }
+        }
         $plugin = is_string($template['plugin'] ?? null) ? $template['plugin'] : null;
         $version = (int) $template['version'];
         $runId = $this->ledger->start($tenantId, $key, $plugin, $version, $profileId);
-        $this->ledger->recordPart($tenantId, $runId, 'template:' . $key, $plugin, $version);
+        foreach ($parts as $part) {
+            $this->ledger->recordPart($tenantId, $runId, $part['key'], $part['plugin'] ?? $plugin, $part['version']);
+        }
+        $this->tenantId = $tenantId;
+        $this->runId = $runId;
         $done = $this->ledger->items($tenantId, $runId);
 
         $this->settings(is_array($template['settings'] ?? null) ? $template['settings'] : []);
@@ -114,7 +148,15 @@ final class TemplateEngine
         $this->roles($tenantId, $runId, $done, $profileId, is_array($template['roles'] ?? null) ? $template['roles'] : [], $language);
         $this->forms($tenantId, $runId, $done, is_array($template['forms'] ?? null) ? $template['forms'] : []);
         $this->documents($tenantId, $runId, $done, is_array($template['documents'] ?? null) ? $template['documents'] : [], $language);
-        if ($withExamples) {
+        $examplesRemoved = false;
+        foreach ($done as $kindKey => $item) {
+            if ($item['removed'] && (str_starts_with($kindKey, 'contact:') || str_starts_with($kindKey, 'booking:'))) {
+                $examplesRemoved = true;
+            }
+        }
+        if ($withExamples && $examplesRemoved) {
+            $this->note('examples', 'all', self::KEEP, 'You removed the examples, so they are not added again.');
+        } elseif ($withExamples) {
             $examples = is_array($template['examples'] ?? null) ? $template['examples'] : [];
             $timezone = is_string($effective['timezone'] ?? null) ? $effective['timezone'] : 'UTC';
             $this->examples($tenantId, $runId, $done, $profileId, $examples, $services, $timezone);
@@ -239,7 +281,9 @@ final class TemplateEngine
     {
         $ids = [];
         $existing = [];
+        $there = [];
         foreach (self::listData($this->api->call('GET', '/api/calendar/services')) as $row) {
+            $there[(int) ($row['id'] ?? 0)] = true;
             foreach (self::names($row['name'] ?? null) as $name) {
                 $existing[$name] = (int) ($row['id'] ?? 0);
             }
@@ -251,7 +295,8 @@ final class TemplateEngine
             $key = (string) $service['key'];
             if (isset($done["service:{$key}"])) {
                 $ids[$key] = (int) $done["service:{$key}"]['ref_id'];
-                $this->note('services', $key, self::DONE);
+                $gone = !isset($there[$ids[$key]]);
+                $this->note('services', $key, $gone ? self::DONE : $this->doneOrChanged('service', $key, $service, $done));
                 continue;
             }
             if (($service['ticked'] ?? true) === false) {
@@ -285,6 +330,7 @@ final class TemplateEngine
             $id = $this->created($result, 'services', $key);
             if ($id !== null) {
                 $this->ledger->record($tenantId, $runId, 'service', $key, (string) $id, false);
+                $this->ledger->setFingerprint($tenantId, $runId, 'service', $key, self::fingerprint($service));
                 $ids[$key] = $id;
             }
         }
@@ -304,7 +350,7 @@ final class TemplateEngine
             }
             $key = (string) $role['key'];
             if (isset($done['role:' . $key])) {
-                $this->note('roles', $key, self::DONE);
+                $this->note('roles', $key, $this->doneOrChanged('role', $key, $role, $done));
                 continue;
             }
             $name = (string) ($role['name'][$language] ?? $role['name']['en']);
@@ -328,6 +374,7 @@ final class TemplateEngine
                 continue;
             }
             $this->ledger->record($tenantId, $runId, 'role', $key, (string) $id, false);
+            $this->ledger->setFingerprint($tenantId, $runId, 'role', $key, self::fingerprint($role));
             if ($permissions !== []) {
                 $this->outcome($this->api->call('POST', "/api/roles/{$id}/permissions", ['permissions' => $permissions]), 'roles', $key);
             }
@@ -349,7 +396,7 @@ final class TemplateEngine
             }
             $key = (string) $form['key'];
             if (isset($done['form:' . $key])) {
-                $this->note('forms', $key, self::DONE);
+                $this->note('forms', $key, $this->doneOrChanged('form', $key, $form, $done));
                 continue;
             }
             $result = $this->api->call('POST', '/api/forms', array_filter([
@@ -367,19 +414,12 @@ final class TemplateEngine
                 continue;
             }
             $this->ledger->record($tenantId, $runId, 'form', $key, (string) $id, false);
+            $this->ledger->setFingerprint($tenantId, $runId, 'form', $key, self::fingerprint($form));
             $fields = [];
             foreach ((array) $form['fields'] as $field) {
-                if (!is_array($field)) {
-                    continue;
+                if (is_array($field)) {
+                    $fields[] = self::field($field);
                 }
-                $fields[] = array_filter([
-                    'field_key' => $field['key'],
-                    'field_type' => $field['type'],
-                    'label' => $field['label'],
-                    'help_text' => $field['help'] ?? null,
-                    'is_required' => $field['required'] ?? false,
-                    'options' => $field['options'] ?? null,
-                ], static fn (mixed $v): bool => $v !== null);
             }
             $saved = $this->api->call('PUT', "/api/forms/{$id}/fields", ['fields' => $fields]);
             $this->outcome($saved, 'forms', $key);
@@ -404,7 +444,7 @@ final class TemplateEngine
             }
             $key = (string) $document['key'];
             if (isset($done['document:' . $key])) {
-                $this->note('documents', $key, self::DONE);
+                $this->note('documents', $key, $this->doneOrChanged('document', $key, $document, $done));
                 continue;
             }
             $result = $this->api->call('POST', '/api/document-sources', [
@@ -417,6 +457,7 @@ final class TemplateEngine
             $id = $this->created($result, 'documents', $key);
             if ($id !== null) {
                 $this->ledger->record($tenantId, $runId, 'document', $key, (string) $id, false);
+                $this->ledger->setFingerprint($tenantId, $runId, 'document', $key, self::fingerprint($document));
             }
         }
     }
@@ -493,6 +534,222 @@ final class TemplateEngine
                 $this->ledger->record($tenantId, $runId, 'booking', $key, (string) $id, true);
             }
         }
+    }
+
+    /**
+     * Use the template's version of one item an earlier run made, as the
+     * person (SDK 1.170; decision WT.2, WT.3). It changes only what the
+     * template sets on the item and deletes nothing:
+     * - a service: its names, description, duration, buffer and its price in
+     *   the workspace's currency;
+     * - a form: each template question's label and help, and the questions
+     *   the template has that the form lacks (the person's own stay);
+     * - a role: the template's permissions it lacks, only those the person
+     *   holds (none removed);
+     * - a document: a new copy beside the person's.
+     *
+     * @param array<string, mixed> $template a valid, composed manifest
+     * @param string $part `services`, `roles`, `forms` or `documents`
+     * @return array{action: string, reason?: string} `add` when done, `keep` when it already matches, `skip` with why
+     */
+    public function adopt(int $tenantId, int $profileId, array $template, string $part, string $itemKey): array
+    {
+        $kind = self::ADOPTABLE[$part] ?? null;
+        $entry = null;
+        foreach (is_array($template[$part] ?? null) ? $template[$part] : [] as $candidate) {
+            if (is_array($candidate) && ($candidate['key'] ?? null) === $itemKey) {
+                $entry = $candidate;
+            }
+        }
+        $run = $this->ledger->find($tenantId, (string) $template['key']);
+        if ($kind === null || $entry === null || $run === null) {
+            return ['action' => self::SKIP, 'reason' => 'The template has no such item for this workspace.'];
+        }
+        $item = $this->ledger->items($tenantId, (int) $run['id'])["{$kind}:{$itemKey}"] ?? null;
+        if ($item === null) {
+            return ['action' => self::SKIP, 'reason' => 'This template did not make that item here, so it is yours to change.'];
+        }
+        $fingerprint = self::fingerprint($entry);
+        if (($item['fingerprint'] ?? null) === $fingerprint) {
+            return ['action' => self::KEEP];
+        }
+        $id = $item['ref_id'];
+        $result = match ($kind) {
+            'service' => $this->adoptService($id, $entry),
+            'role' => $this->adoptRole($tenantId, $profileId, $id, $entry),
+            'form' => $this->adoptForm($id, $entry),
+            default => $this->adoptDocument($entry),
+        };
+        if ($result['status'] === 404) {
+            return ['action' => self::SKIP, 'reason' => 'It is no longer in your workspace.'];
+        }
+        if ($result['status'] >= 300) {
+            return ['action' => self::SKIP, 'reason' => self::reason($result)];
+        }
+        $this->ledger->setFingerprint($tenantId, (int) $run['id'], $kind, $itemKey, $fingerprint);
+
+        return ['action' => self::ADD];
+    }
+
+    /**
+     * A manifest entry's fingerprint: the same entry always gives the same
+     * one, whatever order its keys are in.
+     *
+     * @param array<array-key, mixed> $entry
+     */
+    public static function fingerprint(array $entry): string
+    {
+        return substr(hash('sha256', (string) json_encode(self::canonical($entry), JSON_UNESCAPED_UNICODE)), 0, 40);
+    }
+
+    /**
+     * An item an earlier run made: `done`, or `changed` when its manifest
+     * entry differs from the one it was made from. An item made before
+     * fingerprints were kept takes today's when the workspace already has
+     * this version, and is offered as changed when it does not.
+     *
+     * @param array<string, mixed> $entry
+     * @param array<string, array{ref_id: string, removed: bool, fingerprint?: ?string}> $done
+     */
+    private function doneOrChanged(string $kind, string $key, array $entry, array $done): string
+    {
+        $stored = $done["{$kind}:{$key}"]['fingerprint'] ?? null;
+        $now = self::fingerprint($entry);
+        if ($stored === null) {
+            if ($this->sameVersions) {
+                $this->ledger->setFingerprint($this->tenantId, $this->runId, $kind, $key, $now);
+
+                return self::DONE;
+            }
+
+            return self::CHANGED;
+        }
+
+        return $stored === $now ? self::DONE : self::CHANGED;
+    }
+
+    /**
+     * @param array<string, mixed> $service
+     * @return array{status: int, body: mixed}
+     */
+    private function adoptService(string $id, array $service): array
+    {
+        $effective = $this->effectiveSettings();
+        $currency = is_string($effective['billing.default_currency'] ?? null) ? $effective['billing.default_currency'] : 'USD';
+        $amount = is_array($service['prices'] ?? null) ? ($service['prices'][$currency] ?? null) : null;
+        $price = is_string($amount) ? TemplateMoney::toMinor($amount, $currency) : null;
+
+        return $this->api->call('PATCH', "/api/calendar/services/{$id}", array_filter([
+            'name' => $service['name'],
+            'description' => $service['description'] ?? null,
+            'duration_minutes' => $service['durationMinutes'],
+            'buffer_after_minutes' => $service['bufferAfterMinutes'] ?? 0,
+            'price_minor' => $price,
+            'currency' => $price === null ? null : $currency,
+        ], static fn (mixed $v): bool => $v !== null));
+    }
+
+    /**
+     * @param array<string, mixed> $role
+     * @return array{status: int, body: mixed}
+     */
+    private function adoptRole(int $tenantId, int $profileId, string $id, array $role): array
+    {
+        $permissions = [];
+        foreach ((array) $role['permissions'] as $slug) {
+            if (is_string($slug) && ($this->holds)($profileId, $slug, $tenantId)) {
+                $permissions[] = $slug;
+            }
+        }
+        if ($permissions === []) {
+            return ['status' => 200, 'body' => null];
+        }
+
+        return $this->api->call('POST', "/api/roles/{$id}/permissions", ['permissions' => $permissions]);
+    }
+
+    /**
+     * @param array<string, mixed> $form
+     * @return array{status: int, body: mixed}
+     */
+    private function adoptForm(string $id, array $form): array
+    {
+        $current = $this->api->call('GET', "/api/forms/{$id}/fields");
+        if ($current['status'] >= 300) {
+            return $current;
+        }
+        $have = [];
+        foreach (self::listData($current) as $row) {
+            if (is_string($row['field_key'] ?? null)) {
+                $have[$row['field_key']] = (int) ($row['id'] ?? 0);
+            }
+        }
+        $last = ['status' => 200, 'body' => null];
+        foreach ((array) $form['fields'] as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+            $fieldId = $have[(string) $field['key']] ?? null;
+            $result = $fieldId === null
+                ? $this->api->call('POST', "/api/forms/{$id}/fields", self::field($field))
+                : $this->api->call('PATCH', "/api/forms/{$id}/fields/{$fieldId}", array_filter([
+                    'label' => $field['label'],
+                    'help_text' => $field['help'] ?? null,
+                ], static fn (mixed $v): bool => $v !== null));
+            if ($result['status'] >= 300) {
+                return $result;
+            }
+            $last = $result;
+        }
+
+        return $last;
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @return array{status: int, body: mixed}
+     */
+    private function adoptDocument(array $document): array
+    {
+        $language = ($this->effectiveSettings()['locale'] ?? 'en') === 'ar' ? 'ar' : 'en';
+
+        return $this->api->call('POST', '/api/document-sources', [
+            'kind' => $document['kind'],
+            'title' => $document['title'][$language] ?? $document['title']['en'],
+            'lang' => $language,
+            'blocks' => $document['blocks'][$language] ?? $document['blocks']['en'],
+            'scope' => 'tenant',
+        ]);
+    }
+
+    /**
+     * A form question as core's routes take it.
+     *
+     * @param array<mixed> $field
+     * @return array<string, mixed>
+     */
+    private static function field(array $field): array
+    {
+        return array_filter([
+            'field_key' => $field['key'],
+            'field_type' => $field['type'],
+            'label' => $field['label'],
+            'help_text' => $field['help'] ?? null,
+            'is_required' => $field['required'] ?? false,
+            'options' => $field['options'] ?? null,
+        ], static fn (mixed $v): bool => $v !== null);
+    }
+
+    private static function canonical(mixed $value): mixed
+    {
+        if (!is_array($value)) {
+            return $value;
+        }
+        if (!array_is_list($value)) {
+            ksort($value);
+        }
+
+        return array_map(self::canonical(...), $value);
     }
 
     /** @param array{status: int, body: mixed} $result */

@@ -31,9 +31,11 @@ interface TemplateLedger
     public function start(int $tenantId, string $templateKey, ?string $pluginName, int $version, int $profileId): int;
 
     /**
-     * What a run made, by `kind:key`.
+     * What a run made, by `kind:key`. `fingerprint` (SDK 1.170) is the
+     * fingerprint of the manifest entry the item was last made or updated
+     * from, or null when it was made before core kept one.
      *
-     * @return array<string, array{ref_id: string, removed: bool}>
+     * @return array<string, array{ref_id: string, removed: bool, fingerprint?: ?string}>
      */
     public function items(int $tenantId, int $runId): array;
 
@@ -47,6 +49,14 @@ interface TemplateLedger
     public function liveExamples(int $tenantId): array;
 
     public function markRemoved(int $tenantId, int $itemId): void;
+
+    /**
+     * Remember which version of its manifest entry an item now matches
+     * (SDK 1.170): set when it is made, and when the person chooses "Use the
+     * template's version". Only the host and {@see MemoryLedger} implement
+     * this interface.
+     */
+    public function setFingerprint(int $tenantId, int $runId, string $kind, string $itemKey, string $fingerprint): void;
 
     /**
      * Record that a run applied one part at a version: the template itself is

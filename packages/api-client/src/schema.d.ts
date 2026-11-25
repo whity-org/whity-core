@@ -14699,6 +14699,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspace/templates/{key}/items/{part}/{item}/adopt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Use the template's version of one item
+         * @description For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template's labels and its missing questions; a role gets the template's missing permissions the caller holds; a document gets a new copy beside the workspace's.
+         */
+        post: operations["post_api_v1_workspace_templates_key_items_part_item_adopt"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspace/templates/{key}/preview": {
         parameters: {
             query?: never;
@@ -15793,6 +15813,16 @@ export interface components {
                         [key: string]: unknown;
                     };
                 };
+            };
+        };
+        AdoptWorkspaceTemplateItemResponse: {
+            data: {
+                template: string;
+                part: string;
+                key: string;
+                /** @enum {string} */
+                action: "add" | "keep" | "skip";
+                reason?: string;
             };
         };
         Affiliate: {
@@ -27319,6 +27349,8 @@ export interface components {
             /** @description The theme the template suggests, when this workspace has it (SDK 1.131) */
             theme?: components["schemas"]["WorkspaceTemplateTheme"] | null;
             chosen: boolean;
+            /** @description What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied */
+            update?: components["schemas"]["WorkspaceTemplateUpdate"];
         };
         WorkspaceTemplateItem: {
             /** @description settings, theme, calendar, services, roles, forms, documents or examples */
@@ -27326,10 +27358,10 @@ export interface components {
             /** @description The template's key for the item */
             key: string;
             /**
-             * @description add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason
+             * @description add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template's version, SDK 1.170); left: not ticked; skip: not done, see reason
              * @enum {string}
              */
-            action: "add" | "keep" | "done" | "left" | "skip";
+            action: "add" | "keep" | "done" | "changed" | "left" | "skip";
             reason?: string;
         };
         WorkspaceTemplateListResponse: {
@@ -27435,6 +27467,23 @@ export interface components {
             id: string;
             /** @description The theme's name in the reader's language */
             name?: string | null;
+        };
+        WorkspaceTemplateUpdate: {
+            /** @description The template's version this workspace applied last */
+            from: number;
+            /** @description The version on offer */
+            to: number;
+            parts: {
+                /** @description template:{key}, extends:{key} or extension:{plugin}.{key} */
+                key: string;
+                /** @description Null for a part this workspace never applied, such as a new extension */
+                from: number | null;
+                to: number;
+            }[];
+            changes: {
+                version: number;
+                summary: string | null;
+            }[];
         };
         WorkspaceTrialResponse: {
             data: components["schemas"]["WorkspaceTrialState"] | null;
@@ -105566,6 +105615,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description There is no such template */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_workspace_templates_key_items_part_item_adopt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+                part: string;
+                item: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description add when it was changed, keep when it already matched, skip with why */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdoptWorkspaceTemplateItemResponse"];
                 };
             };
             /** @description Missing or invalid authentication */

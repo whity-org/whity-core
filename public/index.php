@@ -3068,6 +3068,8 @@ $router->register('GET', '/api/workspace/templates', [$workspaceTemplatesHandler
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/apply', [$workspaceTemplatesHandler, 'apply'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // WHIT-1409 (SDK 1.169): what applying would do, changing nothing.
 $router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/preview', [$workspaceTemplatesHandler, 'preview'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
+// WHIT-1413 (SDK 1.170): "Use the template's version" of one item (WT.2, WT.3).
+$router->register('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents}/{item:[a-z][a-z0-9-]*}/adopt', [$workspaceTemplatesHandler, 'adoptItem'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 $router->register('DELETE', '/api/workspace/templates/examples', [$workspaceTemplatesHandler, 'removeExamples'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);
 // WHIT-1195: a chosen template's guided setup, as the caller.
 $router->register('GET', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/setup/status', [$workspaceTemplatesHandler, 'setupStatus'], null, null, \Whity\Core\RBAC\CorePermissions::SETTINGS_WRITE);

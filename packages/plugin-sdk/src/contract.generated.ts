@@ -2,7 +2,7 @@
 // tests/Sdk/PluginSdkPackageTest.php fails when this file is not what the script writes.
 
 /** The PHP SDK version this package matches (Whity\Sdk\Sdk::VERSION). */
-export const SDK_VERSION = "1.169.0";
+export const SDK_VERSION = "1.170.0";
 
 /** The deepest a block tree may nest (BlockContract::MAX_DEPTH). */
 export const MAX_DEPTH = 32;

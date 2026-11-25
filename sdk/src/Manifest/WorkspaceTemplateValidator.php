@@ -43,6 +43,13 @@ namespace Whity\Sdk\Manifest;
  * itself; the host also checks what only it knows (that the offered plugin is
  * installed and paid, that each permission exists) and applies only what the
  * person choosing it may do.
+ *
+ * SDK 1.170 (WHIT-1413, design section 40): `extends` names a template this
+ * one builds on, `remove` drops some of the parent's items, `hidesParent`
+ * hides the parent's card where this one is offered, and `changes` says what
+ * each version added. {@see self::extensionErrors()} checks the pieces a
+ * plugin adds to another plugin's template. Older hosts refuse these keys, so
+ * a plugin using them requires `^1.170`.
  */
 final class WorkspaceTemplateValidator
 {
@@ -79,7 +86,15 @@ final class WorkspaceTemplateValidator
 
     public const DOCUMENT_KINDS = ['note', 'letter', 'template', 'label'];
 
-    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'examples', 'setup', 'offer', 'theme'];
+    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'examples', 'setup', 'offer', 'theme', 'extends', 'remove', 'hidesParent', 'changes'];
+
+    /** What a template that extends another may drop from it (SDK 1.170), by list. */
+    public const REMOVABLE = ['services', 'roles', 'forms', 'documents', 'steps'];
+
+    /** The parts an extension may add to another plugin's template (SDK 1.170). */
+    private const EXTENSION_KEYS = ['key', 'version', 'target', 'setsUp', 'services', 'roles', 'forms', 'documents', 'examples', 'setup'];
+
+    public const MAX_CHANGES = 20;
     private const KEY_PATTERN = '/^[a-z][a-z0-9-]{0,40}$/';
     private const PERMISSION_PATTERN = '/^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)+$/';
     private const ICON_PATTERN = '/^[a-z0-9-]{1,64}$/';
@@ -103,6 +118,11 @@ final class WorkspaceTemplateValidator
             return ['template: must be an object'];
         }
         $errors = self::unknownKeys($template, self::TOP_KEYS, 'template');
+        // A template that builds on another (SDK 1.170) may point at the
+        // parent's services and example contacts; those references are checked
+        // again on the template core composes from both.
+        $partial = array_key_exists('extends', $template);
+        array_push($errors, ...self::lineageErrors($template));
 
         if (!is_string($template['key'] ?? null) || preg_match(self::KEY_PATTERN, $template['key']) !== 1) {
             $errors[] = 'template.key: required, lowercase letters, digits and hyphens';
@@ -142,7 +162,7 @@ final class WorkspaceTemplateValidator
             array_push($errors, ...self::duplicateKeys($template['documents'], 'template.documents'));
         }
         if (array_key_exists('examples', $template)) {
-            array_push($errors, ...self::exampleErrors($template['examples'], $services));
+            array_push($errors, ...self::exampleErrors($template['examples'], $partial ? null : $services));
         }
         $kinds = [];
         if (array_key_exists('setup', $template)) {
@@ -154,7 +174,7 @@ final class WorkspaceTemplateValidator
                 }
             }
         }
-        if (in_array('services', $kinds, true) && $services === []) {
+        if (!$partial && in_array('services', $kinds, true) && $services === []) {
             $errors[] = 'template.setup: a services step needs the template\'s own services';
         }
         if (array_key_exists('offer', $template)) {
@@ -405,10 +425,10 @@ final class WorkspaceTemplateValidator
     /**
      * Examples: made-up contacts and bookings, marked and removable in one click.
      *
-     * @param list<string> $services the template's own service keys
+     * @param list<string>|null $services the template's own service keys; null when they may come from a parent or the target (SDK 1.170), so references are not checked here
      * @return list<string>
      */
-    public static function exampleErrors(mixed $examples, array $services): array
+    public static function exampleErrors(mixed $examples, ?array $services): array
     {
         if (!is_array($examples) || ($examples !== [] && array_is_list($examples))) {
             return ['template.examples: must be an object'];
@@ -447,11 +467,16 @@ final class WorkspaceTemplateValidator
                 }
                 $errors = self::unknownKeys($booking, ['key', 'service', 'contact', 'inDays', 'time'], $path);
                 array_push($errors, ...self::keyErrors($booking['key'] ?? null, "{$path}.key"));
-                if (!in_array($booking['service'] ?? null, $services, true)) {
+                if ($services !== null && !in_array($booking['service'] ?? null, $services, true)) {
                     $errors[] = "{$path}.service: one of the template's services";
                 }
-                if (!in_array($booking['contact'] ?? null, $contacts, true)) {
+                if ($services !== null && !in_array($booking['contact'] ?? null, $contacts, true)) {
                     $errors[] = "{$path}.contact: one of the example contacts";
+                }
+                foreach (['service', 'contact'] as $ref) {
+                    if ($services === null && !is_string($booking[$ref] ?? null)) {
+                        $errors[] = "{$path}.{$ref}: required, a key";
+                    }
                 }
                 $days = $booking['inDays'] ?? null;
                 if (!is_int($days) || $days < 1 || $days > 14) {
@@ -509,6 +534,115 @@ final class WorkspaceTemplateValidator
             return $errors;
         }));
         array_push($errors, ...self::duplicateKeys($setup['steps'] ?? null, 'template.setup.steps', 'id'));
+
+        return $errors;
+    }
+
+    /**
+     * `extends`, `remove`, `hidesParent` and `changes` (SDK 1.170).
+     *
+     * @param array<array-key, mixed> $template
+     * @return list<string>
+     */
+    public static function lineageErrors(array $template): array
+    {
+        $errors = [];
+        $extends = array_key_exists('extends', $template);
+        if ($extends) {
+            array_push($errors, ...self::keyErrors($template['extends'], 'template.extends'));
+            if (($template['extends'] ?? null) === ($template['key'] ?? null)) {
+                $errors[] = 'template.extends: a template cannot build on itself';
+            }
+        }
+        if (array_key_exists('remove', $template)) {
+            $remove = $template['remove'];
+            if (!$extends) {
+                $errors[] = 'template.remove: only a template that extends another removes from it';
+            } elseif (!is_array($remove) || ($remove !== [] && array_is_list($remove))) {
+                $errors[] = 'template.remove: must be an object';
+            } else {
+                array_push($errors, ...self::unknownKeys($remove, self::REMOVABLE, 'template.remove'));
+                foreach ($remove as $list => $keys) {
+                    array_push($errors, ...self::listOf($keys, "template.remove.{$list}", 1, 30, static fn (mixed $key, string $path): array => self::keyErrors($key, $path)));
+                }
+            }
+        }
+        if (array_key_exists('hidesParent', $template)) {
+            if (!$extends) {
+                $errors[] = 'template.hidesParent: only for a template that extends another';
+            } elseif (!is_bool($template['hidesParent'])) {
+                $errors[] = 'template.hidesParent: true or false';
+            }
+        }
+        if (array_key_exists('changes', $template)) {
+            $version = is_int($template['version'] ?? null) ? $template['version'] : 0;
+            array_push($errors, ...self::listOf($template['changes'], 'template.changes', 1, self::MAX_CHANGES, static function (mixed $change, string $path) use ($version): array {
+                if (!is_array($change) || array_is_list($change)) {
+                    return ["{$path}: must be an object"];
+                }
+                $errors = self::unknownKeys($change, ['version', 'summary'], $path);
+                $at = $change['version'] ?? null;
+                if (!is_int($at) || $at < 1 || $at > $version) {
+                    $errors[] = "{$path}.version: a version from 1 to the template's own";
+                }
+                array_push($errors, ...self::textErrors($change['summary'] ?? null, "{$path}.summary", 160));
+
+                return $errors;
+            }));
+            if (is_array($template['changes']) && array_is_list($template['changes'])) {
+                $previous = PHP_INT_MAX;
+                foreach ($template['changes'] as $i => $change) {
+                    $at = is_array($change) && is_int($change['version'] ?? null) ? $change['version'] : null;
+                    if ($at !== null && $at >= $previous) {
+                        $errors[] = "template.changes[{$i}].version: newest first, each version once";
+                    }
+                    $previous = $at ?? $previous;
+                }
+            }
+        }
+
+        return $errors;
+    }
+
+    /**
+     * Everything wrong with one extension (SDK 1.170): pieces a plugin adds to
+     * another plugin's template, `target` naming it. Only additive parts:
+     * services, roles, forms, documents, examples, guided setup steps and
+     * lines the card lists. Its examples may use the target's services and
+     * contacts; those references are checked on the template core composes.
+     *
+     * @return list<string> each naming its path; empty when valid
+     */
+    public static function extensionErrors(mixed $extension): array
+    {
+        if (!is_array($extension) || array_is_list($extension)) {
+            return ['extension: must be an object'];
+        }
+        $errors = self::unknownKeys($extension, self::EXTENSION_KEYS, 'extension');
+        array_push($errors, ...self::keyErrors($extension['key'] ?? null, 'extension.key'));
+        array_push($errors, ...self::keyErrors($extension['target'] ?? null, 'extension.target'));
+        if (!is_int($extension['version'] ?? null) || $extension['version'] < 1) {
+            $errors[] = 'extension.version: required, a whole number from 1';
+        }
+        if (array_key_exists('setsUp', $extension)) {
+            array_push($errors, ...self::listOf($extension['setsUp'], 'extension.setsUp', 0, 4, static fn (mixed $line, string $path): array => self::textErrors($line, $path, 80)));
+        }
+        foreach (['services' => [self::MAX_SERVICES, 'serviceErrors'], 'roles' => [self::MAX_ROLES, 'roleErrors'], 'forms' => [self::MAX_FORMS, 'formErrors'], 'documents' => [self::MAX_DOCUMENTS, 'documentErrors']] as $list => [$max, $check]) {
+            if (array_key_exists($list, $extension)) {
+                array_push($errors, ...self::listOf($extension[$list], "extension.{$list}", 0, $max, [self::class, $check]));
+                array_push($errors, ...self::duplicateKeys($extension[$list], "extension.{$list}"));
+            }
+        }
+        if (array_key_exists('examples', $extension)) {
+            array_push($errors, ...self::exampleErrors($extension['examples'], null));
+        }
+        if (array_key_exists('setup', $extension)) {
+            $setup = $extension['setup'];
+            if (is_array($setup) && !array_is_list($setup) && array_diff(array_keys($setup), ['steps']) !== []) {
+                $errors[] = 'extension.setup: only steps';
+            }
+            array_push($errors, ...self::setupErrors($setup));
+        }
 
         return $errors;
     }

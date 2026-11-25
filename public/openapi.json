@@ -101450,6 +101450,109 @@
                 ]
             }
         },
+        "/api/v1/workspace/templates/{key}/items/{part}/{item}/adopt": {
+            "post": {
+                "operationId": "post_api_v1_workspace_templates_key_items_part_item_adopt",
+                "summary": "Use the template's version of one item",
+                "tags": [
+                    "platform-ops"
+                ],
+                "description": "For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template's labels and its missing questions; a role gets the template's missing permissions the caller holds; a document gets a new copy beside the workspace's.",
+                "parameters": [
+                    {
+                        "name": "key",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "part",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "item",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "add when it was changed, keep when it already matched, skip with why",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/AdoptWorkspaceTemplateItemResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "There is no such template",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/workspace/templates/{key}/preview": {
             "post": {
                 "operationId": "post_api_v1_workspace_templates_key_preview",
@@ -105245,6 +105348,45 @@
                 },
                 "required": [
                     "stats"
+                ]
+            },
+            "AdoptWorkspaceTemplateItemResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "template": {
+                                "type": "string"
+                            },
+                            "part": {
+                                "type": "string"
+                            },
+                            "key": {
+                                "type": "string"
+                            },
+                            "action": {
+                                "type": "string",
+                                "enum": [
+                                    "add",
+                                    "keep",
+                                    "skip"
+                                ]
+                            },
+                            "reason": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "template",
+                            "part",
+                            "key",
+                            "action"
+                        ]
+                    }
+                },
+                "required": [
+                    "data"
                 ]
             },
             "Affiliate": {
@@ -145263,6 +145405,11 @@
                     },
                     "chosen": {
                         "type": "boolean"
+                    },
+                    "update": {
+                        "$ref": "#/components/schemas/WorkspaceTemplateUpdate",
+                        "nullable": true,
+                        "description": "What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied"
                     }
                 },
                 "required": [
@@ -145293,10 +145440,11 @@
                             "add",
                             "keep",
                             "done",
+                            "changed",
                             "left",
                             "skip"
                         ],
-                        "description": "add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason"
+                        "description": "add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template's version, SDK 1.170); left: not ticked; skip: not done, see reason"
                     },
                     "reason": {
                         "type": "string"
@@ -145622,6 +145770,69 @@
                 },
                 "required": [
                     "id"
+                ]
+            },
+            "WorkspaceTemplateUpdate": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "type": "integer",
+                        "description": "The template's version this workspace applied last"
+                    },
+                    "to": {
+                        "type": "integer",
+                        "description": "The version on offer"
+                    },
+                    "parts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "key": {
+                                    "type": "string",
+                                    "description": "template:{key}, extends:{key} or extension:{plugin}.{key}"
+                                },
+                                "from": {
+                                    "type": "integer",
+                                    "nullable": true,
+                                    "description": "Null for a part this workspace never applied, such as a new extension"
+                                },
+                                "to": {
+                                    "type": "integer"
+                                }
+                            },
+                            "required": [
+                                "key",
+                                "from",
+                                "to"
+                            ]
+                        }
+                    },
+                    "changes": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "version": {
+                                    "type": "integer"
+                                },
+                                "summary": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "version",
+                                "summary"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "from",
+                    "to",
+                    "parts",
+                    "changes"
                 ]
             },
             "WorkspaceTrialResponse": {
