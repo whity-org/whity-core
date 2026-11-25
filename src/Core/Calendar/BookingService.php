@@ -1107,6 +1107,8 @@ final class BookingService
         $booking = BookingRepository::toApi($row);
         $booking['service'] = $this->services->find($tenantId, (int) $row['service_id']);
         $booking['staff_name'] = $this->calendar->displayName((int) $row['profile_id']);
+        // WHIT-1417 (AP.14): every reminder sent, with its channel and outcome.
+        $booking['reminders'] = $this->bookings->reminderLog($tenantId, $id);
         // WHIT-1173: a booking of several services reads as one to everything
         // that shows a booking's service (the emails, reminders, calendar
         // files, the customer's page): their names joined, the whole length
@@ -1128,9 +1130,16 @@ final class BookingService
     }
 
     /**
-     * Send a booking's reminder if it is still due (the queued job's work).
-     * Returns what happened, or `['due' => …]` when it is not due yet and the
-     * job must be queued again.
+     * Send a booking's reminder if it is still due (the queued job's and the
+     * sweep's work). Returns what happened, or `['due' => …]` when it is not
+     * due yet and the job must be queued again.
+     *
+     * WHIT-1417 (AP.14, AP.15): a booking has several reminders
+     * (`calendar.reminders`, 24 and 2 hours before by default).
+     * `reminder_due_at` is always the next one; sending it moves the booking
+     * on to the one after, in the same statement that claims it, so the
+     * queued job and the sweep never both send it. Each channel's outcome is
+     * kept in `calendar_booking_reminders` for the desk.
      *
      * @return string|array{due: DateTimeImmutable}
      */
@@ -1140,31 +1149,118 @@ final class BookingService
         if ($row === null || $row['status'] !== BookingRepository::STATUS_CONFIRMED) {
             return 'not on';
         }
-        if (Interval::toApi(Interval::fromDb((string) $row['starts_at'])) !== $startsAt) {
+        $start = Interval::fromDb((string) $row['starts_at']);
+        if (Interval::toApi($start) !== $startsAt) {
             return 'moved';
         }
-        if ($row['reminder_sent_at'] !== null || $row['reminder_due_at'] === null) {
+        if ($row['reminder_due_at'] === null) {
             return 'nothing due';
         }
         $due = Interval::fromDb((string) $row['reminder_due_at']);
-        if ($due->getTimestamp() > $this->now()->getTimestamp() + 60) {
+        $now = $this->now();
+        if ($due->getTimestamp() > $now->getTimestamp() + 60) {
             return ['due' => $due];
         }
+        if ($start <= $now) {
+            // Too late to remind anyone; stop it being found again.
+            $this->bookings->claimReminder($tenantId, $bookingId, $due, null, $now);
+
+            return 'too late';
+        }
+        $next = $this->reminderDue($start, $this->settingsFor($tenantId), $now);
         // Claimed before sending, so two workers never both send it.
-        if (!$this->bookings->markReminded($tenantId, $bookingId, $this->now())) {
+        if (!$this->bookings->claimReminder($tenantId, $bookingId, $due, $next, $now)) {
             return 'already sent';
         }
+        $hoursBefore = (int) round(($start->getTimestamp() - $due->getTimestamp()) / 3600);
         $booking = $this->bookingOrFail($tenantId, $bookingId);
-        $this->tell('remind', $tenantId, $booking);
+        $email = trim((string) ($booking['customer']['email'] ?? ''));
+        $phone = trim((string) ($booking['customer']['phone'] ?? ''));
+        if ($this->links !== null && ($email !== '' || $phone !== '')) {
+            // A fresh link for I'm coming and I can't come; the reminder is now
+            // the customer's latest message, so it carries the link that works.
+            $booking['manage_token'] = $this->links->issue($tenantId, $bookingId, $start);
+            if ($this->manageUrlBase !== '') {
+                $booking['manage_url'] = rtrim($this->manageUrlBase, '/') . '/' . $booking['manage_token'];
+            }
+        }
+
+        $emailed = BookingRepository::REMINDER_NO_ADDRESS;
+        if ($email !== '') {
+            try {
+                if ($this->messenger instanceof ReportsReminderDelivery) {
+                    $emailed = $this->messenger->remindReported($tenantId, $booking);
+                } else {
+                    $this->messenger->remind($tenantId, $booking);
+                    $emailed = BookingRepository::REMINDER_SENT;
+                }
+            } catch (Throwable $e) {
+                \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not send the reminder email', $e);
+                $emailed = BookingRepository::REMINDER_FAILED;
+            }
+        }
+        $this->logReminder($tenantId, $bookingId, $hoursBefore, 'email', $emailed, $now);
         // C4: and by text on every channel a plugin adds (design 3.3: WhatsApp
         // is paid), through the one way Whity messages customers.
         try {
-            ($this->textReminders ??= BookingTextReminders::fromApp($this->settings))->remind($tenantId, $booking);
+            $texts = ($this->textReminders ??= BookingTextReminders::fromApp($this->settings))->remind($tenantId, $booking);
+            foreach ($texts as $channel => $outcome) {
+                $this->logReminder($tenantId, $bookingId, $hoursBefore, $channel, $outcome, $now);
+            }
         } catch (Throwable $e) {
             error_log('[calendar] the text reminders failed: ' . $e->getMessage());
         }
 
+        if ($next !== null && $this->queue !== null) {
+            try {
+                BookingReminderJob::schedule($this->queue, $tenantId, $bookingId, $startsAt, $next, $now);
+            } catch (Throwable $e) {
+                // The sweep sends it anyway.
+                \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not queue the next reminder', $e);
+            }
+        }
+
         return 'sent';
+    }
+
+    /**
+     * Reminders that are due and unsent, in every workspace, for the sweep
+     * (WHIT-1417, AP.14).
+     *
+     * @return list<array{tenant_id: int, id: int, starts_at: string}>
+     */
+    public function dueReminders(int $limit = 500): array
+    {
+        return array_map(
+            static fn (array $r): array => ['tenant_id' => $r['tenant_id'], 'id' => $r['id'], 'starts_at' => Interval::toApi(Interval::fromDb($r['starts_at']))],
+            $this->bookings->dueReminders($this->now(), $limit),
+        );
+    }
+
+    /**
+     * The customer pressed I'm coming on their page (WHIT-1417, AP.15).
+     * Pressing it again changes nothing.
+     *
+     * @return array<string, mixed>
+     */
+    public function confirmByCustomer(int $tenantId, int $bookingId): array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if ($row['status'] !== BookingRepository::STATUS_CONFIRMED) {
+            throw new CalendarRejectedException('This booking is not confirmed, so there is nothing to answer.', 409);
+        }
+        $this->bookings->confirmByCustomer($tenantId, $bookingId, $this->now());
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    private function logReminder(int $tenantId, int $bookingId, int $hoursBefore, string $channel, string $outcome, DateTimeImmutable $now): void
+    {
+        try {
+            $this->bookings->logReminder($tenantId, $bookingId, $hoursBefore, $channel, $outcome, $now);
+        } catch (Throwable $e) {
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not keep the reminder\'s outcome', $e);
+        }
     }
 
     /**
@@ -1372,14 +1468,18 @@ final class BookingService
         }
     }
 
+    /** The next reminder still ahead of `$now`, or null (WHIT-1417: there may be several). */
     private function reminderDue(DateTimeImmutable $start, CalendarSettings $settings, DateTimeImmutable $now): ?DateTimeImmutable
     {
-        if ($settings->reminderHoursBefore <= 0) {
-            return null;
+        $next = null;
+        foreach ($settings->reminderHours as $hours) {
+            $due = $start->modify('-' . $hours . ' hours');
+            if ($due > $now && ($next === null || $due < $next)) {
+                $next = $due;
+            }
         }
-        $due = $start->modify('-' . $settings->reminderHoursBefore . ' hours');
 
-        return $due > $now ? $due : null;
+        return $next;
     }
 
     /** @return list<int> */

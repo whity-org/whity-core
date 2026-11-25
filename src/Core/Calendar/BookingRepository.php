@@ -39,7 +39,12 @@ final class BookingRepository
         b.customer_phone, b.customer_note, b.starts_at, b.ends_at, b.blocks_from, b.blocks_until, b.status,
         b.hold_expires_at, b.source, b.price_minor, b.currency, b.payment_ref, b.reminder_due_at, b.reminder_sent_at,
         b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id,
-        b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence';
+        b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence, b.confirmed_by_customer_at';
+
+    /** WHIT-1417: what happened to one reminder on one channel. */
+    public const REMINDER_SENT = 'sent';
+    public const REMINDER_FAILED = 'failed';
+    public const REMINDER_NO_ADDRESS = 'no_address';
 
     public function __construct(private readonly PDO $db)
     {
@@ -436,12 +441,99 @@ final class BookingRepository
         ];
     }
 
-    /** Claim the reminder; false when another worker already did. */
-    public function markReminded(int $tenantId, int $id, DateTimeImmutable $now): bool
+    /**
+     * Claim the reminder due at `$due` and point the booking at the next one
+     * (WHIT-1417). Only one caller can move `reminder_due_at` off `$due`, so
+     * the queued job and the sweep never both send it. False when someone
+     * already did, or the booking was moved meanwhile.
+     */
+    public function claimReminder(int $tenantId, int $id, DateTimeImmutable $due, ?DateTimeImmutable $next, DateTimeImmutable $now): bool
     {
         $stmt = $this->db->prepare(
-            'UPDATE calendar_bookings SET reminder_sent_at = :now
-              WHERE tenant_id = :tenant_id AND id = :id AND reminder_sent_at IS NULL'
+            "UPDATE calendar_bookings SET reminder_sent_at = :now, reminder_due_at = :next
+              WHERE tenant_id = :tenant_id AND id = :id AND reminder_due_at = :due AND status = 'confirmed'"
+        );
+        $stmt->execute([
+            ':now' => Interval::toDb($now),
+            ':next' => $next !== null ? Interval::toDb($next) : null,
+            ':tenant_id' => $tenantId,
+            ':id' => $id,
+            ':due' => Interval::toDb($due),
+        ]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /** Keep what happened to one reminder on one channel (WHIT-1417, AP.14). */
+    public function logReminder(int $tenantId, int $bookingId, int $hoursBefore, string $channel, string $outcome, DateTimeImmutable $now): void
+    {
+        $this->db->prepare(
+            'INSERT INTO calendar_booking_reminders (tenant_id, booking_id, hours_before, channel, outcome, sent_at)
+             VALUES (:tenant_id, :booking_id, :hours_before, :channel, :outcome, :sent_at)'
+        )->execute([
+            ':tenant_id' => $tenantId,
+            ':booking_id' => $bookingId,
+            ':hours_before' => $hoursBefore,
+            ':channel' => substr($channel, 0, 40),
+            ':outcome' => $outcome,
+            ':sent_at' => Interval::toDb($now),
+        ]);
+    }
+
+    /**
+     * Every reminder sent for a booking, oldest first.
+     *
+     * @return list<array{hours_before: int, channel: string, outcome: string, sent_at: ?string}>
+     */
+    public function reminderLog(int $tenantId, int $bookingId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT hours_before, channel, outcome, sent_at FROM calendar_booking_reminders
+              WHERE tenant_id = :tenant_id AND booking_id = :booking_id ORDER BY sent_at, id'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':booking_id' => $bookingId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[] = [
+                'hours_before' => (int) $r['hours_before'],
+                'channel' => (string) $r['channel'],
+                'outcome' => (string) $r['outcome'],
+                'sent_at' => is_string($r['sent_at']) ? Interval::toApi(Interval::fromDb($r['sent_at'])) : null,
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Reminders that are due and still unsent, across every workspace, for the
+     * sweep (WHIT-1417, AP.14): confirmed bookings that have not started.
+     *
+     * @return list<array{tenant_id: int, id: int, starts_at: string}>
+     */
+    public function dueReminders(DateTimeImmutable $now, int $limit): array
+    {
+        // @tenant-guard-ignore: the reminder sweep (WHIT-1417, AP.14) is the platform's own scheduled job across every workspace; it reads only ids and start times and queues one reminder job per booking bound to that row's tenant_id, which re-reads the booking under its tenant.
+        $stmt = $this->db->prepare(
+            "SELECT tenant_id, id, starts_at FROM calendar_bookings
+              WHERE status = 'confirmed' AND reminder_due_at IS NOT NULL AND reminder_due_at <= :now AND starts_at > :now
+              ORDER BY reminder_due_at LIMIT " . max(1, $limit)
+        );
+        $stmt->execute([':now' => Interval::toDb($now)]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[] = ['tenant_id' => (int) $r['tenant_id'], 'id' => (int) $r['id'], 'starts_at' => (string) $r['starts_at']];
+        }
+
+        return $out;
+    }
+
+    /** The customer pressed I'm coming (WHIT-1417); false when it was already set or the booking isn't confirmed. */
+    public function confirmByCustomer(int $tenantId, int $id, DateTimeImmutable $now): bool
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE calendar_bookings SET confirmed_by_customer_at = :now
+              WHERE tenant_id = :tenant_id AND id = :id AND status = 'confirmed' AND confirmed_by_customer_at IS NULL"
         );
         $stmt->execute([':now' => Interval::toDb($now), ':tenant_id' => $tenantId, ':id' => $id]);
 
@@ -498,6 +590,8 @@ final class BookingRepository
             'checked_in_at' => $at($r['checked_in_at'] ?? null),
             'suggested_at' => $at($r['suggested_at'] ?? null),
             'reminder_sent_at' => $at($r['reminder_sent_at'] ?? null),
+            // WHIT-1417: the customer pressed I'm coming.
+            'confirmed_by_customer_at' => $at($r['confirmed_by_customer_at'] ?? null),
             // The calendar file's revision (E2): raised by every move and the cancel.
             'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
         ];

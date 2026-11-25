@@ -119,7 +119,8 @@ export function RequestsCard({ requests, services, staff, timeZone, canChange, o
 export function TodayCard({ unitId, reloadKey, settings }: { unitId: number | null; reloadKey: number; settings: CalendarSettings }) {
   const t = useTranslation('calendar');
   const { data, error } = useFetch(() => calendarApi.today({ unitId }), [unitId, reloadKey]);
-  const hours = settings.reminder_hours_before;
+  // WHIT-1417: every reminder, such as "24, 2".
+  const hours = (settings.reminders ?? (settings.reminder_hours_before > 0 ? [settings.reminder_hours_before] : [])).join(', ');
 
   const rows: { label: string; value: string; testId: string }[] = data
     ? [
@@ -129,8 +130,8 @@ export function TodayCard({ unitId, reloadKey, settings }: { unitId: number | nu
         {
           label: t('today.reminders', 'Reminders'),
           value:
-            hours > 0
-              ? t('today.remindersValue', '{n} sent · email, {hours} h before', { n: data.reminders_sent, hours })
+            hours !== ''
+              ? t('today.remindersSent', '{n} sent · {hours} h before', { n: data.reminders_sent, hours })
               : t('today.remindersOff', 'Off'),
           testId: 'today-reminders',
         },

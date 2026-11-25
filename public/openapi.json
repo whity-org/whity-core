@@ -78545,6 +78545,104 @@
                 }
             }
         },
+        "/api/v1/public/bookings/{token}/coming": {
+            "post": {
+                "operationId": "post_api_v1_public_bookings_token_coming",
+                "summary": "The customer says they are coming (public, WHIT-1417); pressing it again changes nothing",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The 64-character token from the customer's email."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Noted",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This link is invalid or has expired",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The booking is not confirmed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/bookings/{token}/ics": {
             "get": {
                 "operationId": "get_api_v1_public_bookings_token_ics",
@@ -108297,7 +108395,20 @@
                     },
                     "reminder_sent_at": {
                         "type": "string",
-                        "nullable": true
+                        "nullable": true,
+                        "description": "When the last reminder went."
+                    },
+                    "confirmed_by_customer_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When the customer pressed I'm coming (WHIT-1417)."
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBookingReminder"
+                        },
+                        "description": "Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14)."
                     },
                     "room_name": {
                         "type": "object",
@@ -108508,6 +108619,38 @@
                 },
                 "required": [
                     "starts_at"
+                ]
+            },
+            "CalendarBookingReminder": {
+                "type": "object",
+                "properties": {
+                    "hours_before": {
+                        "type": "integer",
+                        "description": "Which reminder: this many hours before the start."
+                    },
+                    "channel": {
+                        "type": "string",
+                        "description": "`email`, or the text channel's key (such as `whatsapp`)."
+                    },
+                    "outcome": {
+                        "type": "string",
+                        "enum": [
+                            "sent",
+                            "failed",
+                            "no_address"
+                        ],
+                        "description": "`no_address`: the booking has no email, or no phone for a text channel."
+                    },
+                    "sent_at": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "hours_before",
+                    "channel",
+                    "outcome",
+                    "sent_at"
                 ]
             },
             "CalendarBookingServiceChoice": {
@@ -109394,7 +109537,14 @@
                     },
                     "reminder_hours_before": {
                         "type": "integer",
-                        "description": "0 means no reminder."
+                        "description": "The first reminder's hours before; 0 means none. Kept for older clients: `reminders` lists them all."
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "Every reminder, as hours before the start, largest first; empty means none (WHIT-1417)."
                     },
                     "payment_hold_minutes": {
                         "type": "integer"
@@ -109466,7 +109616,17 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 168,
-                        "description": "Send one reminder this many hours before; 0 sends none."
+                        "description": "Older clients: one reminder this many hours before; 0 sends none. Replaces `reminders`."
+                    },
+                    "reminders": {
+                        "type": "array",
+                        "maxItems": 3,
+                        "items": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 168
+                        },
+                        "description": "Up to three reminders, as hours before the start, all different; empty sends none (WHIT-1417)."
                     },
                     "payment_hold_minutes": {
                         "type": "integer",
@@ -133293,6 +133453,10 @@
                     "suggested": {
                         "type": "boolean",
                         "description": "The business suggested this time for the request; the customer can take it."
+                    },
+                    "coming": {
+                        "type": "boolean",
+                        "description": "The customer already said they are coming (WHIT-1417)."
                     },
                     "starts_at": {
                         "type": "string"

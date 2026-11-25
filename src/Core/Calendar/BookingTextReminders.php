@@ -53,16 +53,17 @@ final class BookingTextReminders
     }
 
     /**
-     * Remind the customer on every text channel that is on. Returns the
-     * channels it went on.
+     * Remind the customer on every text channel that is on. Returns what
+     * happened on each channel (WHIT-1417): a {@see BookingRepository}
+     * REMINDER_* outcome, `no_address` when the booking has no phone.
      *
      * @param array<string, mixed> $booking as {@see BookingService} reads it, with `service` and `staff_name`
-     * @return list<string>
+     * @return array<string, string>
      */
     public function remind(int $tenantId, array $booking): array
     {
         $phone = trim((string) ($booking['customer']['phone'] ?? $booking['customer_phone'] ?? ''));
-        $messaging = $phone !== '' ? ($this->messaging)() : null;
+        $messaging = ($this->messaging)();
         if ($messaging === null) {
             return [];
         }
@@ -70,7 +71,11 @@ final class BookingTextReminders
         $name = trim((string) ($booking['customer']['name'] ?? $booking['customer_name'] ?? ''));
         $sent = [];
         foreach ($messaging->channels()->keys() as $key) {
-            if (in_array($key, self::NOT_TEXT, true)) {
+            if (in_array($key, self::NOT_TEXT, true) || !$this->isOn($messaging, $tenantId, $key)) {
+                continue;
+            }
+            if ($phone === '') {
+                $sent[$key] = BookingRepository::REMINDER_NO_ADDRESS;
                 continue;
             }
             try {
@@ -80,14 +85,27 @@ final class BookingTextReminders
                     $text,
                     new SendOptions(channel: $key, source: 'calendar.reminder'),
                 );
-                $sent[] = $key;
+                $sent[$key] = BookingRepository::REMINDER_SENT;
             } catch (Throwable $e) {
                 // Off for the workspace, no consent, a bad number: the email still went.
                 $this->logger?->info('[calendar] no text reminder on ' . $key . ': ' . $e->getMessage());
+                $sent[$key] = BookingRepository::REMINDER_FAILED;
             }
         }
 
         return $sent;
+    }
+
+    /** Whether a channel is on for the workspace; one that is off is not a failed reminder. */
+    private function isOn(MessagingService $messaging, int $tenantId, string $key): bool
+    {
+        try {
+            return $messaging->channels()->get($key)?->isEnabled($tenantId) === true;
+        } catch (Throwable $e) {
+            $this->logger?->info('[calendar] could not tell whether ' . $key . ' is on: ' . $e->getMessage());
+
+            return false;
+        }
     }
 
     /** @param array<string, mixed> $booking */
@@ -101,11 +119,15 @@ final class BookingTextReminders
         $service = is_array($booking['service']['name'] ?? null) ? $booking['service']['name'] : [];
         $serviceName = (string) ($service[$arabic ? 'ar' : 'en'] ?? $service['en'] ?? reset($service) ?: '');
         $with = trim((string) ($booking['staff_name'] ?? ''));
+        // WHIT-1417 (AP.15): the customer's page, where I'm coming and I can't come are.
+        $link = is_string($booking['manage_url'] ?? null) && $booking['manage_url'] !== '' ? $booking['manage_url'] : null;
 
         if ($arabic) {
-            return trim('تذكير: ' . $serviceName . ' ' . $when . ($with !== '' ? ' مع ' . $with : '') . '.');
+            return trim('تذكير: ' . $serviceName . ' ' . $when . ($with !== '' ? ' مع ' . $with : '') . '.'
+                . ($link !== null ? ' هل ستحضر؟ أخبرنا هنا: ' . $link : ''));
         }
 
-        return trim('Reminder: ' . $serviceName . ' on ' . $when . ($with !== '' ? ' with ' . $with : '') . '.');
+        return trim('Reminder: ' . $serviceName . ' on ' . $when . ($with !== '' ? ' with ' . $with : '') . '.'
+            . ($link !== null ? ' Are you coming? Let us know: ' . $link : ''));
     }
 }

@@ -6507,6 +6507,7 @@ $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',    
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/cancel',      [$publicBookingHandler, 'cancel'],      null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/accept',      [$publicBookingHandler, 'acceptSuggestion'], null);
+$router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/coming',      [$publicBookingHandler, 'coming'],      null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/ics',         [$publicBookingHandler, 'ics'],         null);
 $router->register('GET',  '/api/public/calendar/feeds/{token:[a-f0-9]{64}\.ics}', [$publicBookingHandler, 'feed'],        null);
 $brandingHandler = new \Whity\Api\BrandingApiHandler(
