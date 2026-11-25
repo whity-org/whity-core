@@ -13149,6 +13149,98 @@
                 }
             }
         },
+        "/api/v1/auth/sso/native/exchange": {
+            "post": {
+                "operationId": "post_api_v1_auth_sso_native_exchange",
+                "summary": "Exchange a native sign-in code for a token-mode session",
+                "tags": [
+                    "sso"
+                ],
+                "description": "Send `X-Auth-Mode: token`. Answers like `POST /api/login` in token mode: tokens, or `requires_tenant_selection` with the memberships and a `selection_token` for `POST /api/auth/select-tenant`. An unknown, expired or replayed code, or a wrong verifier, is a generic 401; the code is spent either way.",
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/NativeSignInExchangeRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Session issued, or a workspace to choose",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/LoginResponse"
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Not token mode, or code and code_verifier missing or malformed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Invalid or expired code",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts from this address",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/sso/providers": {
             "get": {
                 "operationId": "get_api_v1_auth_sso_providers",
@@ -129646,6 +129738,21 @@
                 },
                 "required": [
                     "data"
+                ]
+            },
+            "NativeSignInExchangeRequest": {
+                "type": "object",
+                "properties": {
+                    "code": {
+                        "type": "string"
+                    },
+                    "code_verifier": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "code",
+                    "code_verifier"
                 ]
             },
             "NavigationItem": {

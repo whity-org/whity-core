@@ -134,6 +134,14 @@ final class SsoAuthHandler
          * (`/start?link=1`). Null records nothing.
          */
         private readonly ?\Whity\Core\Audit\AuditLoggerInterface $audit = null,
+        /**
+         * WHIT-1406: a native app's sign-in return (`/start?mode=native`). The
+         * one-time code between the callback and `exchange()`. Null refuses
+         * `mode=native` and the exchange.
+         */
+        private readonly ?\Whity\Auth\NativeSignInCodes $nativeCodes = null,
+        /** Slows a guessing client at `exchange()`; null means no throttle (tests). */
+        private readonly ?\Whity\Auth\LoginThrottleService $throttle = null,
     ) {
     }
 
@@ -464,6 +472,24 @@ final class SsoAuthHandler
             $inviteToken = '';
         }
 
+        // WHIT-1406: a native app (Whity Desktop) asks for its sign-in result
+        // on its loopback listener instead of a browser session. Where to
+        // return, and the PKCE challenge the exchange must answer, travel only
+        // inside the signed flow cookie. A plain sign-in only: never with a
+        // reauth, a link, a join, a form or an invitation.
+        $native = null;
+        if ($this->query('mode') === 'native') {
+            if ($this->nativeCodes === null || $reauth !== null || $linkProfileId !== null
+                || $joinTenantId !== null || $form !== null || $inviteToken !== ''
+            ) {
+                return $this->fail('native_unavailable');
+            }
+            $native = self::nativeTarget($this->query('port'), $this->query('code_challenge'), $this->query('state'));
+            if ($native === null) {
+                return $this->fail('native_invalid');
+            }
+        }
+
         // Joining (from a sign-up page or a form) uses the operator's
         // global-trust providers only.
         // Linking uses them too: only they speak for the person's own account.
@@ -518,6 +544,9 @@ final class SsoAuthHandler
             'reauth_route_id'   => $reauth['route_id'] ?? null,
             'reauth_purpose'    => $reauth['purpose'] ?? null,
             'link_profile_id'   => $linkProfileId,
+            'native_port'       => $native['port'] ?? null,
+            'native_challenge'  => $native['challenge'] ?? null,
+            'native_state'      => $native['state'] ?? null,
         ], self::FLOW_TTL, 'oidc_flow');
         CookieManager::setSsoFlowToken($flowToken, self::FLOW_TTL);
 
@@ -544,10 +573,12 @@ final class SsoAuthHandler
     public function callback(Request $request, array $params): Response
     {
         $this->reauthCallback = null;
+        $this->nativeCallback = null;
         try {
             return $this->handleCallback($request, $params);
         } finally {
             $this->reauthCallback = null;
+            $this->nativeCallback = null;
         }
     }
 
@@ -577,6 +608,9 @@ final class SsoAuthHandler
         }
         if (is_int($flow['reauth_profile_id'] ?? null)) {
             $this->reauthCallback = $flow;
+        }
+        if (is_int($flow['native_port'] ?? null) && is_string($flow['native_state'] ?? null)) {
+            $this->nativeCallback = $flow;
         }
 
         // The provider may signal an error (user denied consent, etc.).
@@ -783,6 +817,13 @@ final class SsoAuthHandler
             } catch (\Throwable $e) {
                 error_log('[sso] ' . self::SIGNED_IN_EVENT . ' listener failed for profile ' . $profileId . ': ' . $e->getMessage());
             }
+        }
+
+        // WHIT-1406: a native app gets a one-time code on its loopback
+        // listener and exchanges it for a token-mode session itself. No
+        // cookie is set here: the browser that signed in holds nothing.
+        if ($this->nativeCallback !== null) {
+            return $this->nativeReturn($flow, $profileId, $email, $providerId, $tenantId, $ctx, $request);
         }
 
         // Mint the session (sets cookies as a side effect). Global-trust logs the
@@ -1247,6 +1288,13 @@ final class SsoAuthHandler
      */
     private function fail(string $reason): Response
     {
+        $native = $this->nativeCallback;
+        if ($native !== null) {
+            // The app is waiting on 127.0.0.1; a bounce to the login page would
+            // leave it waiting. The reason is the same non-enumerating code.
+            return self::loopbackRedirect($native, ['error' => $reason]);
+        }
+
         $reauth = $this->reauthCallback;
         if ($reauth !== null) {
             $this->logReauth('sign_in_failed', $reauth, $reason);
@@ -1264,6 +1312,178 @@ final class SsoAuthHandler
      * @var array<string, mixed>|null
      */
     private ?array $reauthCallback = null;
+
+    /**
+     * The native flow in progress, read from the signed flow cookie; null for
+     * any other callback. Reset per request: workers keep this object.
+     *
+     * @var array<string, mixed>|null
+     */
+    private ?array $nativeCallback = null;
+
+    /**
+     * How long a native app's one-time code lives (WHIT-1406). The app is
+     * already listening when the browser is redirected to it.
+     */
+    public const NATIVE_CODE_TTL = \Whity\Auth\NativeSignInCodes::TTL_SECONDS;
+
+    /**
+     * The native return a `/start?mode=native` asks for, or null when any part
+     * is not what the app would send: a loopback port a person's app can
+     * listen on (1024-65535), a PKCE S256 challenge, a state of the app's own.
+     *
+     * @return array{port: int, challenge: string, state: string}|null
+     */
+    public static function nativeTarget(?string $port, ?string $challenge, ?string $state): ?array
+    {
+        if ($port === null || preg_match('/^[1-9][0-9]{3,4}$/', $port) !== 1) {
+            return null;
+        }
+        $portNumber = (int) $port;
+        if ($portNumber < 1024 || $portNumber > 65535) {
+            return null;
+        }
+        if ($challenge === null || preg_match('/^[A-Za-z0-9_-]{43,128}$/', $challenge) !== 1) {
+            return null;
+        }
+        if ($state === null || preg_match('/^[A-Za-z0-9_-]{8,128}$/', $state) !== 1) {
+            return null;
+        }
+
+        return ['port' => $portNumber, 'challenge' => $challenge, 'state' => $state];
+    }
+
+    /**
+     * Only ever to the loopback address and the port the app named at
+     * `/start`, with the app's own state echoed, so a redirect can't be
+     * pointed anywhere else by anything that happened in between.
+     *
+     * @param array<string, mixed> $flow
+     * @param array<string, string> $query
+     */
+    private static function loopbackRedirect(array $flow, array $query): Response
+    {
+        $port = (int) $flow['native_port'];
+        $query = ['state' => (string) $flow['native_state']] + $query;
+
+        return new Response(302, '', ['Location' => 'http://127.0.0.1:' . $port . '/callback?' . http_build_query($query)]);
+    }
+
+    /**
+     * WHIT-1406: the person is signed in by the provider; give the native app a
+     * one-time code bound to the PKCE challenge it sent, and audit it. The code
+     * carries the provider's trust tier, so `exchange()` confines the session
+     * exactly as a browser sign-in through the same provider would be.
+     *
+     * @param array<string, mixed> $flow
+     */
+    private function nativeReturn(
+        array $flow,
+        int $profileId,
+        string $email,
+        int $providerId,
+        int $tenantId,
+        FederatedProviderContext $ctx,
+        Request $request,
+    ): Response {
+        if ($this->nativeCodes === null || !is_string($flow['native_challenge'] ?? null)) {
+            return $this->fail('native_unavailable');
+        }
+        $code = $this->nativeCodes->issue(
+            $profileId,
+            $email,
+            $providerId,
+            $tenantId,
+            !$ctx->isGlobalTrust(),
+            (string) $flow['native_challenge'],
+            self::NATIVE_CODE_TTL,
+        );
+        $this->audit?->record('auth.native.code_issued', [
+            'tenant_id'   => null,
+            'actor_id'    => $profileId,
+            'target_type' => 'profile',
+            'target_id'   => $profileId,
+            'metadata'    => ['provider_key' => (string) ($flow['provider_key'] ?? ''), 'port' => (int) $flow['native_port']],
+        ]);
+
+        return self::loopbackRedirect($flow, ['code' => $code]);
+    }
+
+    /**
+     * POST /api/v1/auth/sso/native/exchange (WHIT-1406): the native app turns
+     * its one-time code into a token-mode session. Body `{code, code_verifier}`
+     * and the header `X-Auth-Mode: token`, since the answer is tokens in the
+     * body and never a cookie. The code is spent on the first attempt whatever
+     * its outcome; a wrong verifier, an expired code or a replay answer the
+     * same generic 401 and are audited by reason. What comes back is what a
+     * federated browser sign-in gets: tokens, or the memberships to choose
+     * from with a selection token for `/auth/select-tenant`.
+     *
+     * @param array<string, string> $params
+     */
+    public function exchange(Request $request, array $params = []): Response
+    {
+        if ($this->nativeCodes === null) {
+            return Response::error('Native sign-in is not available', 404);
+        }
+        if (strtolower(trim((string) ($request->getHeader('X-Auth-Mode') ?? ''))) !== 'token') {
+            return Response::error('Send X-Auth-Mode: token', 400);
+        }
+        $ip = isset($_SERVER['REMOTE_ADDR']) && is_string($_SERVER['REMOTE_ADDR']) ? $_SERVER['REMOTE_ADDR'] : null;
+        if ($this->throttle !== null && $this->throttle->isThrottled(null, $ip)) {
+            return \Whity\Core\RateLimit\RateLimited::response(60);
+        }
+
+        $body = json_decode($request->getBody(), true);
+        $code = is_array($body) && is_string($body['code'] ?? null) ? $body['code'] : '';
+        $verifier = is_array($body) && is_string($body['code_verifier'] ?? null) ? $body['code_verifier'] : '';
+        if (preg_match('/^[A-Za-z0-9_-]{43}$/', $code) !== 1 || preg_match('/^[A-Za-z0-9_-]{43,128}$/', $verifier) !== 1) {
+            return Response::error('code and code_verifier are required', 400);
+        }
+
+        $row = $this->nativeCodes->consume($code);
+        if ($row === null) {
+            return $this->exchangeRefused('unknown_code', null, $ip);
+        }
+        if ($this->nativeCodes->isExpired($row)) {
+            return $this->exchangeRefused('expired', $row['profile_id'], $ip);
+        }
+        if (!hash_equals($row['code_challenge'], \Whity\Auth\NativeSignInCodes::challengeFor($verifier))) {
+            return $this->exchangeRefused('wrong_verifier', $row['profile_id'], $ip);
+        }
+
+        $result = $this->auth->completeFederatedLogin(
+            $row['profile_id'],
+            $row['email'],
+            $request,
+            $row['tenant_trust'] ? $row['provider_tenant_id'] : null,
+            $row['tenant_trust'],
+        );
+        $this->audit?->record('auth.native.exchanged', [
+            'tenant_id'   => $row['tenant_trust'] ? $row['provider_tenant_id'] : null,
+            'actor_id'    => $row['profile_id'],
+            'target_type' => 'profile',
+            'target_id'   => $row['profile_id'],
+            'metadata'    => ['provider_id' => $row['provider_id'], 'status' => $result->getStatusCode()],
+        ]);
+
+        return $result;
+    }
+
+    /** One generic answer for every refused exchange; the reason goes to the audit log only. */
+    private function exchangeRefused(string $reason, ?int $profileId, ?string $ip): Response
+    {
+        $this->throttle?->recordFailure(null, $ip);
+        $this->audit?->record('auth.native.exchange_refused', [
+            'tenant_id'   => null,
+            'actor_id'    => $profileId,
+            'target_type' => 'profile',
+            'target_id'   => $profileId,
+            'metadata'    => ['reason' => $reason],
+        ]);
+
+        return Response::error('Invalid or expired code', 401);
+    }
 
     /**
      * Back to the page that asked for the sign-in, with the outcome it explains.

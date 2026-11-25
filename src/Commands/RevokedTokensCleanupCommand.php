@@ -64,6 +64,12 @@ class RevokedTokensCleanupCommand
 
             $count = $stmt->rowCount();
             echo "Cleaned {$count} expired revocation entries\n";
+
+            // WHIT-1406: a native app's one-time sign-in codes live a minute and
+            // are swept on every issue and exchange; this catches the rest on an
+            // instance nobody has signed in to since. Also install-wide, no tenant.
+            $codes = (new \Whity\Auth\NativeSignInCodes($this->db))->pruneExpired();
+            echo "Cleaned {$codes} expired native sign-in codes\n";
         } catch (\Exception $e) {
             echo "Error cleaning expired revoked tokens: " . $e->getMessage() . "\n";
             exit(1);

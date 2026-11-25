@@ -1911,6 +1911,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/sso/native/exchange": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Exchange a native sign-in code for a token-mode session
+         * @description Send `X-Auth-Mode: token`. Answers like `POST /api/login` in token mode: tokens, or `requires_tenant_selection` with the memberships and a `selection_token` for `POST /api/auth/select-tenant`. An unknown, expired or replayed code, or a wrong verifier, is a generic 401; the code is spent either way.
+         */
+        post: operations["post_api_v1_auth_sso_native_exchange"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/sso/providers": {
         parameters: {
             query?: never;
@@ -23035,6 +23055,10 @@ export interface components {
                 phone: string | null;
             };
         };
+        NativeSignInExchangeRequest: {
+            code: string;
+            code_verifier: string;
+        };
         NavigationItem: {
             id: string;
             label: string;
@@ -37241,6 +37265,84 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_auth_sso_native_exchange: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NativeSignInExchangeRequest"];
+            };
+        };
+        responses: {
+            /** @description Session issued, or a workspace to choose */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponse"];
+                };
+            };
+            /** @description Not token mode, or code and code_verifier missing or malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Invalid or expired code */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts from this address */
+            429: {
                 headers: {
                     [name: string]: unknown;
                 };

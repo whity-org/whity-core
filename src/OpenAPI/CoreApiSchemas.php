@@ -5519,6 +5519,12 @@ final class CoreApiSchemas
                 'locale' => self::str(),
                 'main_color' => self::str(),
             ], ['name']),
+            // WHIT-1406: a native app turns the one-time code from its loopback
+            // listener into a token-mode session.
+            'NativeSignInExchangeRequest' => self::object([
+                'code' => self::str(),
+                'code_verifier' => self::str(),
+            ], ['code', 'code_verifier']),
             // Creating another workspace while signed in (WHIT-1169).
             'WorkspaceCreateRequest' => self::object([
                 'name' => self::str(),
@@ -13739,7 +13745,31 @@ final class CoreApiSchemas
             ]),
         ];
 
+        // WHIT-1406: Whity Desktop's sign-in return. The browser signed the
+        // person in through `/start?mode=native`; core sent a one-time code to
+        // the app's loopback listener; the app exchanges it here, token mode
+        // only, with the PKCE verifier. The code is spent on the first attempt.
+        $nativeExchange = [
+            'method' => 'POST',
+            'path' => '/api/auth/sso/native/exchange',
+            'requiredRole' => null,
+            'requiredPermission' => null,
+            'schema' => [
+                'summary' => 'Exchange a native sign-in code for a token-mode session',
+                'description' => 'Send `X-Auth-Mode: token`. Answers like `POST /api/login` in token mode: tokens, or `requires_tenant_selection` with the memberships and a `selection_token` for `POST /api/auth/select-tenant`. An unknown, expired or replayed code, or a wrong verifier, is a generic 401; the code is spent either way.',
+                'tags' => ['sso'],
+                'request' => 'NativeSignInExchangeRequest',
+                'responses' => [
+                    200 => self::jsonResponse('Session issued, or a workspace to choose', 'LoginResponse'),
+                    400 => self::errorResponse('Not token mode, or code and code_verifier missing or malformed'),
+                    401 => self::errorResponse('Invalid or expired code'),
+                    429 => self::errorResponse('Too many attempts from this address'),
+                ],
+            ],
+        ];
+
         return [
+            $nativeExchange,
             $ssoWorkspaceShow,
             $ssoWorkspaceCreate,
             $workspaceCreateState,

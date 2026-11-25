@@ -6952,12 +6952,19 @@ $ssoAuthHandler = new \Whity\Api\SsoAuthHandler(
     $formRepository,
     // WHIT-1350: linking the operator's provider from Settings › Security is audited.
     $auditLogger,
+    // WHIT-1406: a native app's sign-in return (Whity Desktop) and its exchange.
+    new \Whity\Auth\NativeSignInCodes($db->getPdo()),
+    $loginThrottle,
 );
 // Public list of ENABLED providers for the current tenant, so the login page can
 // render "Sign in with …" buttons (display-safe fields only; no secrets).
 $router->register('GET', '/api/auth/sso/providers',                      [$ssoAuthHandler, 'providers'], null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/start',    [$ssoAuthHandler, 'start'],    null);
 $router->register('GET', '/api/auth/sso/{provider:[a-z0-9_]+}/callback', [$ssoAuthHandler, 'callback'], null);
+// WHIT-1406: a native app exchanges the one-time code from its loopback
+// listener for a token-mode session. Public like the rest of /auth/sso/
+// (EnforceTenantIsolation::PUBLIC_ROUTE_PREFIXES); the code is the credential.
+$router->register('POST', '/api/auth/sso/native/exchange', [$ssoAuthHandler, 'exchange'], null);
 // WHIT-994: after a sign-in that found no workspace. Public like select-tenant:
 // the caller holds only the short-lived workspace_setup cookie the callback
 // set (no session). The POST creates their workspace only when every gate in

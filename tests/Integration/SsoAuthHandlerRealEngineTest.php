@@ -59,6 +59,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
     private int $tenantProviderId;  // TENANT-TRUST provider (Acme's own IdP)
     private \Whity\Core\Settings\SettingsService $settings;
     private \Whity\Core\Hooks\HookManager $hooks;
+    /** The native sign-in codes' clock (WHIT-1406); tests move it. */
+    private int $now = 1_800_000_000;
 
     protected function setUp(): void
     {
@@ -131,6 +133,8 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
             $frontendUrls,
             invitations: new \Whity\Core\Identity\InvitationService($this->pdo, new \Whity\Core\Identity\ProfileProvisioner($this->pdo)),
             phones: new \Whity\Core\Identity\PersonalPhone($this->pdo),
+            audit: new AuditLogger($this->pdo, new NullLogger()),
+            nativeCodes: new \Whity\Auth\NativeSignInCodes($this->pdo, fn (): int => $this->now),
         );
         $this->handler = ($this->makeHandler)();
 
@@ -1253,6 +1257,224 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
         self::assertNull($this->phoneOf($this->profileId));
     }
+    private const NATIVE_VERIFIER = 'native-verifier-0123456789abcdefghijklmnopqrstuvwxyz-ABCDEF';
+
+    /** @return array{port: int, challenge: string, state: string} */
+    private function nativeTarget(): array
+    {
+        return ['port' => 43127, 'challenge' => \Whity\Auth\NativeSignInCodes::challengeFor(self::NATIVE_VERIFIER), 'state' => 'app-state-12345678'];
+    }
+
+    private function primeNativeFlow(): void
+    {
+        $this->primeFlow();
+        $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
+            'state' => 'state-1',
+            'nonce' => 'nonce-1',
+            'code_verifier' => 'verifier-1',
+            'provider_id' => $this->providerId,
+            'tenant_id' => 0,
+            'provider_key' => 'google',
+            'native_port' => 43127,
+            'native_challenge' => $this->nativeTarget()['challenge'],
+            'native_state' => $this->nativeTarget()['state'],
+        ], 600, 'oidc_flow');
+        $_GET = ['code' => 'authcode', 'state' => 'state-1'];
+    }
+
+    /** @return array<string, string> */
+    private function loopbackQuery(\Whity\Sdk\Http\Response $res): array
+    {
+        $loc = $this->location($res);
+        self::assertStringStartsWith('http://127.0.0.1:43127/callback?', $loc, 'only ever to the loopback port the app named');
+        parse_str((string) parse_url($loc, PHP_URL_QUERY), $query);
+        /** @var array<string, string> $query */
+        return $query;
+    }
+
+    /** @param array<string, string> $headers */
+    private function exchange(string $code, string $verifier = self::NATIVE_VERIFIER, array $headers = ['X-Auth-Mode' => 'token']): \Whity\Sdk\Http\Response
+    {
+        return $this->handler->exchange(new Request(
+            'POST',
+            '/api/v1/auth/sso/native/exchange',
+            $headers,
+            (string) json_encode(['code' => $code, 'code_verifier' => $verifier]),
+        ));
+    }
+
+    public function testNativeStartCarriesTheReturnInsideTheFlowCookie(): void
+    {
+        $target = $this->nativeTarget();
+        $_GET = ['mode' => 'native', 'port' => (string) $target['port'], 'code_challenge' => $target['challenge'], 'state' => $target['state']];
+        $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+
+        // The flow cookie is sent as a header, which this harness can't read; the
+        // callback tests build the same flow and prove what the claims do.
+        self::assertSame(302, $res->getStatusCode());
+        $loc = $this->location($res);
+        self::assertStringStartsWith('https://accounts.google.com/', $loc);
+        self::assertStringContainsString('code_challenge_method=S256', $loc);
+        self::assertStringNotContainsString($target['state'], $loc, "the app's state is not the provider's state");
+        self::assertStringNotContainsString($target['challenge'], $loc, "the app's challenge is not the provider's challenge");
+        self::assertStringNotContainsString('43127', $loc, 'the loopback port stays inside the signed flow cookie');
+    }
+
+    public function testNativeStartRefusesAnythingButALoopbackPortAChallengeAndAState(): void
+    {
+        $target = $this->nativeTarget();
+        $cases = [
+            'privileged port' => ['port' => '80'],
+            'port too high' => ['port' => '70000'],
+            'not a port' => ['port' => 'abc'],
+            'no challenge' => ['code_challenge' => ''],
+            'short challenge' => ['code_challenge' => 'abc'],
+            'no state' => ['state' => ''],
+        ];
+        foreach ($cases as $label => $override) {
+            $_GET = ['mode' => 'native', 'port' => (string) $target['port'], 'code_challenge' => $target['challenge'], 'state' => $target['state']] + [];
+            foreach ($override as $k => $v) {
+                $_GET[$k] = $v;
+            }
+            $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+            self::assertStringContainsString('sso_error=native_invalid', $this->location($res), $label);
+            self::assertArrayNotHasKey('sso_flow_token', $_COOKIE, $label . ': no flow starts');
+            $_GET = [];
+            $_COOKIE = [];
+        }
+
+        // Native never rides with a join, a form, a link, an invitation or a reauth.
+        $_GET = ['mode' => 'native', 'port' => '43127', 'code_challenge' => $target['challenge'], 'state' => $target['state'], 'invite' => 'tok'];
+        $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
+        self::assertStringContainsString('sso_error=native_unavailable', $this->location($res));
+    }
+
+    public function testNativeCallbackSendsAOneTimeCodeToTheLoopbackAndSetsNoSession(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+
+        $res = $this->runCallback();
+
+        self::assertSame(302, $res->getStatusCode());
+        $query = $this->loopbackQuery($res);
+        self::assertSame('app-state-12345678', $query['state']);
+        self::assertMatchesRegularExpression('/^[A-Za-z0-9_-]{43}$/', $query['code']);
+        self::assertArrayNotHasKey('access_token', $_COOKIE, 'the browser gets no session');
+        self::assertArrayNotHasKey('refresh_token', $_COOKIE);
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'));
+        self::assertSame(0, (int) $this->col("SELECT COUNT(*) FROM native_sign_in_codes WHERE code_hash = " . $this->pdo->quote($query['code'])), 'only the hash is stored');
+    }
+
+    public function testTheCodeExchangesOnceForATokenModeSessionAndNeverAgain(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        $res = $this->exchange($code);
+        self::assertSame(200, $res->getStatusCode(), $res->getBody());
+        $body = json_decode($res->getBody(), true);
+        self::assertSame('Bearer', $body['token_type']);
+        self::assertNotEmpty($body['access_token']);
+        self::assertNotEmpty($body['refresh_token']);
+        self::assertSame('alice@acme.test', $body['user']['email']);
+        self::assertSame($this->tenantId, $body['user']['tenant_id']);
+        self::assertArrayNotHasKey('access_token', $_COOKIE, 'token mode sets no cookie');
+        $claims = $this->jwtParser->parse($body['access_token']);
+        self::assertNotNull($claims);
+        self::assertSame($this->profileId, $claims['profile_id']);
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'spent');
+
+        // Replay.
+        $again = $this->exchange($code);
+        self::assertSame(401, $again->getStatusCode());
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.native.exchange_refused'"));
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.native.exchanged'"));
+    }
+
+    public function testAWrongVerifierSpendsTheCodeAndGetsNothing(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        $wrong = $this->exchange($code, 'another-verifier-0123456789abcdefghijklmnopqrstuvwxyz');
+        self::assertSame(401, $wrong->getStatusCode());
+        self::assertStringNotContainsString('access_token', $wrong->getBody());
+
+        // The right verifier is too late now: one attempt spends the code.
+        self::assertSame(401, $this->exchange($code)->getStatusCode());
+        self::assertSame(
+            'wrong_verifier',
+            json_decode((string) $this->col("SELECT metadata FROM audit_log WHERE action = 'auth.native.exchange_refused' ORDER BY id ASC LIMIT 1"), true)['reason'] ?? null,
+        );
+    }
+
+    public function testAnExpiredCodeIsRefused(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        $this->now += SsoAuthHandler::NATIVE_CODE_TTL + 1;
+        $res = $this->exchange($code);
+        self::assertSame(401, $res->getStatusCode());
+        self::assertSame(
+            'expired',
+            json_decode((string) $this->col("SELECT metadata FROM audit_log WHERE action = 'auth.native.exchange_refused' ORDER BY id DESC LIMIT 1"), true)['reason'] ?? null,
+        );
+    }
+
+    public function testTheExchangeIsTokenModeOnlyAndChecksItsInput(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $code = $this->loopbackQuery($this->runCallback())['code'];
+
+        self::assertSame(400, $this->exchange($code, self::NATIVE_VERIFIER, [])->getStatusCode(), 'no X-Auth-Mode: token');
+        self::assertSame(400, $this->exchange('short', self::NATIVE_VERIFIER)->getStatusCode());
+        self::assertSame(400, $this->exchange($code, 'short')->getStatusCode());
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'a refused shape spends nothing');
+        self::assertSame(200, $this->exchange($code)->getStatusCode());
+    }
+
+    public function testAProviderErrorOnANativeFlowGoesBackToTheLoopback(): void
+    {
+        $this->primeNativeFlow();
+        $_GET = ['error' => 'access_denied', 'state' => 'state-1'];
+
+        $query = $this->loopbackQuery($this->runCallback());
+        self::assertSame('denied', $query['error']);
+        self::assertSame('app-state-12345678', $query['state']);
+        self::assertArrayNotHasKey('code', $query);
+    }
+
+
+    public function testExpiredCodesAreSweptOnTheNextExchangeAndByTheCleanupJob(): void
+    {
+        $this->linkIdentity();
+        $this->primeNativeFlow();
+        $stale = $this->loopbackQuery($this->runCallback())['code'];
+        $this->now += SsoAuthHandler::NATIVE_CODE_TTL + 1;
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the expired row waits for a sweep');
+
+        // Another exchange sweeps it, whatever that exchange's own outcome.
+        self::assertSame(401, $this->exchange(str_repeat('x', 43))->getStatusCode());
+        self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'));
+        self::assertSame(401, $this->exchange($stale)->getStatusCode(), 'and it cannot be used afterwards');
+
+        // The daily job covers an instance nobody exchanges on. It runs on the
+        // real clock, so these rows are dated against it.
+        $codes = new \Whity\Auth\NativeSignInCodes($this->pdo);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', 60);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', -1);
+        ob_start();
+        (new \Whity\Commands\RevokedTokensCleanupCommand($this->pdo))->execute();
+        $output = (string) ob_get_clean();
+        self::assertStringContainsString('Cleaned 1 expired native sign-in codes', $output);
+        self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the live one stays');
+    }
 }
 
 /**
@@ -1274,4 +1496,7 @@ final class StubOidcHttp implements HttpClient
     {
         return $this->tokenResponse;
     }
+
+    // ── native sign-in return (WHIT-1406) ────────────────────────────────────
+
 }
