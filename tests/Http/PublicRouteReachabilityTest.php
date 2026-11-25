@@ -46,6 +46,9 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'a citizen verifying a printed document' => ['/api/v1/document-verifications/sometoken'];
         yield 'a browser fetching the UI language before login' => ['/api/v1/translations/ar/admin'];
         yield 'a student redeeming an activation code' => ['/api/v1/public/licensing/redeem'];
+        yield 'a customer opening a quote link' => ['/api/v1/public/quotes/' . str_repeat('a', 64)];
+        yield 'a customer accepting a quote' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/accept'];
+        yield 'a customer declining a quote' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/decline'];
     }
 
     #[DataProvider('pathsWithNoPossibleSession')]
@@ -91,6 +94,8 @@ final class PublicRouteReachabilityTest extends TestCase
         yield 'a tenant starting a payment' => ['/api/v1/billing/invoices/7/pay'];
         yield 'the operator plan catalogue' => ['/api/v1/plans'];
         yield 'the operator promotion catalogue' => ['/api/v1/promotions'];
+        yield 'anything else under a quote link' => ['/api/v1/public/quotes/' . str_repeat('a', 64) . '/revise'];
+        yield 'the staff quotes list' => ['/api/v1/sales/quotes'];
     }
 
     /**
