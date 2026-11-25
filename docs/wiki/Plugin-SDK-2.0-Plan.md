@@ -1,12 +1,16 @@
-# Plugin SDK 2.0 plan (0.2.31 → 2.0.0 at 0.2.40)
+# Plugin SDK 2.0 plan (on hold: the SDK stays on 1.x)
 
 Status: **plan**, built from the owner's decisions of 19 Nov 2026 on the [streamline proposal](Plugin-SDK-Streamline-Proposal.md) (D1–D11). Ticket WHIT-1242. The SDK lane keeps this page current: when a release ships, its row says so.
 
-**Public beta moved (owner, 24 Nov 2026, WHIT-1385):** the plan below is unchanged and SDK 2.0.0 still ships at 0.2.40. The public beta itself now comes after 0.2.50, not at 0.2.40. Where this page or the proposal says "at the beta", read it as "by 2.0.0".
+**Owner, 24 Nov 2026 (WHIT-1385, WHIT-1386):** the public beta comes after 0.2.50, not at 0.2.40. **The SDK stays on 1.x.** There is no 2.0.0 at 0.2.40: 2.0 comes only with a change that cannot be made additively, or with the beta phase, and neither is decided yet. Until then:
+
+- Everything in the table below that is additive still lands, as the next 1.x minor (the aliases, the `plugin.json` schema, the event catalogue, the npm package, `Page`, `NoWorkspaceInScope`, the D9 issues, `seats.enforcement`).
+- First-party plugins still move to the new names, so 2.0 stays cheap whenever it comes.
+- Nothing is removed and no shim starts logging: the 2.0 freeze, the migration guide and codemod, the RC and 2.0.0 itself wait until 2.0 is decided. When it is, this page gets new dates.
 
 ## The rules this plan follows
 
-- **One SDK minor per core release (D7).** 0.2.31 is 1.124, 0.2.32 is 1.125, and so on up to 0.2.39, which is 1.132. **0.2.40 is 2.0.0.** Every lane that adds to the SDK in a release adds to that release's minor, through the SDK lane. Nobody else bumps `Sdk::VERSION`. The `Sdk.php` ledger gets one entry per release, listing every contract added.
+- **One SDK minor per core release (D7).** 0.2.31 is 1.124, 0.2.32 is 1.125, and so on up to 0.2.39, which is 1.132. **No 2.0.0 for now (owner, 24 Nov 2026):** every release stays on 1.x. Every lane that adds to the SDK in a release adds to that release's minor, through the SDK lane. Nobody else bumps `Sdk::VERSION`. The `Sdk.php` ledger gets one entry per release, listing every contract added.
 - **Additive until 2.0 (D1).** Every new shape lands in 1.x next to the old one, and the old one is marked `@deprecated` with its replacement named. No 1.x release removes anything the published plugins use.
 - **Shims through 2.x's first release (D1).** 2.0.0 makes the new surface the contract. The 1.x names, factories and event names still resolve in 2.0.x as deprecated shims, and each one logs a notice once per plugin. They are removed in 2.1.0.
   - The host's SDK constraint gate accepts a plugin declaring `^1.124` (or later 1.x) on a 2.0.x host. A plugin declaring an older `^1.x` is refused, with a message that names the migration guide.
@@ -24,13 +28,13 @@ Status: **plan**, built from the owner's decisions of 19 Nov 2026 on the [stream
 | **0.2.34** | 1.127 | Event catalogue metadata (kind, payload keys, async twin, since), generated into HOOK_SYSTEM.md. **Shipped as 1.164 (WHIT-1390).** Renaming events, and firing them under both names, waits until 2.0 is decided (owner, 24 Nov 2026); the catalogue has an empty `renamedFrom` field ready for it | **#1681** record-page tabs, sections and actions (designed in 0.2.32); **#1680** people readers and picker blocks, on #1914 | |
 | **0.2.35** | 1.128 | `@whity/plugin-sdk` npm 1.128 (D8): block types generated from `BlockContract`, a typed builder, the plugin route client, `fetchAllPages`, one `LocalizedText`, test helpers. The web app and desktop template import it and their copies go. Unused `@whity/ui`/`@whity/features` subpaths become private. | **#1728** route subjects and a `Routes` service | |
 | **0.2.36** | 1.129 | `Page` for every new list method; `NoWorkspaceInScope`; a `reason` on every `*Rejected`; `plugin.json` schema part 2 (MCP, agents, roles, data types, the rest) | **#1688** and **#1693** designs approved (isolated origin; least-privilege capabilities) | |
-| **0.2.37** | 1.130 | **2.0 freeze.** Every 2.0 name exists in 1.x. Every first-party plugin (Whity Pay, Appointments, Salons, Front Office, WorkspaceTemplates, store, theme-creator, demos) moves to the new names, one PR each, with no deprecation notice left in its test run | (catch-up) | |
-| **0.2.38** | 1.131 | The migration guide (`Plugin-SDK-Migrating-to-2`) and the `whity plugin upgrade` codemod, tried on a copy of each first-party plugin before its PR | | |
-| **0.2.39** | 1.132 | 2.0.0-RC on a branch: the host runs with shims in "notice" mode, and the constraint gate accepts `^1.124` and `^2.0` | | |
-| **0.2.40** | **2.0.0** | 2.0.0 released: the new names are the contract, and the shims log once per plugin. `seats.enforcement` lands. The PHP floor follows core (8.4.27+). | | |
-| 0.2.41+ | 2.1.0 | Shims removed. Build #1688 and #1693 | the rest of the issue list (#1684, #1682, #1912, #1913, #1687, #1692, #1911, #1691, #1689, #1690, #1694) | |
+| **0.2.37** | 1.x | Every 2.0 name exists in 1.x. *(The freeze itself waits until 2.0 is decided.)* Every first-party plugin (Whity Pay, Appointments, Salons, Front Office, WorkspaceTemplates, store, theme-creator, demos) moves to the new names, one PR each, with no deprecation notice left in its test run | (catch-up) | |
+| *when 2.0 is decided* | 1.x | The migration guide (`Plugin-SDK-Migrating-to-2`) and the `whity plugin upgrade` codemod, tried on a copy of each first-party plugin before its PR | | |
+| *when 2.0 is decided* | 1.x | 2.0.0-RC on a branch: the host runs with shims in "notice" mode, and the constraint gate accepts `^1.124` and `^2.0` | | |
+| **0.2.40** | 1.x | `seats.enforcement` lands, additively. *(2.0.0, with the new names as the contract and shims that log, waits until 2.0 is decided.)* The PHP floor follows core (8.4.27+). | | |
+| 0.2.41+ | 1.x (2.1.0 after 2.0) | Build #1688 and #1693; shims are removed only in the release after 2.0 | the rest of the issue list (#1684, #1682, #1912, #1913, #1687, #1692, #1911, #1691, #1689, #1690, #1694) | |
 
-A release that can't take its row's issue moves the issue down, never the 2.0 date. The freeze in 0.2.37 is what has to hold.
+A release that can't take its row's issue moves the issue down. There is no 2.0 date until the owner sets one.
 
 ## What 2.0.0 changes
 
