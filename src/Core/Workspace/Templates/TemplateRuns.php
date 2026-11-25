@@ -117,15 +117,19 @@ final class TemplateRuns implements TemplateLedger
     /**
      * What a run made, by kind and the template's key for it.
      *
-     * @return array<string, array{ref_id: string, removed: bool}>
+     * @return array<string, array{ref_id: string, removed: bool, fingerprint: ?string}>
      */
     public function items(int $tenantId, int $runId): array
     {
-        $stmt = $this->db->prepare('SELECT kind, item_key, ref_id, removed_at FROM workspace_template_items WHERE tenant_id = ? AND run_id = ?');
+        $stmt = $this->db->prepare('SELECT kind, item_key, ref_id, removed_at, fingerprint FROM workspace_template_items WHERE tenant_id = ? AND run_id = ?');
         $stmt->execute([$tenantId, $runId]);
         $out = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $row) {
-            $out[$row['kind'] . ':' . $row['item_key']] = ['ref_id' => (string) $row['ref_id'], 'removed' => $row['removed_at'] !== null];
+            $out[$row['kind'] . ':' . $row['item_key']] = [
+                'ref_id' => (string) $row['ref_id'],
+                'removed' => $row['removed_at'] !== null,
+                'fingerprint' => $row['fingerprint'] === null ? null : (string) $row['fingerprint'],
+            ];
         }
 
         return $out;
@@ -170,6 +174,13 @@ final class TemplateRuns implements TemplateLedger
     {
         $stmt = $this->db->prepare('UPDATE workspace_template_items SET removed_at = CURRENT_TIMESTAMP WHERE id = ? AND tenant_id = ?');
         $stmt->execute([$itemId, $tenantId]);
+    }
+
+    /** SDK 1.170 (migration 359): which version of its manifest entry the item now matches. */
+    public function setFingerprint(int $tenantId, int $runId, string $kind, string $itemKey, string $fingerprint): void
+    {
+        $stmt = $this->db->prepare('UPDATE workspace_template_items SET fingerprint = ? WHERE tenant_id = ? AND run_id = ? AND kind = ? AND item_key = ?');
+        $stmt->execute([$fingerprint, $tenantId, $runId, $kind, $itemKey]);
     }
 
     public function recordPart(int $tenantId, int $runId, string $partKey, ?string $pluginName, int $version): void

@@ -2438,6 +2438,10 @@
     "en": "Apply a workspace template",
     "ar": "تطبيق قالب على مساحة العمل"
   },
+  "post_api_workspace_templates_key_items_part_item_adopt": {
+    "en": "Use the template's version of one item",
+    "ar": "استخدام نسخة القالب لعنصر واحد"
+  },
   "post_api_workspace_templates_key_preview": {
     "en": "Preview what a workspace template adds",
     "ar": "معاينة ما يضيفه قالب مساحة العمل"

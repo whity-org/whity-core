@@ -5,20 +5,33 @@ declare(strict_types=1);
 namespace Whity\Core\Workspace\Templates;
 
 use Whity\Core\PluginLoader;
+use Whity\Sdk\Templates\TemplateComposer;
 
 /**
- * The workspace templates on offer (SDK 1.116, WHIT-1194): core's own
- * "Blank", then those of the plugins on in this workspace. A plugin cannot
+ * The workspace templates on offer (SDK 1.116, WHIT-1194): those of the
+ * plugins on in this workspace, then core's own "Blank". A plugin cannot
  * replace Blank.
+ *
+ * Since SDK 1.170 (WHIT-1413) they are composed first
+ * ({@see TemplateComposer}): a template that `extends` another is merged
+ * with it, and the extensions of the plugins on here are added. Each composed
+ * template lists its `parts` with their versions.
  */
 final class TemplateCatalogue
 {
     public const BLANK = 'blank';
 
-    /** @param (\Closure(): list<array<string, mixed>>)|null $plugins for tests */
+    /** @var list<string> */
+    private array $notes = [];
+
+    /**
+     * @param (\Closure(): list<array<string, mixed>>)|null $plugins for tests
+     * @param (\Closure(): list<array<string, mixed>>)|null $extensions for tests
+     */
     public function __construct(
         private readonly ?PluginLoader $loader,
         private readonly ?\Closure $plugins = null,
+        private readonly ?\Closure $extensions = null,
     ) {
     }
 
@@ -26,15 +39,24 @@ final class TemplateCatalogue
     public function all(): array
     {
         $fromPlugins = $this->plugins !== null ? ($this->plugins)() : ($this->loader?->getWorkspaceTemplates() ?? []);
-        $out = [];
-        foreach ($fromPlugins as $template) {
-            if (($template['key'] ?? null) !== self::BLANK) {
-                $out[] = $template;
-            }
-        }
+        $extensions = $this->extensions !== null ? ($this->extensions)() : ($this->loader?->getWorkspaceTemplateExtensions() ?? []);
+        $templates = array_values(array_filter($fromPlugins, static fn (array $t): bool => ($t['key'] ?? null) !== self::BLANK));
+        $composed = TemplateComposer::compose($templates, $extensions);
+        $this->notes = $composed['notes'];
+        $out = $composed['templates'];
         $out[] = self::blank();
 
         return $out;
+    }
+
+    /**
+     * What composing left out the last time {@see self::all()} ran, and why.
+     *
+     * @return list<string>
+     */
+    public function notes(): array
+    {
+        return $this->notes;
     }
 
     /** @return array<string, mixed>|null */

@@ -123,7 +123,9 @@ final class FakeWorkspace implements WorkspaceSetup
         if (in_array($route, $this->refused, true)) {
             return self::answer(403, ['error' => 'Forbidden']);
         }
-        $id = preg_match('#/(\d+)(?:/|$)#', $path, $m) === 1 ? (int) $m[1] : 0;
+        preg_match_all('#/(\d+)(?=/|$)#', $path, $m);
+        $id = (int) ($m[1][0] ?? 0);
+        $second = (int) ($m[1][1] ?? 0);
 
         return match ($route) {
             'GET /api/settings' => self::answer(200, ['data' => ['effective' => $this->settings, 'overridden' => $this->overridden]]),
@@ -138,10 +140,14 @@ final class FakeWorkspace implements WorkspaceSetup
             'PATCH /api/calendar/services/{id}' => $this->update('services', $id, $body),
             'GET /api/roles' => self::answer(200, ['data' => array_values($this->roles)]),
             'POST /api/roles' => $this->createRole($body),
-            'POST /api/roles/{id}/permissions' => $this->update('roles', $id, ['permissions' => $body['permissions'] ?? []]),
+            // Granting adds, as core's route does; it never removes.
+            'POST /api/roles/{id}/permissions' => $this->update('roles', $id, ['permissions' => array_values(array_unique([...($this->roles[$id]['permissions'] ?? []), ...(is_array($body['permissions'] ?? null) ? $body['permissions'] : [])]))]),
             'GET /api/forms' => self::answer(200, ['data' => array_values($this->forms)]),
             'POST /api/forms' => $this->createForm($body),
-            'PUT /api/forms/{id}/fields' => $this->update('forms', $id, ['fields' => $body['fields'] ?? []]),
+            'PUT /api/forms/{id}/fields' => $this->update('forms', $id, ['fields' => $this->withIds(is_array($body['fields'] ?? null) ? $body['fields'] : [])]),
+            'GET /api/forms/{id}/fields' => isset($this->forms[$id]) ? self::answer(200, ['data' => $this->forms[$id]['fields'] ?? []]) : self::answer(404, ['error' => 'Not found']),
+            'POST /api/forms/{id}/fields' => $this->addField($id, $body),
+            'PATCH /api/forms/{id}/fields/{id}' => $this->patchField($id, $second, $body),
             'POST /api/forms/{id}/publish' => $this->update('forms', $id, ['published' => true]),
             'POST /api/document-sources' => $this->create('documents', $body),
             'GET /api/contacts' => self::answer(200, ['data' => array_values($this->contacts)]),
@@ -247,6 +253,54 @@ final class FakeWorkspace implements WorkspaceSetup
         $this->{$kind}[$id] = array_merge($this->{$kind}[$id], $changes);
 
         return self::answer(200, ['data' => $this->{$kind}[$id]]);
+    }
+
+    /**
+     * @param array<mixed> $fields
+     * @return list<array<string, mixed>>
+     */
+    private function withIds(array $fields): array
+    {
+        $out = [];
+        foreach ($fields as $field) {
+            if (is_array($field)) {
+                $out[] = ['id' => $this->nextId++] + $field;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array{status: int, body: mixed}
+     */
+    private function addField(int $formId, array $body): array
+    {
+        if (!isset($this->forms[$formId])) {
+            return self::answer(404, ['error' => 'Not found']);
+        }
+        $field = $this->withIds([$body])[0];
+        $this->forms[$formId]['fields'][] = $field;
+
+        return self::answer(201, ['data' => ['id' => $field['id']]]);
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     * @return array{status: int, body: mixed}
+     */
+    private function patchField(int $formId, int $fieldId, array $body): array
+    {
+        foreach ($this->forms[$formId]['fields'] ?? [] as $i => $field) {
+            if (is_array($field) && ($field['id'] ?? null) === $fieldId) {
+                $this->forms[$formId]['fields'][$i] = array_merge($field, $body);
+
+                return self::answer(200, ['data' => $this->forms[$formId]['fields'][$i]]);
+            }
+        }
+
+        return self::answer(404, ['error' => 'Not found']);
     }
 
     /** @return array{status: int, body: mixed} */

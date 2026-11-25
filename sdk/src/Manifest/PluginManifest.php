@@ -434,6 +434,30 @@ final class PluginManifest
         return $this->data['themes'] ?? [];
     }
 
+    /**
+     * `workspaceTemplates`: paths of workspace template files inside the
+     * plugin (SDK 1.170).
+     *
+     * @return list<string>
+     */
+    public function workspaceTemplateFiles(): array
+    {
+        /** @var list<string> */
+        return $this->data['workspaceTemplates'] ?? [];
+    }
+
+    /**
+     * `workspaceTemplateExtensions`: paths of files with pieces for other
+     * plugins' templates (SDK 1.170).
+     *
+     * @return list<string>
+     */
+    public function workspaceTemplateExtensionFiles(): array
+    {
+        /** @var list<string> */
+        return $this->data['workspaceTemplateExtensions'] ?? [];
+    }
+
     /** @return array<string, mixed> */
     private function plugin(): array
     {

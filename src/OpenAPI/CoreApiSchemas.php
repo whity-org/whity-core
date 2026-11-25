@@ -21116,6 +21116,16 @@ final class CoreApiSchemas
                     404 => self::errorResponse('There is no such template'),
                 ] + self::authErrors(),
             ]),
+            // WHIT-1413 (SDK 1.170).
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents}/{item:[a-z][a-z0-9-]*}/adopt', 'settings:write', [
+                'summary' => 'Use the template\'s version of one item',
+                'description' => 'For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template\'s labels and its missing questions; a role gets the template\'s missing permissions the caller holds; a document gets a new copy beside the workspace\'s.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('add when it was changed, keep when it already matched, skip with why', 'AdoptWorkspaceTemplateItemResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
                 'summary' => 'Remove the example contacts and bookings a template added',
                 'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
@@ -21316,6 +21326,7 @@ final class CoreApiSchemas
                 'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
                 'theme' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateTheme')], 'description' => 'The theme the template suggests, when this workspace has it (SDK 1.131)'],
                 'chosen' => self::bool(),
+                'update' => array_merge(SchemaBuilder::ref('WorkspaceTemplateUpdate'), ['nullable' => true, 'description' => 'What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied']),
             ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
             'WorkspaceTemplateListResponse' => self::object([
                 'data' => self::object([
@@ -21337,10 +21348,29 @@ final class CoreApiSchemas
                     'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateItem'), 'description' => 'Each item of the template and what happened to it (SDK 1.169)'],
                 ], ['template', 'made', 'skipped']),
             ], ['data']),
+            'AdoptWorkspaceTemplateItemResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'part' => self::str(),
+                    'key' => self::str(),
+                    'action' => self::str() + ['enum' => ['add', 'keep', 'skip']],
+                    'reason' => self::str(),
+                ], ['template', 'part', 'key', 'action']),
+            ], ['data']),
+            'WorkspaceTemplateUpdate' => self::object([
+                'from' => self::int() + ['description' => 'The template\'s version this workspace applied last'],
+                'to' => self::int() + ['description' => 'The version on offer'],
+                'parts' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str() + ['description' => 'template:{key}, extends:{key} or extension:{plugin}.{key}'],
+                    'from' => self::int() + ['nullable' => true, 'description' => 'Null for a part this workspace never applied, such as a new extension'],
+                    'to' => self::int(),
+                ], ['key', 'from', 'to'])],
+                'changes' => ['type' => 'array', 'items' => self::object(['version' => self::int(), 'summary' => self::str() + ['nullable' => true]], ['version', 'summary'])],
+            ], ['from', 'to', 'parts', 'changes']),
             'WorkspaceTemplateItem' => self::object([
                 'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents or examples'],
                 'key' => self::str() + ['description' => 'The template\'s key for the item'],
-                'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason'],
+                'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'changed', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template\'s version, SDK 1.170); left: not ticked; skip: not done, see reason'],
                 'reason' => self::str(),
             ], ['part', 'key', 'action']),
             'PreviewWorkspaceTemplateResponse' => self::object([

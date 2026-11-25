@@ -875,6 +875,41 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     private array $workspaceTemplates = [];
 
     /**
+     * Each plugin's validated workspace template extensions (SDK 1.170), by
+     * plugin key.
+     *
+     * @var array<string, list<array<string, mixed>>>
+     */
+    private array $workspaceTemplateExtensions = [];
+
+    /**
+     * The template extensions of the plugins on in the current workspace
+     * (SDK 1.170, WHIT-1413), each with the plugin that contributed it, in
+     * load order. {@see \Whity\Sdk\Templates\TemplateComposer} applies them.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getWorkspaceTemplateExtensions(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $extensions = $this->workspaceTemplateExtensions[$pluginKey] ?? [];
+            if ($extensions === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive() || $this->isOffForWorkspace($pluginKey)) {
+                continue;
+            }
+            foreach ($extensions as $extension) {
+                $out[] = $extension + ['plugin' => $info['plugin']->getName()];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * The workspace templates of the plugins on in the current workspace
      * (SDK 1.116, WHIT-1194), each with the plugin that contributed it. A key
      * offered by two plugins is kept from the first loaded.
@@ -897,6 +932,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             foreach ($templates as $template) {
                 $key = (string) $template['key'];
                 if (isset($seen[$key])) {
+                    $this->logWarning("[Plugin:{$pluginKey}] workspace template {$key} ignored: another plugin offers that key");
                     continue;
                 }
                 $seen[$key] = true;
@@ -1061,6 +1097,34 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
      * Validate a plugin's workspace templates (SDK 1.116): each one alone, so a
      * bad template is dropped with its reasons and the rest are kept.
      *
+     * @return list<array<string, mixed>>
+     */
+    private function collectWorkspaceTemplateExtensions(PluginInterface $plugin, string $pluginKey): array
+    {
+        if (!$plugin instanceof \Whity\Sdk\Contribute\PluginWorkspaceTemplateExtensionsInterface) {
+            return [];
+        }
+        try {
+            $declared = $plugin->getWorkspaceTemplateExtensions();
+        } catch (Throwable $e) {
+            $this->handlePluginThrowable($pluginKey, $e, 'getWorkspaceTemplateExtensions');
+
+            return [];
+        }
+        $out = [];
+        foreach ($declared as $i => $extension) {
+            $errors = \Whity\Sdk\Manifest\WorkspaceTemplateValidator::extensionErrors($extension);
+            if ($errors !== []) {
+                $this->logWarning("[Plugin:{$pluginKey}] getWorkspaceTemplateExtensions(): extension {$i} dropped: " . implode('; ', array_slice($errors, 0, 5)));
+                continue;
+            }
+            $out[] = $extension;
+        }
+
+        return $out;
+    }
+
+    /**
      * @return list<array<string, mixed>>
      */
     private function collectWorkspaceTemplates(PluginInterface $plugin, string $pluginKey): array
@@ -5135,6 +5199,8 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // 4d. Workspace templates (SDK 1.116, WHIT-1194): data only, each
         //     checked alone.
         $this->workspaceTemplates[$pluginKey] = $this->collectWorkspaceTemplates($plugin, $pluginKey);
+        // SDK 1.170 (WHIT-1413): pieces it adds to other plugins' templates.
+        $this->workspaceTemplateExtensions[$pluginKey] = $this->collectWorkspaceTemplateExtensions($plugin, $pluginKey);
 
         // 4d'. Themes (SDK 1.125, WHIT-1225): data only, each checked alone.
         $this->themes[$pluginKey] = $this->collectThemes($plugin, $pluginKey);
