@@ -219,3 +219,18 @@ WORKDIR /app
 # from them on a real deployment. Set WHITY_REFERENCE_PLUGINS=on to run them.
 # Development, CI and e2e build the `base` stage, where it is unset (= on).
 ENV WHITY_REFERENCE_PLUGINS=off
+
+# READINESS CO-26: the app and every worker run as www-data. The entrypoint
+# starts as root only to hand the writable directories to www-data (once per
+# volume) and then drops to it before running anything; WHITY_RUN_AS_ROOT=1
+# is the roll-back switch. See docker/production/whity-entrypoint.sh.
+#
+# The base image gives frankenphp a file capability (cap_net_bind_service). With
+# `cap_drop: ALL` the kernel refuses to exec a file that asks for a capability
+# outside the bounding set ("Operation not permitted"), so it is removed here:
+# copying the binary drops the attribute. www-data binds :80 without it, since
+# Docker sets net.ipv4.ip_unprivileged_port_start=0 in a container's namespace.
+COPY docker/production/whity-entrypoint.sh /usr/local/bin/whity-entrypoint
+RUN chmod 0755 /usr/local/bin/whity-entrypoint     && command -v setpriv >/dev/null     && cp /usr/local/bin/frankenphp /tmp/frankenphp     && mv /tmp/frankenphp /usr/local/bin/frankenphp     && chmod 0755 /usr/local/bin/frankenphp     && test -z "$(getcap /usr/local/bin/frankenphp)"
+ENTRYPOINT ["whity-entrypoint"]
+CMD ["--config", "/etc/frankenphp/Caddyfile", "--adapter", "caddyfile"]

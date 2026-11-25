@@ -135,3 +135,66 @@ deliberately NOT failed-closed onto a shared bucket when the IP is unknown:
 collapsing all IP-less failures into one counter would let modest failed-login
 volume trip a single global limit and lock out *every* user (an availability
 DoS). Set `TRUSTED_PROXY_HOPS` correctly to activate the per-IP backstop.
+
+## The app runs as www-data (READINESS CO-26)
+
+From this release the app image runs the web server and every worker as
+`www-data`, not root. Its entrypoint (`docker/production/whity-entrypoint.sh`)
+starts as root only to hand the writable directories to `www-data`, then drops
+to `www-data` before running anything:
+
+- `/app/storage` (the storage volume), `/app/plugins`, `/data` and `/config`.
+- The first start on an existing install walks the volume once (about a
+  second for 20,000 files) and leaves a `.whity-owner-www-data` marker; later
+  starts check only the marker and the directory's owner.
+- Every container that runs the image goes through it, whatever command the
+  compose file gives, so the queue, scheduler, events relay and health-watch
+  workers need no change.
+- It still listens on :80 inside the container. Docker lets an unprivileged
+  process bind low ports in its own network namespace, so no proxy, published
+  port or `WHITY_BACKEND_URL` changes.
+- The compose files drop every capability except the five the start needs
+  (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`) and set
+  `no-new-privileges`. Once running, the process has no capabilities at all.
+
+### Running commands in the app container
+
+**Use `docker exec -u www-data` (or `docker compose exec -u www-data`) for any
+command you run inside the app or a worker container.** `docker exec` skips the
+image's entrypoint, so without `-u` it runs as root. A command that writes files
+(uploads, generated documents, a plugin install, a backup, a cache) would then
+leave root-owned files that the app, running as `www-data`, can't change later.
+
+```bash
+docker exec -u www-data <app>_frankenphp php bin/whity-cli render:check
+docker compose exec -u www-data frankenphp php public/index.php migrate run
+```
+
+- A one-off container (`docker compose run --rm frankenphp …`) goes through the
+  entrypoint and is already `www-data`; it needs no `-u`.
+- Reading only (logs, `ls`, `cat`) works either way.
+- If a root command did leave files behind, nothing is lost: restart the
+  container with `WHITY_RUN_AS_ROOT=1` once and then without it, and the
+  entrypoint hands everything back to `www-data` (or `chown -R 33:33` the
+  directory on the host).
+- The development stack (`docker-compose.yml`, the `base` stage with the
+  checkout bind-mounted) still runs as root; this applies to the release image.
+
+### If writes fail after an upgrade
+
+The entrypoint logs `[entrypoint] WARNING: could not give <dir> to www-data`
+when it can't take a directory over (an unusual bind mount, a read-only
+volume). Writes there then fail with "permission denied".
+
+1. **Quick switch, same image:** set `WHITY_RUN_AS_ROOT=1` for the app (and,
+   if they write the same directory, the workers) and recreate the
+   containers. They run as root exactly as before. Files `www-data` created
+   stay readable by root, and the next start without the switch hands over
+   whatever root created meanwhile.
+2. **Or go back to the previous image:** set the image tag (`WHITY_VERSION`,
+   or `WHITY_IMAGE` on a staging-style deploy) to the release before and
+   recreate. The old image runs as root and reads everything the new one
+   wrote. Nothing needs to be chowned back.
+3. Then fix the directory's ownership on the host (`chown -R 33:33`) or
+   remove the bind mount that can't be changed, and start again without the
+   switch.

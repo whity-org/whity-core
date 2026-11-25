@@ -61,7 +61,7 @@ working:
 - **The command line**, inside the app container:
 
   ```bash
-  docker compose exec frankenphp php bin/whity-cli render:check
+  docker compose exec -u www-data frankenphp php bin/whity-cli render:check
   ```
 
   Exit code 0 when ready, 1 when not.
