@@ -196,6 +196,11 @@ For a compose-based deployment (the per-product deployment anatomy in
      is already up, which is still the old image until step 6, so it applies the
      old release's migrations (none) and reports success.
 
+     `run --rm` goes through the image's entrypoint, so it runs as `www-data`
+     like the app does; nothing else is needed. Any `docker exec` into the app
+     container, by contrast, needs `-u www-data` (see "Running commands in the
+     app container" in the [deployment guide](DEPLOYMENT_GUIDE.md)).
+
    The one-off container also works when the app container will not start, which
    is the way out if an upgrade leaves it restarting.
    **v0.2.27 is such an upgrade:** its app container cannot start on a database

@@ -293,6 +293,11 @@ export const publicBookingApi = {
     })).data;
   },
 
+  /** WHIT-1417: the customer says they are coming. Pressing it again changes nothing. */
+  async coming(token: string): Promise<PublicBooking> {
+    return (await send<{ data: PublicBooking }>(`${LINK(token)}/coming`, { method: 'POST', body: '{}' })).data;
+  },
+
   /** Take the time the business suggested for a request (design 3.3). The link changes: the new token comes back. */
   async acceptSuggestion(token: string): Promise<PublicBooking & { manage_token?: string | null }> {
     return (await send<{ data: PublicBooking & { manage_token?: string | null } }>(`${LINK(token)}/accept`, { method: 'POST', body: '{}' })).data;

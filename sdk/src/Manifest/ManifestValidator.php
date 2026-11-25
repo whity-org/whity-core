@@ -46,6 +46,8 @@ final class ManifestValidator
         'automations', 'tests', 'documents', 'agentPresets', 'homeCard',
         // Schema part 1 (SDK 1.163, D4).
         'settings', 'notifications', 'jobs', 'dashboard', 'onboarding', 'contactFields', 'themes',
+        // Workspace templates as files (SDK 1.170, WHIT-1413).
+        'workspaceTemplates', 'workspaceTemplateExtensions',
     ];
 
     private const NAME_PATTERN = '/^[A-Za-z][A-Za-z0-9_]{0,63}$/';
@@ -144,6 +146,9 @@ final class ManifestValidator
             ...JobsValidator::errors($manifest['jobs'] ?? null),
             ...OnboardingValidator::errors($manifest['onboarding'] ?? null, array_keys($permissions)),
             ...ThemeFilesValidator::errors($manifest['themes'] ?? null),
+            // The files' paths; what each says is checked when the plugin loads, and offline by `whity-cli plugin validate`.
+            ...ThemeFilesValidator::errors($manifest['workspaceTemplates'] ?? null, 'workspaceTemplates'),
+            ...ThemeFilesValidator::errors($manifest['workspaceTemplateExtensions'] ?? null, 'workspaceTemplateExtensions'),
         ];
         if (array_key_exists('dashboard', $manifest)) {
             $errors = [...$errors, ...DashboardValidator::errors($manifest['dashboard'])];

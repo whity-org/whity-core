@@ -1249,6 +1249,26 @@
         "type": "string",
         "pattern": "^(?!/)[A-Za-z0-9_./-]{1,200}\\.json$"
       }
+    },
+    "workspaceTemplates": {
+      "description": "SDK 1.170 (WHIT-1413): workspace template files inside the plugin, each a manifest as Whity\\Sdk\\Manifest\\WorkspaceTemplateValidator checks it (docs/wiki/Plugin-Workspace-Templates.md). The host checks every file when the plugin loads.",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)[A-Za-z0-9_./-]{1,200}\\.json$"
+      }
+    },
+    "workspaceTemplateExtensions": {
+      "description": "SDK 1.170 (WHIT-1413): files with pieces this plugin adds to another plugin's workspace template, each checked by WorkspaceTemplateValidator::extensionErrors().",
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^(?!/)[A-Za-z0-9_./-]{1,200}\\.json$"
+      }
     }
   },
   "$defs": {

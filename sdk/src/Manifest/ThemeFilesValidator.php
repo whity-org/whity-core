@@ -14,7 +14,8 @@ namespace Whity\Sdk\Manifest;
  * ```
  *
  * Checked here: each is a relative path inside the plugin ending in `.json`,
- * listed once. What a file says is checked by `whity-cli plugin:validate` and
+ * listed once. The same check serves `workspaceTemplates` and
+ * `workspaceTemplateExtensions` (SDK 1.170). What a file says is checked by `whity-cli plugin:validate` and
  * by the host when it loads the plugin, theme by theme. Pure and static.
  */
 final class ThemeFilesValidator
@@ -34,17 +35,17 @@ final class ThemeFilesValidator
             return [];
         }
         if (!is_array($themes) || !array_is_list($themes)) {
-            return ["{$path}: must be a list of theme file paths"];
+            return ["{$path}: must be a list of file paths"];
         }
         if (count($themes) > self::MAX_THEMES) {
-            return ["{$path}: at most " . self::MAX_THEMES . ' themes'];
+            return ["{$path}: at most " . self::MAX_THEMES . ' files'];
         }
 
         $errors = [];
         $seen = [];
         foreach ($themes as $i => $file) {
             if (!is_string($file) || preg_match(self::PATH_PATTERN, $file) !== 1) {
-                $errors[] = "{$path}[{$i}]: a path inside the plugin ending in .json, such as themes/harbour.json";
+                $errors[] = "{$path}[{$i}]: a path inside the plugin ending in .json, such as " . ($path === 'themes' ? 'themes/harbour.json' : 'templates/clinic.json');
             } elseif (isset($seen[$file])) {
                 $errors[] = "{$path}[{$i}]: \"{$file}\" is listed twice";
             } else {

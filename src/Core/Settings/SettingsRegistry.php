@@ -881,7 +881,14 @@ final class SettingsRegistry
     public const CALENDAR_MIN_NOTICE_MINUTES = 'calendar.min_notice_minutes';
     public const CALENDAR_MAX_ADVANCE_DAYS = 'calendar.max_advance_days';
     public const CALENDAR_SLOT_STEP_MINUTES = 'calendar.slot_step_minutes';
+    /** Replaced by {@see self::CALENDAR_REMINDERS} (migration 361); nothing reads it any more. */
     public const CALENDAR_REMINDER_HOURS_BEFORE = 'calendar.reminder_hours_before';
+    /**
+     * WHIT-1417 (design section 39, AP.15): the reminders before each booking,
+     * as hours before the start, comma separated, at most three ("24,2" by
+     * default; empty = no reminders).
+     */
+    public const CALENDAR_REMINDERS = 'calendar.reminders';
     public const CALENDAR_PAYMENT_HOLD_MINUTES = 'calendar.payment_hold_minutes';
     public const CALENDAR_WEEK_START = 'calendar.week_start';
     public const CALENDAR_WEEKEND_DAYS = 'calendar.weekend_days';
@@ -1602,6 +1609,7 @@ final class SettingsRegistry
         self::CALENDAR_MAX_ADVANCE_DAYS => '60',
         self::CALENDAR_SLOT_STEP_MINUTES => '15',
         self::CALENDAR_REMINDER_HOURS_BEFORE => '24',
+        self::CALENDAR_REMINDERS => '24,2',
         self::CALENDAR_PAYMENT_HOLD_MINUTES => '15',
         self::CALENDAR_WEEK_START => 'saturday',
         self::CALENDAR_WEEKEND_DAYS => 'friday,saturday',
@@ -2120,6 +2128,7 @@ final class SettingsRegistry
             self::CALENDAR_MAX_ADVANCE_DAYS => self::validateWholeNumberBetween($value, self::CALENDAR_MAX_ADVANCE_DAYS, 1, 730),
             self::CALENDAR_SLOT_STEP_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_SLOT_STEP_MINUTES, 5, 240),
             self::CALENDAR_REMINDER_HOURS_BEFORE => self::validateWholeNumberBetween($value, self::CALENDAR_REMINDER_HOURS_BEFORE, 0, 168),
+            self::CALENDAR_REMINDERS => self::validateReminderHours($value),
             self::CALENDAR_PAYMENT_HOLD_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_PAYMENT_HOLD_MINUTES, 1, 1440),
             self::CALENDAR_WEEK_START => in_array($value, self::ENUM_OPTIONS[self::CALENDAR_WEEK_START], true) ? null : 'calendar.week_start must be a day of the week.',
             self::CALENDAR_WEEKEND_DAYS => self::validateWeekdayList($value),
@@ -2349,6 +2358,28 @@ final class SettingsRegistry
         }
         if ((int) $value < $min || (int) $value > $max) {
             return "{$key} must be between {$min} and {$max}.";
+        }
+
+        return null;
+    }
+
+    /** Up to three different hours before a booking, 1 to 168, comma separated; empty means none. */
+    private static function validateReminderHours(string $value): ?string
+    {
+        if (trim($value) === '') {
+            return null;
+        }
+        $hours = array_map('trim', explode(',', $value));
+        if (count($hours) > 3) {
+            return 'calendar.reminders can hold at most three reminders.';
+        }
+        foreach ($hours as $hour) {
+            if (preg_match('/^\d+$/', $hour) !== 1 || (int) $hour < 1 || (int) $hour > 168) {
+                return 'calendar.reminders must be hours between 1 and 168, comma separated.';
+            }
+        }
+        if (count(array_unique(array_map('intval', $hours))) !== count($hours)) {
+            return 'calendar.reminders must not repeat an hour.';
         }
 
         return null;

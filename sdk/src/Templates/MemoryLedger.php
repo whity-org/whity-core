@@ -18,7 +18,7 @@ final class MemoryLedger implements TemplateLedger
     /** @var array<string, array{id: int, version: int, plugin: ?string}> by `tenant:key` */
     private array $runs = [];
 
-    /** @var array<int, array<string, array{id: int, tenant: int, kind: string, ref_id: string, example: bool, removed: bool}>> by run, then `kind:key` */
+    /** @var array<int, array<string, array{id: int, tenant: int, kind: string, ref_id: string, example: bool, removed: bool, fingerprint: ?string}>> by run, then `kind:key` */
     private array $items = [];
 
     /** @var array<int, array<string, int>> by run, then part key */
@@ -63,7 +63,7 @@ final class MemoryLedger implements TemplateLedger
         $out = $runId > 0 && $this->base !== null ? $this->base->items($tenantId, $runId) : [];
         foreach ($this->items[$runId] ?? [] as $kindKey => $item) {
             if ($item['tenant'] === $tenantId) {
-                $out[$kindKey] = ['ref_id' => $item['ref_id'], 'removed' => $item['removed']];
+                $out[$kindKey] = ['ref_id' => $item['ref_id'], 'removed' => $item['removed'], 'fingerprint' => $item['fingerprint']];
             }
         }
 
@@ -79,7 +79,30 @@ final class MemoryLedger implements TemplateLedger
             'ref_id' => $refId,
             'example' => $isExample,
             'removed' => false,
+            'fingerprint' => null,
         ];
+    }
+
+    public function setFingerprint(int $tenantId, int $runId, string $kind, string $itemKey, string $fingerprint): void
+    {
+        $kindKey = "{$kind}:{$itemKey}";
+        if (!isset($this->items[$runId][$kindKey])) {
+            // The base's item: copy it here so the change stays in memory.
+            $base = $this->items($tenantId, $runId)[$kindKey] ?? null;
+            if ($base === null) {
+                return;
+            }
+            $this->items[$runId][$kindKey] = [
+                'id' => $this->newItemId(),
+                'tenant' => $tenantId,
+                'kind' => $kind,
+                'ref_id' => $base['ref_id'],
+                'example' => false,
+                'removed' => $base['removed'],
+                'fingerprint' => null,
+            ];
+        }
+        $this->items[$runId][$kindKey]['fingerprint'] = $fingerprint;
     }
 
     public function liveExamples(int $tenantId): array

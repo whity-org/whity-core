@@ -225,6 +225,62 @@ PHP);
         self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'done'], $again['items'], 'Made by the last run: not made again');
     }
 
+    public function testANewVersionIsOfferedItemByItemAndNeverAppliedOnItsOwn(): void
+    {
+        TenantContext::setTenantId(self::BAKERY);
+        $setup = new FakeSetup();
+        $setup->effective['billing.default_currency'] = 'USD';
+        $offered = \Tests\Support\ExampleClinicTemplates::clinic(1, '20.00');
+        $runs = new TemplateRuns($this->pdo);
+        $handler = new WorkspaceTemplatesApiHandler(
+            new TemplateCatalogue(null, static function () use (&$offered): array {
+                return [$offered + ['plugin' => 'ClinicTemplate']];
+            }),
+            $runs,
+            static fn (): TemplateApplier => new TemplateApplier($setup, $runs, static fn (): bool => true),
+            null,
+            null,
+            static fn (): string => 'en',
+        );
+        $request = new Request('POST', '/api/v1/workspace/templates/clinic/apply', ['content-type' => 'application/json'], '{}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+
+        self::assertSame(200, $handler->apply($request, ['key' => 'clinic'])->getStatusCode());
+        $contactsMade = $setup->count('POST /api/contacts');
+        self::assertSame(1, $contactsMade, 'Examples come with the first apply');
+        $setup->services = [['id' => 10, 'name' => ['en' => 'Consultation', 'ar' => 'استشارة']]];
+        $card = static fn (): array => json_decode($handler->list(new Request('GET', '/api/v1/workspace/templates'))->getBody(), true)['data']['templates'][0];
+        self::assertNull($card()['update'], 'Nothing new yet');
+
+        $offered = \Tests\Support\ExampleClinicTemplates::clinic(2, '25.00');
+        self::assertSame([
+            'from' => 1,
+            'to' => 2,
+            'parts' => [['key' => 'template:clinic', 'from' => 1, 'to' => 2]],
+            'changes' => [['version' => 2, 'summary' => 'Visits and an intake form']],
+        ], $card()['update']);
+
+        $plan = json_decode($handler->preview($request, ['key' => 'clinic'])->getBody(), true)['data'];
+        self::assertContains(['part' => 'services', 'key' => 'consultation', 'action' => 'changed'], $plan['items']);
+        self::assertSame(1, $plan['appliedVersion']);
+
+        self::assertSame(200, $handler->apply($request, ['key' => 'clinic'])->getStatusCode());
+        self::assertSame($contactsMade, $setup->count('POST /api/contacts'), 'An update adds no examples unless asked');
+        self::assertSame(0, $setup->count('PATCH /api/calendar/services/10'), 'Never changed on its own');
+        self::assertNull($card()['update'], 'Applied: nothing new');
+
+        $adopt = new Request('POST', '/api/v1/workspace/templates/clinic/items/services/consultation/adopt');
+        $adopt->user = (object) ['profile_id' => self::AMRO];
+        $answer = json_decode($handler->adoptItem($adopt, ['key' => 'clinic', 'part' => 'services', 'item' => 'consultation'])->getBody(), true)['data'];
+
+        self::assertSame('add', $answer['action']);
+        self::assertSame(2500, $setup->body('PATCH /api/calendar/services/10')['price_minor']);
+        $run = $runs->find(self::BAKERY, 'clinic');
+        self::assertNotNull($run);
+        $item = $runs->items(self::BAKERY, $run['id'])['service:consultation'];
+        self::assertSame(\Whity\Sdk\Templates\TemplateEngine::fingerprint($offered['services'][0]), $item['fingerprint']);
+    }
+
     public function testAChosenTemplatesSetupJoinsTheOnboardingsAndTheDashboard(): void
     {
         TenantContext::setTenantId(self::BAKERY);

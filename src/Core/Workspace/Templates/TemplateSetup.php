@@ -143,10 +143,14 @@ final class TemplateSetup
         if ($kind === 'booking') {
             $rules = $this->data('GET', '/api/calendar/settings');
             $out = [];
-            foreach (['min_notice_minutes', 'max_advance_days', 'reminder_hours_before'] as $key) {
+            foreach (['min_notice_minutes', 'max_advance_days'] as $key) {
                 if (is_int($rules[$key] ?? null)) {
                     $out[$key] = (string) $rules[$key];
                 }
+            }
+            // WHIT-1417: the reminders, as the choice's value ("24,2").
+            if (is_array($rules['reminders'] ?? null)) {
+                $out['reminders'] = implode(',', array_map('strval', $rules['reminders']));
             }
             if (is_bool($rules['instant_booking'] ?? null)) {
                 $out['instant_booking'] = $rules['instant_booking'];
@@ -353,10 +357,16 @@ final class TemplateSetup
     private function booking(array $body): bool
     {
         $rules = ['booking_page_enabled' => true];
-        foreach (['min_notice_minutes', 'max_advance_days', 'reminder_hours_before'] as $key) {
+        foreach (['min_notice_minutes', 'max_advance_days'] as $key) {
             if (is_numeric($body[$key] ?? null)) {
                 $rules[$key] = (int) $body[$key];
             }
+        }
+        // WHIT-1417: "24,2" → [24, 2]; an older form's one hour still works.
+        if (is_string($body['reminders'] ?? null)) {
+            $rules['reminders'] = \Whity\Core\Calendar\CalendarSettings::reminderHours($body['reminders']);
+        } elseif (is_numeric($body['reminder_hours_before'] ?? null)) {
+            $rules['reminder_hours_before'] = (int) $body['reminder_hours_before'];
         }
         if (array_key_exists('instant_booking', $body)) {
             $rules['instant_booking'] = in_array($body['instant_booking'], [true, 'true', '1', 1, 'on'], true);
@@ -457,10 +467,11 @@ final class TemplateSetup
                         $option('30', '1 month', 'شهر'),
                         $option('90', '3 months', '3 أشهر'),
                     ]],
-                    ['type' => 'select', 'name' => 'reminder_hours_before', 'label' => $t('Reminder', 'التذكير'), 'default' => '24', 'options' => [
-                        $option('2', '2 hours before', 'قبل ساعتين'),
+                    ['type' => 'select', 'name' => 'reminders', 'label' => $t('Reminders', 'التذكيرات'), 'default' => '24,2', 'options' => [
+                        $option('24,2', 'The day before and 2 hours before', 'قبل يوم وقبل ساعتين'),
                         $option('24', 'The day before', 'قبل يوم'),
-                        $option('48', 'Two days before', 'قبل يومين'),
+                        $option('2', '2 hours before', 'قبل ساعتين'),
+                        $option('48,2', 'Two days before and 2 hours before', 'قبل يومين وقبل ساعتين'),
                     ]],
                     ['type' => 'checkbox', 'name' => 'instant_booking', 'label' => $t('Bookings are confirmed at once', 'تُؤكَّد الحجوزات فوراً'), 'default' => true],
                 ], $t('Save and open the booking page', 'حفظ وفتح صفحة الحجز')),

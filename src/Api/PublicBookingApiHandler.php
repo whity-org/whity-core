@@ -375,6 +375,20 @@ final class PublicBookingApiHandler
         });
     }
 
+    /**
+     * The customer says they are coming (WHIT-1417, AP.15). The reminder links
+     * here through the page, which asks for the press; opening a link never
+     * answers for them.
+     *
+     * @param array<string, string> $params
+     */
+    public function coming(Request $request, array $params): Response
+    {
+        return $this->withLink($request, $params, function (int $tenantId, int $bookingId): Response {
+            return Response::json(['data' => self::forCustomer($this->booking->confirmByCustomer($tenantId, $bookingId))]);
+        });
+    }
+
     /** @param array<string, string> $params */
     public function cancel(Request $request, array $params): Response
     {
@@ -449,6 +463,7 @@ final class PublicBookingApiHandler
             'id' => $booking['id'],
             'status' => $booking['status'],
             'suggested' => ($booking['suggested_at'] ?? null) !== null,
+            'coming' => ($booking['confirmed_by_customer_at'] ?? null) !== null,
             'starts_at' => $booking['starts_at'],
             'ends_at' => $booking['ends_at'],
             'service' => [

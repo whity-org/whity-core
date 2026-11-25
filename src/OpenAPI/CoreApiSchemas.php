@@ -11194,6 +11194,7 @@ final class CoreApiSchemas
                 'id' => self::int(),
                 'status' => self::str() + ['enum' => ['pending_payment', 'requested', 'confirmed', 'cancelled', 'expired'], 'description' => '`requested`: the customer asked for this time and staff accept it first.'],
                 'suggested' => self::bool() + ['description' => 'The business suggested this time for the request; the customer can take it.'],
+                'coming' => self::bool() + ['description' => 'The customer already said they are coming (WHIT-1417).'],
                 'starts_at' => self::str(),
                 'ends_at' => self::str(),
                 'service' => self::object(['id' => self::int(true), 'name' => SchemaBuilder::ref('LocalizedLabel'), 'duration_minutes' => self::int(true)], ['id', 'name']),
@@ -11228,7 +11229,8 @@ final class CoreApiSchemas
                 'min_notice_minutes' => self::int(),
                 'max_advance_days' => self::int(),
                 'slot_step_minutes' => self::int(),
-                'reminder_hours_before' => self::int() + ['description' => '0 means no reminder.'],
+                'reminder_hours_before' => self::int() + ['description' => 'The first reminder\'s hours before; 0 means none. Kept for older clients: `reminders` lists them all.'],
+                'reminders' => ['type' => 'array', 'items' => self::int(), 'description' => 'Every reminder, as hours before the start, largest first; empty means none (WHIT-1417).'],
                 'payment_hold_minutes' => self::int(),
                 'week_start' => self::str(),
                 'weekend_days' => ['type' => 'array', 'items' => self::str()],
@@ -11242,7 +11244,8 @@ final class CoreApiSchemas
                 'min_notice_minutes' => self::int() + ['minimum' => 0, 'maximum' => 43200, 'description' => 'Least time between booking and start, in minutes.'],
                 'max_advance_days' => self::int() + ['minimum' => 1, 'maximum' => 730, 'description' => 'How many days ahead a booking may be made.'],
                 'slot_step_minutes' => self::int() + ['minimum' => 5, 'maximum' => 240, 'description' => 'Free times are offered every this many minutes.'],
-                'reminder_hours_before' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'Send one reminder this many hours before; 0 sends none.'],
+                'reminder_hours_before' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'Older clients: one reminder this many hours before; 0 sends none. Replaces `reminders`.'],
+                'reminders' => ['type' => 'array', 'maxItems' => 3, 'items' => self::int() + ['minimum' => 1, 'maximum' => 168], 'description' => 'Up to three reminders, as hours before the start, all different; empty sends none (WHIT-1417).'],
                 'payment_hold_minutes' => self::int() + ['minimum' => 1, 'maximum' => 1440, 'description' => 'How long a payment step holds a slot.'],
                 'week_start' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'], 'description' => 'The first day of the week in calendar views.'],
                 'weekend_days' => ['type' => 'array', 'items' => self::str() + ['enum' => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']], 'description' => 'Days shown as the weekend.'],
@@ -11471,10 +11474,18 @@ final class CoreApiSchemas
                 'room_id' => self::int(true) + ['description' => 'The room it holds.'],
                 'checked_in_at' => self::str(true) + ['description' => 'When the customer arrived.'],
                 'suggested_at' => self::str(true) + ['description' => 'When staff suggested this time for a request.'],
-                'reminder_sent_at' => self::str(true),
+                'reminder_sent_at' => self::str(true) + ['description' => 'When the last reminder went.'],
+                'confirmed_by_customer_at' => self::str(true) + ['description' => 'When the customer pressed I\'m coming (WHIT-1417).'],
+                'reminders' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingReminder'), 'description' => 'Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14).'],
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
+            'CalendarBookingReminder' => self::object([
+                'hours_before' => self::int() + ['description' => 'Which reminder: this many hours before the start.'],
+                'channel' => self::str() + ['description' => '`email`, or the text channel\'s key (such as `whatsapp`).'],
+                'outcome' => self::str() + ['enum' => ['sent', 'failed', 'no_address'], 'description' => '`no_address`: the booking has no email, or no phone for a text channel.'],
+                'sent_at' => self::str(true),
+            ], ['hours_before', 'channel', 'outcome', 'sent_at']),
             'CalendarBookingCreateRequest' => self::object([
                 'service_id' => self::int() + ['description' => 'The service to book. Leave out when sending `services`.'],
                 'services' => ['type' => 'array', 'minItems' => 1, 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarBookingServiceChoice'), 'description' => 'Several services back to back, in order, as one booking, when the calendar setting `multi_service_booking` is on (WHIT-1173). Each may name its own person.'],
@@ -20085,6 +20096,15 @@ final class CoreApiSchemas
                     422 => self::errorResponse('No suggested time to take'),
                 ] + $limits,
             ]),
+            $route('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/coming', [
+                'summary' => 'The customer says they are coming (public, WHIT-1417); pressing it again changes nothing',
+                'parameters' => [$token],
+                'responses' => [
+                    200 => self::jsonResponse('Noted', self::dataEnvelope(SchemaBuilder::ref('PublicBooking'))),
+                    404 => self::errorResponse('This link is invalid or has expired'),
+                    409 => self::errorResponse('The booking is not confirmed'),
+                ] + $limits,
+            ]),
             $route('GET', '/api/public/bookings/{token:[a-f0-9]{64}}/ics', [
                 'summary' => 'The booking as an .ics file to add to a calendar (public)',
                 'parameters' => [$token],
@@ -21117,6 +21137,16 @@ final class CoreApiSchemas
                     404 => self::errorResponse('There is no such template'),
                 ] + self::authErrors(),
             ]),
+            // WHIT-1413 (SDK 1.170).
+            self::permissionRoute('POST', '/api/workspace/templates/{key:[a-z][a-z0-9-]*}/items/{part:services|roles|forms|documents|pipelines}/{item:[a-z][a-z0-9-]*}/adopt', 'settings:write', [
+                'summary' => 'Use the template\'s version of one item',
+                'description' => 'For an item an earlier run of this template made and the template has changed since (preview action changed): changes only what the template sets on it, as the caller, and deletes nothing. A service takes its names, duration and price; a form gets the template\'s labels and its missing questions; a role gets the template\'s missing permissions the caller holds; a document gets a new copy beside the workspace\'s; a pipeline (SDK 1.172) gets a new review route, and its form moves to it only while the form still uses the route the template made.',
+                'tags' => ['platform-ops'],
+                'responses' => [
+                    200 => self::jsonResponse('add when it was changed, keep when it already matched, skip with why', 'AdoptWorkspaceTemplateItemResponse'),
+                    404 => self::errorResponse('There is no such template'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('DELETE', '/api/workspace/templates/examples', 'settings:write', [
                 'summary' => 'Remove the example contacts and bookings a template added',
                 'description' => 'Cancels the example bookings and archives the example contacts still in the workspace, as the caller. Nothing else is touched.',
@@ -21317,6 +21347,7 @@ final class CoreApiSchemas
                 'offer' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateOffer')]],
                 'theme' => ['nullable' => true, 'allOf' => [SchemaBuilder::ref('WorkspaceTemplateTheme')], 'description' => 'The theme the template suggests, when this workspace has it (SDK 1.131)'],
                 'chosen' => self::bool(),
+                'update' => array_merge(SchemaBuilder::ref('WorkspaceTemplateUpdate'), ['nullable' => true, 'description' => 'What is new since this workspace applied it (SDK 1.170); null when nothing is or it was never applied']),
             ], ['key', 'version', 'name', 'summary', 'setsUp', 'hasExamples', 'hasSetup', 'chosen']),
             'WorkspaceTemplateListResponse' => self::object([
                 'data' => self::object([
@@ -21338,10 +21369,29 @@ final class CoreApiSchemas
                     'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('WorkspaceTemplateItem'), 'description' => 'Each item of the template and what happened to it (SDK 1.169)'],
                 ], ['template', 'made', 'skipped']),
             ], ['data']),
+            'AdoptWorkspaceTemplateItemResponse' => self::object([
+                'data' => self::object([
+                    'template' => self::str(),
+                    'part' => self::str(),
+                    'key' => self::str(),
+                    'action' => self::str() + ['enum' => ['add', 'keep', 'skip']],
+                    'reason' => self::str(),
+                ], ['template', 'part', 'key', 'action']),
+            ], ['data']),
+            'WorkspaceTemplateUpdate' => self::object([
+                'from' => self::int() + ['description' => 'The template\'s version this workspace applied last'],
+                'to' => self::int() + ['description' => 'The version on offer'],
+                'parts' => ['type' => 'array', 'items' => self::object([
+                    'key' => self::str() + ['description' => 'template:{key}, extends:{key} or extension:{plugin}.{key}'],
+                    'from' => self::int() + ['nullable' => true, 'description' => 'Null for a part this workspace never applied, such as a new extension'],
+                    'to' => self::int(),
+                ], ['key', 'from', 'to'])],
+                'changes' => ['type' => 'array', 'items' => self::object(['version' => self::int(), 'summary' => self::str() + ['nullable' => true]], ['version', 'summary'])],
+            ], ['from', 'to', 'parts', 'changes']),
             'WorkspaceTemplateItem' => self::object([
                 'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents or examples'],
                 'key' => self::str() + ['description' => 'The template\'s key for the item'],
-                'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; left: not ticked; skip: not done, see reason'],
+                'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'changed', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template\'s version, SDK 1.170); left: not ticked; skip: not done, see reason'],
                 'reason' => self::str(),
             ], ['part', 'key', 'action']),
             'PreviewWorkspaceTemplateResponse' => self::object([

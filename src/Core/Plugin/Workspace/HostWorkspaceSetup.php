@@ -41,6 +41,18 @@ final class HostWorkspaceSetup implements WorkspaceSetup
         'POST /api/document-sources',
         'POST /api/contacts/{id}/archive',
         'POST /api/calendar/bookings/{id}/cancel',
+        // SDK 1.170 (WHIT-1413): "Use the template's version" of a form adds
+        // the template's missing questions and updates its labels; nothing
+        // is deleted.
+        'GET /api/forms/{id}/fields',
+        'POST /api/forms/{id}/fields',
+        'PATCH /api/forms/{id}/fields/{fieldId}',
+        // SDK 1.172 (WHIT-1419): a template's pipelines become review routes
+        // in Flows, attached to a form that has none yet.
+        'GET /api/forms/{id}',
+        'PATCH /api/forms/{id}',
+        'POST /api/document-route-templates',
+        'PUT /api/document-route-templates/{id}/graph',
     ];
 
     /** @param list<string> $extraRoutes */

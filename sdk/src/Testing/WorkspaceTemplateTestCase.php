@@ -7,6 +7,7 @@ namespace Whity\Sdk\Testing;
 use PHPUnit\Framework\TestCase;
 use Whity\Sdk\Manifest\WorkspaceTemplateValidator;
 use Whity\Sdk\Templates\MemoryLedger;
+use Whity\Sdk\Templates\TemplateComposer;
 use Whity\Sdk\Templates\TemplateEngine;
 
 /**
@@ -135,7 +136,7 @@ abstract class WorkspaceTemplateTestCase extends TestCase
         $this->applyTemplate($new, $workspace, $ledger);
         $after = $workspace->snapshot();
 
-        foreach (['services', 'roles', 'forms', 'documents', 'contacts', 'bookings'] as $kind) {
+        foreach (['services', 'roles', 'forms', 'documents', 'routes', 'contacts', 'bookings'] as $kind) {
             foreach ($before[$kind] as $id => $row) {
                 self::assertArrayHasKey($id, $after[$kind], "The upgrade deleted {$kind} #{$id}");
                 self::assertEquals($row, $after[$kind][$id], "The upgrade overwrote {$kind} #{$id}");
@@ -151,6 +152,60 @@ abstract class WorkspaceTemplateTestCase extends TestCase
         self::assertSame($expected, $newServices, $deletedServices > 0
             ? 'The upgrade should add only the services new in this version, not bring back deleted ones'
             : 'The upgrade should add exactly the services new in this version');
+    }
+
+    /**
+     * Compose templates and extensions as core does before offering them
+     * (SDK 1.170), and return the one with this key.
+     *
+     * @param list<array<string, mixed>> $templates
+     * @param list<array<string, mixed>> $extensions each with `plugin`
+     * @return array<string, mixed>
+     */
+    protected function composed(string $key, array $templates, array $extensions = []): array
+    {
+        $result = TemplateComposer::compose($templates, $extensions);
+        foreach ($result['templates'] as $template) {
+            if ($template['key'] === $key) {
+                return $template;
+            }
+        }
+        self::fail("Template {$key} is not offered: " . implode('; ', $result['notes']));
+    }
+
+    /**
+     * A template built on another (`extends`) composes into a valid
+     * template that applies cleanly and twice safely.
+     *
+     * @param array<string, mixed> $child
+     * @param array<string, mixed> $parent
+     */
+    protected function assertExtends(array $child, array $parent): void
+    {
+        self::assertSame($parent['key'], $child['extends'] ?? null, 'The child names its parent in extends');
+        $this->assertTemplateValid($child);
+        $this->assertTemplateValid($parent);
+        $composed = $this->composed((string) $child['key'], [$parent, $child]);
+        self::assertContains('extends:' . $parent['key'], array_column(TemplateComposer::parts($composed), 'key'));
+        $this->assertIdempotent($composed);
+    }
+
+    /**
+     * An extension is valid, is added to its target whole (nothing of it left
+     * out), and the result applies cleanly and twice safely.
+     *
+     * @param array<string, mixed> $extension
+     * @param array<string, mixed> $target
+     */
+    protected function assertExtension(array $extension, array $target, string $plugin = 'MyPlugin'): void
+    {
+        self::assertSame([], WorkspaceTemplateValidator::extensionErrors($extension), 'The extension fails core\'s check');
+        self::assertSame($target['key'], $extension['target'] ?? null, 'The extension names its target');
+        $result = TemplateComposer::compose([$target], [$extension + ['plugin' => $plugin]]);
+        self::assertSame([], $result['notes'], 'Part of the extension was left out');
+        $composed = $this->composed((string) $target['key'], [$target], [$extension + ['plugin' => $plugin]]);
+        self::assertContains("extension:{$plugin}.{$extension['key']}", array_column(TemplateComposer::parts($composed), 'key'));
+        $this->assertIdempotent($composed);
     }
 
     /**

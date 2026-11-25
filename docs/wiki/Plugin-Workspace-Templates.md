@@ -40,9 +40,12 @@ Checked by `Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors()`. A template
 | `roles` | no | Up to 6: `key`, `name`, `description`, `permissions` (slugs) |
 | `forms` | no | Up to 5: `key` (the form key), `name`, `description`, `fields` (`key`, `type`, `label`, `help`, `required`, `options` for select and multiselect), `publish` |
 | `documents` | no | Up to 5: `key`, `kind` (`note`, `letter`, `template`, `label`), `title`, `blocks` as `{en: [...], ar: [...]}` editor blocks |
+| `pipelines` | no | SDK 1.172: up to 5 review routes in Flows for the template's forms, see below |
 | `examples` | no | Up to 10 `contacts` (`key`, `name`, an `@example.com` `email`, `phone`, `notes`) and 10 `bookings` (`key`, `service`, `contact`, `inDays` 1-14, `time` HH:MM) |
 | `setup` | no | The guided setup: `title`, `description`, and 1 to 8 `steps`, each an `id`, a `kind`, a `title` and a `why` |
 | `theme` | no | The theme that suits this business, by id (`templates.market`), usually one your plugin ships with `PluginThemesInterface` (SDK 1.125). SDK 1.131: older hosts refuse a manifest with it, so require `^1.131`. See below |
+| `extends`, `remove`, `hidesParent` | no | SDK 1.170: build on another template, see below |
+| `changes` | no | SDK 1.170: up to 20 `{version, summary}`, newest first, what each version added |
 | `offer` | no | `plugin` (the name of the plugin made for this business), `trialDays` (1 to 90, the trial started from the template's setup), and `free` and `paid`: 1 to 6 lines each. Hidden until that plugin is installed and paid, so a template can carry its offer before the plugin exists |
 
 ### Guided setup step kinds
@@ -104,6 +107,96 @@ final class ClinicTemplateTest extends WorkspaceTemplateTestCase
 ```
 
 `applyTemplate($manifest, $workspace, $ledger, examples: true)` applies it to a `Testing\FakeWorkspace`, a workspace in memory that answers the routes a template uses as core does (same-name services are one, role names and form keys are unique, settings remember which were chosen). Give it `permissions: [...]` to apply as someone who holds less, or `refuse('POST /api/roles')` to refuse a route. Its rows are public arrays (`services`, `roles`, `forms`, `documents`, `contacts`, `bookings`), so a test can act as the person between two applies.
+
+## Templates from plugin.json (SDK 1.170)
+
+A template plugin needs no PHP. List the files in `plugin.json` and extend `Whity\Sdk\Manifest\ManifestPlugin`:
+
+```json
+{
+  "manifest": "whity.plugin/1",
+  "plugin": {"name": "ClinicTemplate", "version": "1.0.0"},
+  "requires": {"sdk": "^1.170"},
+  "workspaceTemplates": ["templates/clinic.json"],
+  "themes": ["themes/clinic.json"]
+}
+```
+
+`whity-cli plugin validate <dir>` checks each file offline.
+
+## Building on a template (SDK 1.170)
+
+A template can build on another with `extends`. For example, a Dental template on Clinic:
+
+```json
+{"key": "dental", "version": 1, "extends": "clinic", "remove": {"services": ["check-up"]}, "name": {...}, "summary": {...}, "setsUp": [...],
+ "services": [{"key": "cleaning", ...}]}
+```
+
+- **Lists merge by key.** `services`, `roles`, `forms`, `documents`, the example `contacts` and `bookings`, and `setup.steps` (by `id`) all merge by key. The parent's items come first. A child item with the same key takes the parent item's place, and the child's new items come after. `remove` drops parent items by key: `services`, `roles`, `forms`, `documents` or `steps`.
+- **Settings merge key by key.** For `settings` and `calendar.settings`, the child's value wins.
+- **What stays the child's own.** `name`, `summary`, `icon`, `setsUp`, `version` and `changes` are always the child's. `calendar.hours`, `offer`, `theme` and the setup's title are the child's when it has them, otherwise the parent's.
+- **Hiding the parent.** `"hidesParent": true` hides the parent's card wherever the child is offered.
+- **References.** The child may point at the parent's services and example contacts. They are checked on the composed template.
+- **Limits.** At most three levels. A child whose parent isn't offered in the workspace, or that builds a loop, is left out with the reason. The child's plugin should list the parent's plugin in `getPluginDependencies()`.
+
+The Dental example lives in core's tests (`tests/Support/ExampleClinicTemplates.php`), not in the store.
+
+## Adding to another plugin's template (SDK 1.170)
+
+A plugin adds pieces to another plugin's template with `Contribute\PluginWorkspaceTemplateExtensionsInterface`, or with `"workspaceTemplateExtensions": ["templates/clinic-patient-file.json"]` in `plugin.json`:
+
+```json
+{"key": "patient-file", "version": 1, "target": "clinic",
+ "setsUp": [{"en": "A file for each patient", "ar": "ملف لكل مريض"}],
+ "forms": [{"key": "visit-notes", ...}]}
+```
+
+An extension only adds: `setsUp` lines, `services`, `roles`, `forms`, `documents`, `examples` and `setup.steps`.
+
+- It applies to its target, and to every template built on the target, wherever its plugin is on.
+- If the template already has an item with the same key, that item from the extension is left out.
+- If the extension would make the template invalid, the whole extension is left out and the template is offered without it.
+- Each extension is its own part, with its own `version`.
+
+## Versions and updates (SDK 1.170; decisions WT.2, WT.3)
+
+Bump `version` on every change, and say what changed in `changes`, newest first: `[{"version": 2, "summary": {"en": "...", "ar": "..."}}]`. Keys are forever: renaming a key makes a new item.
+
+- **Recorded on every run.** Each run records the version of every part (`template:clinic`, `extends:clinic`, `extension:Clinics.patient-file`). Each item the run makes also records a fingerprint of the manifest entry it came from.
+- **The update offer.** `GET /api/workspace/templates` shows `update` on a chosen card when any part is newer, or when a part is new (such as a new extension). It lists the parts with `from` and `to`, and the `changes` lines.
+- **Never automatic.** Applying again adds only the new pieces. An update adds no examples unless asked, and none after the person removed them.
+- **Changed items.** An item the template has changed since it was made is reported `changed` in the preview and the apply answer, and left exactly as the workspace has it.
+- **Use the template's version.** `POST /api/workspace/templates/{key}/items/{part}/{item}/adopt` (`settings:write`) applies the template's version to that one item, as the person. It changes only what the template sets, and deletes nothing:
+  - a service gets its names, duration and price in the workspace's currency;
+  - a form gets the template's labels and help, plus the questions it is missing (the person's own questions stay);
+  - a role gets the template's permissions it is missing, only those the person holds;
+  - a document gets a new copy beside the workspace's;
+  - a pipeline gets a new review route named with the template's version ("Intake review, version 2"). Its form moves to the new route only while it still uses the route the template made; the old route stays in Flows.
+- **Nothing comes back.** An item the person deleted is never made again and has nothing to adopt.
+
+## Pipelines: review routes in Flows (SDK 1.172)
+
+A pipeline is a review route in Flows for one of the template's forms: each answer to the form goes through its stages in order. Each stage is a decision by the people holding one of the template's roles; an approval moves it on to the next stage.
+
+```json
+"pipelines": [{
+  "key": "intake-review",
+  "name": {"en": "Intake review", "ar": "مراجعة الاستقبال"},
+  "description": {"en": "Reception checks each intake, then a doctor approves it.", "ar": "يدقق الاستقبال كل نموذج ثم يعتمده الطبيب."},
+  "for": {"form": "patient-intake"},
+  "stages": [
+    {"key": "reception", "name": {"en": "Reception checks", "ar": "تدقيق الاستقبال"}, "role": "reception"},
+    {"key": "doctor", "name": {"en": "Doctor approves", "ar": "اعتماد الطبيب"}, "role": "doctor", "sendBack": false}
+  ]
+}]
+```
+
+- `for.form` is the key of one of the template's forms, and each stage's `role` the key of one of its roles. People are never named. A stage cannot name a permission, as Flows routes by role.
+- Up to 5 pipelines, each with 1 to 8 stages. `sendBack: false` stops that stage sending an answer back to the person who sent it.
+- **Applying** makes the route template as the person, through core's own route-template API, and sends the form's answers through it when the form has no route yet. A route the person already chose for the form stays, and the preview says so. The person needs `route_templates:write`; without it, the pipeline is skipped with the reason and everything else is still made.
+- Pipelines compose by key like the other lists: a template built on another can drop one with `remove.pipelines`, and an extension can add one for its target's forms and roles.
+- Older hosts refuse a manifest with `pipelines`, so require `^1.172`.
 
 ## The theme
 

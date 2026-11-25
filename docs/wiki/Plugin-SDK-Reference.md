@@ -166,6 +166,7 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginDashboardInterface`, `PluginHomeCardInterface` | Dashboard setup points and widgets; the older single home card (deprecated 1.124, D5: use a `stat` widget) | [Plugin-Dashboard](Plugin-Dashboard.md) |
 | `PluginOnboardingInterface` | A guided setup | sdk/README |
 | `PluginWorkspaceTemplatesInterface` | Workspace templates | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
+| `Contribute\PluginWorkspaceTemplateExtensionsInterface` | Pieces added to another plugin's workspace template (1.170) | [Plugin-Workspace-Templates](Plugin-Workspace-Templates.md) |
 | `PluginWorkspaceLifecycleInterface` | Called when the plugin is turned on or off in a workspace | Workspace-Plugins |
 | `PluginInstallLifecycleInterface` | Called once when the plugin is installed and once per upgrade, after its migrations (1.152) | [Plugin-Development](Plugin-Development.md) |
 | `Contribute\PluginCapabilitiesInterface` | The context services and own tables the plugin uses (1.151) | [Plugin-Development](Plugin-Development.md) |

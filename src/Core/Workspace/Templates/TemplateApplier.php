@@ -63,6 +63,18 @@ final class TemplateApplier
     }
 
     /**
+     * "Use the template's version" of one item an earlier run made (SDK 1.170,
+     * WHIT-1413).
+     *
+     * @param array<string, mixed> $template
+     * @return array{action: string, reason?: string}
+     */
+    public function adopt(int $tenantId, int $profileId, array $template, string $part, string $itemKey): array
+    {
+        return (new TemplateEngine($this->api, $this->runs, $this->holds, $this->clock))->adopt($tenantId, $profileId, $template, $part, $itemKey);
+    }
+
+    /**
      * Archive or cancel the examples still in the workspace, as the person.
      *
      * @return array{removed: int, failed: int}

@@ -13,6 +13,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Core\Workspace\Templates\TemplateApplier;
 use Whity\Core\Workspace\Templates\TemplateCatalogue;
 use Whity\Core\Workspace\Templates\TemplateRuns;
+use Whity\Sdk\Templates\TemplateComposer;
 use Whity\Core\Workspace\Templates\TemplateSetup;
 use Whity\Http\JsonBody;
 
@@ -39,6 +40,7 @@ final class WorkspaceTemplatesApiHandler
 {
     public const AUDIT_APPLIED = 'workspace_template.applied';
     public const AUDIT_EXAMPLES_REMOVED = 'workspace_template.examples_removed';
+    public const AUDIT_ITEM_ADOPTED = 'workspace_template.item_adopted';
 
     /** A workspace this new, with no template yet, is sent to the picker after sign-in. */
     public const PICKER_DAYS = 14;
@@ -388,6 +390,7 @@ final class WorkspaceTemplatesApiHandler
                     'offer' => $this->offer($template, $tenantId, $language),
                     'theme' => $this->theme($template, $tenantId, $language),
                     'chosen' => in_array($template['key'], $chosen, true),
+                    'update' => $this->update($template, $tenantId, $language),
                 ];
             }
 
@@ -413,7 +416,8 @@ final class WorkspaceTemplatesApiHandler
                 return Response::error('There is no such template.', 404);
             }
             $body = JsonBody::parsed($request);
-            $examples = ($body['examples'] ?? true) !== false;
+            // Examples come with a first apply; an update adds them only when asked (SDK 1.170).
+            $examples = ($body['examples'] ?? ($this->runs->find($tenantId, (string) $template['key']) === null)) !== false;
             // The template's theme is offered on by default; only one installed here is set.
             $theme = ($body['theme'] ?? true) !== false ? ($this->theme($template, $tenantId, $this->language())['id'] ?? null) : null;
 
@@ -454,9 +458,9 @@ final class WorkspaceTemplatesApiHandler
                 return Response::error('There is no such template.', 404);
             }
             $body = JsonBody::parsed($request);
-            $examples = ($body['examples'] ?? true) !== false;
-            $theme = ($body['theme'] ?? true) !== false ? ($this->theme($template, $tenantId, $this->language())['id'] ?? null) : null;
             $run = $this->runs->find($tenantId, (string) $template['key']);
+            $examples = ($body['examples'] ?? ($run === null)) !== false;
+            $theme = ($body['theme'] ?? true) !== false ? ($this->theme($template, $tenantId, $this->language())['id'] ?? null) : null;
             $result = ($this->applier)()->preview($tenantId, $profileId, $template, $examples, $theme);
 
             return Response::json(['data' => [
@@ -468,6 +472,83 @@ final class WorkspaceTemplatesApiHandler
                 'items' => $result['items'],
             ]]);
         });
+    }
+
+    /**
+     * "Use the template's version" of one item an earlier run made (SDK
+     * 1.170; decisions WT.2, WT.3): changes only what the template sets on
+     * it, as the caller, and deletes nothing.
+     *
+     * @param array<string, string> $params
+     */
+    public function adoptItem(Request $request, array $params = []): Response
+    {
+        return $this->inWorkspace(function (int $tenantId) use ($request, $params): Response {
+            $profileId = self::profileId($request);
+            if ($profileId === null) {
+                return Response::error('Sign in to change a template\'s items.', 401);
+            }
+            $template = $this->catalogue->find((string) ($params['key'] ?? ''));
+            if ($template === null) {
+                return Response::error('There is no such template.', 404);
+            }
+            $part = (string) ($params['part'] ?? '');
+            $item = (string) ($params['item'] ?? '');
+            $result = ($this->applier)()->adopt($tenantId, $profileId, $template, $part, $item);
+            if ($result['action'] === 'add') {
+                $this->audit?->record(self::AUDIT_ITEM_ADOPTED, [
+                    'tenant_id' => $tenantId,
+                    'actor_user_id' => $profileId,
+                    'target_type' => 'workspace_template',
+                    'metadata' => ['template' => $template['key'], 'version' => $template['version'], 'part' => $part, 'item' => $item],
+                ]);
+            }
+
+            return Response::json(['data' => ['template' => $template['key'], 'part' => $part, 'key' => $item] + $result]);
+        });
+    }
+
+    /**
+     * What is new in a template this workspace applied: each part whose
+     * version on offer is newer than the one applied here (or that it never
+     * applied, such as a new extension), and the `changes` lines of those
+     * versions. Null when nothing is new or the workspace never applied it.
+     *
+     * @param array<string, mixed> $template
+     * @return array{from: int, to: int, parts: list<array{key: string, from: ?int, to: int}>, changes: list<array{version: int, summary: ?string}>}|null
+     */
+    private function update(array $template, int $tenantId, string $language): ?array
+    {
+        $run = $this->runs->find($tenantId, (string) $template['key']);
+        if ($run === null) {
+            return null;
+        }
+        $recorded = $this->runs->parts($tenantId, $run['id']);
+        $parts = [];
+        $changes = [];
+        foreach (TemplateComposer::parts($template) as $part) {
+            $from = $recorded[$part['key']] ?? null;
+            if ($from !== null && $from >= $part['version']) {
+                continue;
+            }
+            $parts[] = ['key' => $part['key'], 'from' => $from, 'to' => $part['version']];
+            foreach ($part['changes'] as $change) {
+                $at = (int) ($change['version'] ?? 0);
+                if ($at > ($from ?? 0)) {
+                    $changes[] = ['version' => $at, 'summary' => self::text($change['summary'] ?? null, $language)];
+                }
+            }
+        }
+        if ($parts === []) {
+            return null;
+        }
+
+        return [
+            'from' => $recorded['template:' . $template['key']] ?? $run['version'],
+            'to' => (int) $template['version'],
+            'parts' => $parts,
+            'changes' => $changes,
+        ];
     }
 
     public function removeExamples(Request $request): Response

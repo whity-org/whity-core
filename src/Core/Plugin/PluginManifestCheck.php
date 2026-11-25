@@ -78,6 +78,28 @@ final class PluginManifestCheck
             }
         }
 
+        // SDK 1.170 (WHIT-1413): workspace templates and extensions as files.
+        foreach (['workspaceTemplates' => 'errors', 'workspaceTemplateExtensions' => 'extensionErrors'] as $key => $check) {
+            $files = $manifest[$key] ?? null;
+            if (!is_array($files) || !array_is_list($files)) {
+                continue;
+            }
+            foreach ($files as $i => $name) {
+                if (!is_string($name) || str_contains($name, '..')) {
+                    continue; // ManifestValidator already named it.
+                }
+                $path = dirname($file) . DIRECTORY_SEPARATOR . $name;
+                $decoded = is_file($path) ? json_decode((string) file_get_contents($path), true) : null;
+                if (!is_array($decoded)) {
+                    $errors[] = "{$key}[{$i}]: {$name} " . (is_file($path) ? "isn't valid JSON" : "doesn't exist");
+                    continue;
+                }
+                foreach (\Whity\Sdk\Manifest\WorkspaceTemplateValidator::$check($decoded) as $error) {
+                    $errors[] = "{$key}[{$i}] ({$name}): {$error}";
+                }
+            }
+        }
+
         $result['errors'] = $errors;
         $result['ok'] = $errors === [];
 
