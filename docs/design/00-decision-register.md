@@ -1149,5 +1149,36 @@ The owner, 25 November 2026: "we want FTA rates and better appointment system, s
 | AP.30 | Phone and Arabic | Under 640px the desk is the List with 48px rows, Check in on the row and the rest in a sheet, Add walk-in on its plane, 17px text. Every string has Arabic; Western digits for times, rates and amounts; ranges written "من 10:00 إلى 10:30". Messages are in the customer's language |
 | AP.31 | Screens without cards | The desk, reports, waitlist, visit record and plans are built as core screens from `TplCalendarStaff`, `TplCalendarWeek` and the Pw cards until the brand team's cards arrive (Q14) |
 
+## Customer area (proposed 25 November 2026, waiting for the owner)
+
+The owner, 25 November 2026: "for lms student facing pages is very big point for whity and can be generalized for lot's of applications". Specified in section 41 (`41-customer-area.md`, WHIT-1414): a signed-in place in the workspace's brand where a customer sees their bookings, bills and messages, and plugins add tabs through `Contribute\PluginCustomerScreensInterface`. **Proposed, not decided:** these rows wait for the owner's answers to section 41 §16.
+
+| # | Decision | Proposed |
+| --- | --- | --- |
+| CA.1 | Address | `/@handle` is the front door; a signed-in customer goes to Home, everyone else sees the workspace page with Sign in; tabs at `/@handle/home`, `/bookings`, `/bills`, `/messages`, `/account`, plugin screens at `/@handle/x/{id}`; the handle never decides access |
+| CA.2 | Brand | The workspace's logo, name and main colour on every screen, from the public-page brand; "Built on Whity" only at the foot of Account, removable for free |
+| CA.3 | Own domain | Later (CA6): the area at the root of the workspace's own host once sign-in works there; `/@handle` redirects |
+| CA.4 | Install | A manifest per workspace (`/@handle/` scope), named and iconed as the workspace (PW.11) |
+| CA.5 | Sign-in | `/@handle/sign-in` in the workspace's brand; Whity ID only on Whity Cloud (BM.12); the install's own methods when self-hosted; return to the page asked for |
+| CA.6 | Joining | Join in one tap when sign-up is open, Ask to join with approval, a plain message when off; staff can Invite to their account from a contact in any mode |
+| CA.7 | Staff as customers | The area always shows the person as a customer of the workspace in the address, capped, own records only; "Open the team app" when they are staff |
+| CA.8 | Links stay | Token links keep working without an account; emails add "See it in your account" |
+| CA.9 | Whose records | Records whose `contact_id` is a contact with `profile_id` = the person; contacts link at join, by invitation, by hand, or automatically on a verified email or phone only |
+| CA.10 | Customer API | `/api/v1/customer-area/{handle}/…`, every query filtered in core by tenant and the person's contacts; another customer's id answers 404 |
+| CA.11 | Desktop navigation | Top bar: logo and name, tabs, account menu; no sidebar; More after 6 tabs |
+| CA.12 | Phone navigation | Phone tab bar, up to 5; above 5: Home, 3 tabs, More (Account first) |
+| CA.13 | When a tab shows | Only with a reason: Bookings when booking is on or they have one; Bills when they have a document; Messages when chat is on or they have a conversation; plugin tabs when they hold the permission; the workspace can hide core tabs except Home and Account |
+| CA.14 | Home | Waiting for you, Next booking, latest message, plugin cards, quick actions; plain empty state |
+| CA.15 | Bills | One list of quotes, invoices, receipts, credit notes and orders with a Kind filter; Pay now only with a payment plugin, How to pay otherwise |
+| CA.16 | Messages | The customer's own conversations, signed in, using the public chat parts; agents still go through approvals |
+| CA.17 | Plugin screens | `Contribute\PluginCustomerScreensInterface::getCustomerScreens()`: `placement` tab, home or page; `screen` blocks or embed; a customer-grade `requiredPermission`; optional `count` and `fullScreen` |
+| CA.18 | Plugin own records | Deny by default: only routes declared `customer: true` with a customer-grade permission are callable from the area; core hands the plugin the customer's contacts (`Http\CustomerCall`); the test kit's isolation check must pass for Verified plugins; frame tokens are bound to the customer audience |
+| CA.19 | Plugin Home cards | Plugins add Home cards by `placement: home` and one-customer "Waiting for you" items through `CustomerAreaNotifier` |
+| CA.20 | Phone layout | PW rules: bottom bar, 17px rows of 48px, filters as sheets, actions in a bottom bar, full-screen frames under a slim Close bar |
+| CA.21 | Arabic | i18n domain `customer`; customer's language, else the workspace's, else the browser's; Western digits; mirrored bar |
+| CA.22 | Settings | Settings › Customer area: on or off, tabs and order, plugin screens, welcome line, How to pay, Preview as a customer, the address and QR |
+| CA.23 | Words | Staff say "Customer area" (منطقة العملاء); customers see the business's name and "Your account" (حسابك); tabs Home, Bookings, Bills, Messages, Account |
+| CA.24 | Price | Core and free on every plan and self-hosted; customers who sign in count on Whity Cloud's customer meter (BM.3); taking money online needs a payment plugin (BM.16) |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
