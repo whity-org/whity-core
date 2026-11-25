@@ -24,6 +24,19 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   requestHeaders.set('x-nonce', nonce);
   requestHeaders.set('content-security-policy-report-only', policy);
 
+  // HD.5 and the customer area (WHIT-1416, design section 41): `/@handle` and
+  // everything under it is served by `app/w/[handle]`. Next reads an `@`
+  // folder as a parallel-route slot, so the address people share is rewritten
+  // here instead. The handle only names the workspace; the API decides access.
+  const area = customerAreaPath(request.nextUrl.pathname);
+  if (area !== null) {
+    const target = new URL(area + request.nextUrl.search, request.url);
+    const rewritten = NextResponse.rewrite(target, { request: { headers: requestHeaders } });
+    rewritten.headers.set('Content-Security-Policy-Report-Only', policy);
+
+    return rewritten;
+  }
+
   const response = isPathHidden(request.nextUrl.pathname, await hiddenIdsForGuard())
     // A path no route answers: Next renders the app's not-found page.
     ? NextResponse.rewrite(new URL('/_whity/hidden', request.url), { status: 404, request: { headers: requestHeaders } })
@@ -31,6 +44,20 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   response.headers.set('Content-Security-Policy-Report-Only', policy);
 
   return response;
+}
+
+/**
+ * `/@example-bakery/bills` → `/w/example-bakery/bills`; null for any other
+ * path. The handle follows HD.1's shape (lower case, digits, hyphens), so an
+ * odd `@` path is left alone and gets the normal not-found page.
+ */
+export function customerAreaPath(pathname: string): string | null {
+  const match = /^\/@([a-z0-9][a-z0-9-]{0,63})(\/[A-Za-z0-9/_.-]*)?$/.exec(pathname);
+  if (match === null) {
+    return null;
+  }
+
+  return `/w/${match[1]}${match[2] ?? ''}`.replace(/\/$/, '');
 }
 
 export const config = {

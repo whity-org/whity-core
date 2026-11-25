@@ -66,6 +66,7 @@
     "owners": "/admin/settings/owners",
     "signup": "/admin/settings/signup",
     "customer-signup": "/admin/settings/customer-signup",
+    "customer-area": "/admin/settings/customer-area",
     "sso": "/admin/settings/sso",
     "email": "/admin/settings/email",
     "public-forms": "/admin/settings/public-forms",

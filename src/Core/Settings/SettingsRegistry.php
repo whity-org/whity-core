@@ -1026,6 +1026,26 @@ final class SettingsRegistry
     //     is posted (WHIT-1318 A3a); 0 means none.
     public const ACCOUNTING_BILL_ROUTE_TEMPLATE_ID = 'accounting.bill_route_template_id';
 
+    // ---- The customer area (WHIT-1416, design section 41, CA.22) ----
+    //   - enabled: whether the workspace's customers can sign in to their own
+    //     area at /@handle (on, Q2).
+    //   - hidden_tabs: a JSON list of the core tabs the workspace hides, from
+    //     bookings, bills and messages; Home and Account always show.
+    //   - tab_order: a JSON list of those tabs in the order the workspace
+    //     wants them between Home and Account; empty keeps the default.
+    //   - welcome_*: a line on Home, in English and Arabic.
+    //   - how_to_pay_*: how a customer pays an invoice by hand, in English and
+    //     Arabic, shown when no payment plugin takes the money (CA.15).
+    public const CUSTOMER_AREA_ENABLED = 'customer_area.enabled';
+    public const CUSTOMER_AREA_HIDDEN_TABS = 'customer_area.hidden_tabs';
+    public const CUSTOMER_AREA_TAB_ORDER = 'customer_area.tab_order';
+    public const CUSTOMER_AREA_WELCOME_EN = 'customer_area.welcome_en';
+    public const CUSTOMER_AREA_WELCOME_AR = 'customer_area.welcome_ar';
+    public const CUSTOMER_AREA_HOW_TO_PAY_EN = 'customer_area.how_to_pay_en';
+    public const CUSTOMER_AREA_HOW_TO_PAY_AR = 'customer_area.how_to_pay_ar';
+    /** The core tabs a workspace may hide or order (CA.13). */
+    public const CUSTOMER_AREA_TABS = ['bookings', 'bills', 'messages'];
+
     /**
      * Keys a dedicated screen and endpoint manage, with checks the generic
      * settings API cannot make (a customer-safe role, a permission other than
@@ -1063,6 +1083,13 @@ final class SettingsRegistry
         self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS,
         self::ACCOUNTING_PRICES_INCLUDE_TAX,
         self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID,
+        self::CUSTOMER_AREA_ENABLED,
+        self::CUSTOMER_AREA_HIDDEN_TABS,
+        self::CUSTOMER_AREA_TAB_ORDER,
+        self::CUSTOMER_AREA_WELCOME_EN,
+        self::CUSTOMER_AREA_WELCOME_AR,
+        self::CUSTOMER_AREA_HOW_TO_PAY_EN,
+        self::CUSTOMER_AREA_HOW_TO_PAY_AR,
     ];
 
     /**
@@ -1188,6 +1215,7 @@ final class SettingsRegistry
      */
     private const BOOL_KEYS = [
         self::SIGNUP_CUSTOMER_INVITES,
+        self::CUSTOMER_AREA_ENABLED,
         self::MESSAGING_WEBCHAT_ENABLED,
         self::INVENTORY_TRANSFERS_ONE_STEP,
         self::INVENTORY_FEFO,
@@ -1623,6 +1651,13 @@ final class SettingsRegistry
         self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => '0',
         self::ACCOUNTING_PRICES_INCLUDE_TAX => 'false',
         self::ACCOUNTING_BILL_ROUTE_TEMPLATE_ID => '0',
+        self::CUSTOMER_AREA_ENABLED => 'true',
+        self::CUSTOMER_AREA_HIDDEN_TABS => '[]',
+        self::CUSTOMER_AREA_TAB_ORDER => '[]',
+        self::CUSTOMER_AREA_WELCOME_EN => '',
+        self::CUSTOMER_AREA_WELCOME_AR => '',
+        self::CUSTOMER_AREA_HOW_TO_PAY_EN => '',
+        self::CUSTOMER_AREA_HOW_TO_PAY_AR => '',
     ];
 
     /**
@@ -2158,8 +2193,32 @@ final class SettingsRegistry
                 : $key . ' must be a route template id, or 0 for none.',
             self::ACCOUNTING_INVOICE_PAYMENT_TERMS_DAYS => self::validateWholeNumberBetween($value, $key, 0, 365),
             self::ACCOUNTING_PRICES_INCLUDE_TAX => self::validateBoolean($value, $key),
+            self::CUSTOMER_AREA_ENABLED => self::validateBoolean($value, $key),
+            self::CUSTOMER_AREA_HIDDEN_TABS, self::CUSTOMER_AREA_TAB_ORDER => self::validateCustomerAreaTabs($value, $key),
+            self::CUSTOMER_AREA_WELCOME_EN, self::CUSTOMER_AREA_WELCOME_AR => mb_strlen($value) <= 300
+                ? null
+                : $key . ' must be at most 300 characters.',
+            self::CUSTOMER_AREA_HOW_TO_PAY_EN, self::CUSTOMER_AREA_HOW_TO_PAY_AR => mb_strlen($value) <= 2000
+                ? null
+                : $key . ' must be at most 2000 characters.',
             default => "Unknown setting key: {$key}",
         };
+    }
+
+    /** A JSON list of distinct core tab ids from {@see CUSTOMER_AREA_TABS}. */
+    private static function validateCustomerAreaTabs(string $value, string $key): ?string
+    {
+        $list = json_decode($value, true);
+        if (!is_array($list) || !array_is_list($list)) {
+            return $key . ' must be a JSON list of tabs.';
+        }
+        foreach ($list as $tab) {
+            if (!is_string($tab) || !in_array($tab, self::CUSTOMER_AREA_TABS, true)) {
+                return $key . ' may list only bookings, bills and messages.';
+            }
+        }
+
+        return count(array_unique($list)) === count($list) ? null : $key . ' must not list a tab twice.';
     }
 
     /**

@@ -191,8 +191,8 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
 
         $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
 
-        // Owners (WHIT-1170) is a workspace page, never the system tenant's.
-        $this->assertSame(['general', 'branding', 'owners'], $tabs);
+        // Owners (WHIT-1170) and the customer area (WHIT-1416) are workspace pages, never the system tenant's.
+        $this->assertSame(['general', 'branding', 'owners', 'customer-area'], $tabs);
     }
 
     public function testASettingsPageTheOperatorHidIsNotATab(): void
@@ -208,7 +208,7 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
             unset($_ENV[\Whity\Core\Navigation\HiddenNavIds::ENV]);
         }
 
-        $this->assertSame(['general', 'branding'], $tabs);
+        $this->assertSame(['general', 'branding', 'customer-area'], $tabs);
     }
 
     public function testAuthProvidersManageAloneShowsOnlySsoEvenWithoutSettingsRead(): void
@@ -230,7 +230,7 @@ final class SettingsApiHandlerTabsRealEngineTest extends TestCase
         $tabs = $this->tabIds($this->handler->tabs($this->requestAs($profileId, $this->tenantId)));
 
         $this->assertSame(
-            ['general', 'branding', 'owners'],
+            ['general', 'branding', 'owners', 'customer-area'],
             $tabs,
             'settings:manage in a non-system tenant must not reveal Sign-up/Email/Storage.'
         );

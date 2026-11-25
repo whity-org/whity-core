@@ -6735,6 +6735,59 @@ $router->register('GET',  '/api/me/messages',            [$meMessagesHandler, 'l
 $router->register('POST', '/api/me/messages',            [$meMessagesHandler, 'start'], null);
 $router->register('GET',  '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'show'],  null);
 $router->register('POST', '/api/me/messages/{id:\d+}',   [$meMessagesHandler, 'send'],  null);
+
+// ── The customer area (WHIT-1416, design section 41) ─────────────────────
+// A workspace's customers, signed in, see their own bookings, bills, messages
+// and forms at /@handle. The workspace comes from the HANDLE, not the
+// session's active workspace, so these paths bypass EnforceTenantIsolation
+// (anchored shapes there) and the handler checks the session, an active
+// membership in that workspace and confinement itself. Unpermissioned:
+// every query is bound to the caller's own contacts (CustomerRecords).
+$customerAreaHandler = new \Whity\Api\CustomerAreaApiHandler(
+    static fn (): ?array => $tokenValidator->validateAccessToken(),
+    $db->getPdo(),
+    new \Whity\Core\CustomerArea\CustomerRecords($db->getPdo()),
+    $brandingHostRepo,
+    $hostResolver,
+    $brandingService,
+    $settingsService,
+    new MembershipRepository($db->getPdo(), $hookManager),
+    $signupSettings,
+    $customerSignupService,
+    $calendarBookingService,
+    $salesQuotes,
+    $messagingService,
+    new DatabaseSharedStore($db->getPdo()),
+    $auditLogger,
+);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}',                                        [$customerAreaHandler, 'area'],              null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/join',                               [$customerAreaHandler, 'join'],              null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/home',                               [$customerAreaHandler, 'home'],              null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bookings',                           [$customerAreaHandler, 'bookings'],          null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bookings/{id:\d+}',                  [$customerAreaHandler, 'booking'],           null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bookings/{id:\d+}/slots',            [$customerAreaHandler, 'bookingSlots'],      null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bookings/{id:\d+}/move',             [$customerAreaHandler, 'moveBooking'],       null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bookings/{id:\d+}/cancel',           [$customerAreaHandler, 'cancelBooking'],     null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bills',                              [$customerAreaHandler, 'bills'],             null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bills/quotes/{id:\d+}',              [$customerAreaHandler, 'quote'],             null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bills/quotes/{id:\d+}/accept',       [$customerAreaHandler, 'acceptQuote'],       null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bills/quotes/{id:\d+}/decline',      [$customerAreaHandler, 'declineQuote'],      null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bills/invoices/{id:\d+}',            [$customerAreaHandler, 'invoice'],           null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/bills/receipts/{id:\d+}',            [$customerAreaHandler, 'receipt'],           null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/messages',                           [$customerAreaHandler, 'conversations'],     null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/messages',                           [$customerAreaHandler, 'startConversation'], null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/messages/{id:\d+}',                  [$customerAreaHandler, 'conversation'],      null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/messages/{id:\d+}',                  [$customerAreaHandler, 'sendMessage'],       null);
+$router->register('GET',  '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/account',                            [$customerAreaHandler, 'account'],           null);
+$router->register('POST', '/api/customer-area/{handle:[a-z0-9][a-z0-9-]{0,63}}/leave',                              [$customerAreaHandler, 'leave'],             null);
+// Settings › Customer area (CA.22), in the session's own workspace.
+$customerAreaSettingsHandler = new \Whity\Api\CustomerAreaSettingsApiHandler(
+    $settingsService,
+    static fn (int $tenantId): ?string => $brandingHostRepo->findSlugById($tenantId),
+);
+$router->register('GET', '/api/settings/customer-area', [$customerAreaSettingsHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
+$router->register('PUT', '/api/settings/customer-area', [$customerAreaSettingsHandler, 'update'], null, null, CorePermissions::SETTINGS_WRITE);
+
 // Public: web chat for visitors, and the providers' inbound webhook. Both find the
 // workspace from its slug; each path is listed in EnforceTenantIsolation one by one.
 $publicChatHandler = new \Whity\Api\PublicChatApiHandler(

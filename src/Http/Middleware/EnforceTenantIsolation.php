@@ -385,6 +385,20 @@ class EnforceTenantIsolation
         '#^/api/v1/public/forms/[^/]+/uploads$#',
         '#^/api/v1/public/forms/[^/]+/submissions$#',
 
+        // The customer area (WHIT-1416, design section 41). The workspace is the
+        // HANDLE, not the session's active workspace, so a customer of several
+        // workspaces (or staff in one, a customer of another) opens each area
+        // without switching. CustomerAreaApiHandler validates the session itself
+        // (revocation, epoch, membership guard), requires an active membership
+        // in the handle's workspace, honours confinement, and binds every query
+        // to the caller's own contacts. Exactly these shapes.
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}$#',
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/(join|home|bookings|bills|messages|account|leave)$#',
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/bookings/[0-9]{1,18}(/(slots|move|cancel))?$#',
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/bills/quotes/[0-9]{1,18}(/(accept|decline))?$#',
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/bills/(invoices|receipts)/[0-9]{1,18}$#',
+        '#^/api/v1/customer-area/[a-z0-9][a-z0-9-]{0,63}/messages/[0-9]{1,18}$#',
+
         // Messages web chat (ADR 0016 §5). A visitor has no session; the workspace
         // is the slug, checked against the host, and web chat must be on.
         // PublicChatApiHandler throttles per address, per chat and per workspace

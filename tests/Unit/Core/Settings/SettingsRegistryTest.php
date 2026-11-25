@@ -162,7 +162,9 @@ final class SettingsRegistryTest extends TestCase
              // WHIT-1323: the trading emails' switches.
              'sales.email_quote', 'sales.email_invoice', 'sales.email_receipt', 'sales.email_reminder',
              'accounting.invoice_route_template_id', 'accounting.invoice_payment_terms_days', 'accounting.prices_include_tax',
-             'accounting.bill_route_template_id'],
+             'accounting.bill_route_template_id',
+             // WHIT-1416: the customer area.
+             'customer_area.enabled', 'customer_area.hidden_tabs', 'customer_area.tab_order', 'customer_area.welcome_en', 'customer_area.welcome_ar', 'customer_area.how_to_pay_en', 'customer_area.how_to_pay_ar'],
             SettingsRegistry::keys()
         );
     }
@@ -522,7 +524,8 @@ final class SettingsRegistryTest extends TestCase
         // 161 since #2386: navigation.hidden_ids.
         // 164 since #2386: navigation.home_path and the back-to-product link.
         // 165 since WHIT-1363: handles.reserved.
-        self::assertCount(165, $describe);
+        // 172 since WHIT-1416: the customer area's seven keys.
+        self::assertCount(172, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]
