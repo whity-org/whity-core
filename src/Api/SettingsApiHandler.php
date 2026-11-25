@@ -105,6 +105,7 @@ final class SettingsApiHandler
      *   settings.tab.owners = Owners
      *   settings.tab.signup = Sign-up
      *   settings.tab.customer_signup = Sign-up
+     *   settings.tab.customer_area = Customer area
      *   settings.tab.sso = Single sign-on
      *   settings.tab.email = Email
      *   settings.tab.email_domains = Email domains
