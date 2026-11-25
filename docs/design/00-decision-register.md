@@ -1180,5 +1180,16 @@ The owner, 25 November 2026: "for lms student facing pages is very big point for
 | CA.23 | Words | Staff say "Customer area" (منطقة العملاء); customers see the business's name and "Your account" (حسابك); tabs Home, Bookings, Bills, Messages, Account |
 | CA.24 | Price | Core and free on every plan and self-hosted; customers who sign in count on Whity Cloud's customer meter (BM.3); taking money online needs a payment plugin (BM.16) |
 
+## Workspace templates as plugins (decided 25 November 2026)
+
+The owner, 25 November 2026: "we need from you to also help us create a better SDK for the templates feature" and "remove all baked in templates to their plugins please". Specified in section 40 (`40-workspace-templates-sdk.md`, WHIT-1407) and answered the same day: pipelines "Review routes now (Recommended)"; updates that change something the workspace has "Offer per item" (not the recommendation, which was to keep the workspace's copy and only say so); every other question "Accept all (Recommended)".
+
+| # | Decision | Proposed |
+| --- | --- | --- |
+| WT.1 | See before applying | Choosing a template card opens "What this adds" from a dry run: each part with Add, Already there, or Can't add and why, in plain words. Apply is the one filled button |
+| WT.2 | Updates are offered | When a template a workspace uses gets a new version, a setup point on the dashboard and a line on Settings › Workspace say so, never automatic; "See what's new" opens the same preview: what will be added, and each item that changed in the template with **Use the template's version** for that item alone. Apply update adds only the new pieces |
+| WT.3 | Updates keep the person's work | An update never deletes and never brings back what the person deleted; their edits are kept unless they choose Use the template's version on that item, which changes only what the template sets on it and deletes nothing |
+| WT.4 | One plugin per template | Each template is its own free plugin carrying its theme, listed on its own in Settings › Plugins ("Clinic template") and on in every workspace; Start blank stays in core; the shared `workspace-templates` package is retired once empty. Templates can build on each other (a Dental template on Clinic is an SDK example only), other plugins can add pieces to a template, and a template's pipelines are review routes in Flows (Taskaat boards later) |
+
 ## Carried forward, to be re-confirmed in their own stage
 - The name is "Whity", with a capital W, in Latin letters only. There is no Arabic name, logo or brand copy.
