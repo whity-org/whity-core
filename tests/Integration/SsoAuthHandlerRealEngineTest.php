@@ -1268,12 +1268,11 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
     private function primeNativeFlow(): void
     {
         $this->primeFlow();
-        $flow = $this->jwtParser->parse($_COOKIE['sso_flow_token']);
         $_COOKIE['sso_flow_token'] = $this->jwtParser->create([
             'state' => 'state-1',
             'nonce' => 'nonce-1',
             'code_verifier' => 'verifier-1',
-            'provider_id' => $flow['provider_id'],
+            'provider_id' => $this->providerId,
             'tenant_id' => 0,
             'provider_key' => 'google',
             'native_port' => 43127,
@@ -1293,6 +1292,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         return $query;
     }
 
+    /** @param array<string, string> $headers */
     private function exchange(string $code, string $verifier = self::NATIVE_VERIFIER, array $headers = ['X-Auth-Mode' => 'token']): \Whity\Sdk\Http\Response
     {
         return $this->handler->exchange(new Request(
@@ -1382,6 +1382,7 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         self::assertSame($this->tenantId, $body['user']['tenant_id']);
         self::assertArrayNotHasKey('access_token', $_COOKIE, 'token mode sets no cookie');
         $claims = $this->jwtParser->parse($body['access_token']);
+        self::assertNotNull($claims);
         self::assertSame($this->profileId, $claims['profile_id']);
         self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'spent');
 

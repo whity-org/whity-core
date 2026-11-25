@@ -1442,23 +1442,14 @@ final class SsoAuthHandler
         }
 
         $row = $this->nativeCodes->consume($code);
-        $refusal = match (true) {
-            $row === null => 'unknown_code',
-            $this->nativeCodes->isExpired($row) => 'expired',
-            !hash_equals($row['code_challenge'], \Whity\Auth\NativeSignInCodes::challengeFor($verifier)) => 'wrong_verifier',
-            default => null,
-        };
-        if ($refusal !== null) {
-            $this->throttle?->recordFailure(null, $ip);
-            $this->audit?->record('auth.native.exchange_refused', [
-                'tenant_id'   => null,
-                'actor_id'    => $row['profile_id'] ?? null,
-                'target_type' => 'profile',
-                'target_id'   => $row['profile_id'] ?? null,
-                'metadata'    => ['reason' => $refusal],
-            ]);
-
-            return Response::error('Invalid or expired code', 401);
+        if ($row === null) {
+            return $this->exchangeRefused('unknown_code', null, $ip);
+        }
+        if ($this->nativeCodes->isExpired($row)) {
+            return $this->exchangeRefused('expired', $row['profile_id'], $ip);
+        }
+        if (!hash_equals($row['code_challenge'], \Whity\Auth\NativeSignInCodes::challengeFor($verifier))) {
+            return $this->exchangeRefused('wrong_verifier', $row['profile_id'], $ip);
         }
 
         $result = $this->auth->completeFederatedLogin(
@@ -1477,6 +1468,21 @@ final class SsoAuthHandler
         ]);
 
         return $result;
+    }
+
+    /** One generic answer for every refused exchange; the reason goes to the audit log only. */
+    private function exchangeRefused(string $reason, ?int $profileId, ?string $ip): Response
+    {
+        $this->throttle?->recordFailure(null, $ip);
+        $this->audit?->record('auth.native.exchange_refused', [
+            'tenant_id'   => null,
+            'actor_id'    => $profileId,
+            'target_type' => 'profile',
+            'target_id'   => $profileId,
+            'metadata'    => ['reason' => $reason],
+        ]);
+
+        return Response::error('Invalid or expired code', 401);
     }
 
     /**
