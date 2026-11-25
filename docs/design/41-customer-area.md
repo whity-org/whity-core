@@ -166,7 +166,7 @@ The customer's conversations with the workspace (UC.1–UC.13), from the custome
 
 ## 9. Plugin tabs: `Contribute\PluginCustomerScreensInterface`
 
-An additive SDK contract (1.x, owner 24 November 2026). Proposed shape (CA.17):
+An additive SDK contract (1.x, owner 24 November 2026). Shape (CA.17):
 
 ```php
 namespace Whity\Sdk\Contribute;
@@ -249,7 +249,7 @@ A new settings page (`settings:write`), following section 21 and PW.8 on a phone
 
 ## 14. Register rows
 
-| # | Decision | Proposed |
+| # | Decision | Choice |
 | --- | --- | --- |
 | CA.1 | Address | `/@handle` is the front door; a signed-in customer goes to Home, everyone else sees the workspace page with Sign in; tabs at `/@handle/home`, `/bookings`, `/bills`, `/messages`, `/account`, plugin screens at `/@handle/x/{id}`; the handle never decides access |
 | CA.2 | Brand | The workspace's logo, name and main colour on every screen, from the public-page brand; "Built on Whity" only at the foot of Account, removable for free |
