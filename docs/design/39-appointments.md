@@ -162,16 +162,16 @@ The customer is never shown the word "no-show". The booking page and emails say 
 
 ### 5.1 The database refuses overlaps (G1, G2)
 
-A new table, `calendar_holds`, holds one row for each thing a booking or busy event takes:
+A new table, `calendar_holds`, holds one row for each thing a booking takes (AP.11 as changed by the owner on 25 Nov 2026: "Yes, change it (Recommended)"). Time off and busy events are not in it: they stay guarded by the row locks and the re-check, and time off over bookings comes in M6 (AP.17).
 
 | Column | Notes |
 | --- | --- |
 | `tenant_id`, `id` | |
-| `booking_id` or `event_id` | Exactly one of them is set (CHECK). A booking with several services has one row for each part and for each thing that part takes. |
+| `booking_id` | A booking with several services has one row for each part and for each thing that part takes. |
 | `holder_kind` | `person` or `resource` |
 | `holder_id` | The profile id, or the `calendar_resources.id` |
 | `during` | `tsrange(blocks_from, blocks_until, '[)')`, buffers included |
-| `exclusive` | false only for a person on a **Book anyway** booking, or for a person's own non-busy event |
+| `exclusive` | false only for a person on a **Book anyway** booking, or for a booking that already overlapped before the guard |
 | `expires_at` | Set on payment holds |
 
 On Postgres, with the `btree_gist` extension:
@@ -185,8 +185,8 @@ EXCLUDE USING gist (tenant_id WITH =, holder_kind WITH =, holder_id WITH =, duri
 - **A refused insert** (SQLSTATE `23P01`) is turned into the existing 409 (`person_busy` or `room_taken`), so callers see no new error.
 - **Cancel, expire and move** delete or rewrite the rows. Before inserting, the writer deletes rows whose `expires_at` has passed for the same holders (G2). The hold-expiry job also removes them.
 - **Book anyway** stays for people only (CV.9): the person's row is `exclusive = false`. Resources are always exclusive. Book anyway never passes a taken room, chair or piece of equipment.
-- **Time off** and busy team events write person rows. Book anyway can still go over them, because that booking's person row isn't exclusive.
-- **Existing data.** One migration fills `calendar_holds` from live bookings and busy events. Overlaps already in the data (made through Book anyway or before the locks) are copied as non-exclusive and listed by `whity-cli calendar:overlaps` for the owner, never changed automatically.
+- **Time off** and busy team events write no rows (events may overlap each other). The row locks and the re-check keep bookings off them, and Book anyway can still go over them. Time off saved over bookings is M6 (AP.17).
+- **Existing data.** One migration fills `calendar_holds` from live bookings. Overlaps already in the data (made through Book anyway or before the locks) are copied as non-exclusive and listed by `whity-cli calendar:overlaps` for the owner, never changed automatically.
 - **SQLite** keeps the row-lock path, and a test-only check asserts that no exclusive holds overlap after every write in the calendar integration tests.
 - **Proof.** Parallel-process tests on Postgres write directly through a repository that skips the service, and must be refused by the database (verified-change: "prove a guard can fail").
 
@@ -334,7 +334,7 @@ Reliability first. Each milestone is one PR with its own WHIT id, migration numb
 | M3 | **Attendance and no-show marking** | 1 | `attendance`, `cancel_kind`, the late-cancel window, Didn't come, Did they come?, optional end-of-day marking, the customer-record line, the flag policy, events and API |
 | M4 | **No-show reports and the dashboard widget** | 0 | Reports › Appointments, the widget, `calendar:reports`, CSV, MCP tool |
 | M5 | **Resources** | 2 | `calendar_resources` (rename and new columns), `calendar_service_resources`, any-from-group, the Rooms and equipment screens |
-| M6 | **Staff and time** | 1–2 | Per-person length and price, branch time zones, time off over bookings, the external-calendar warning, the DST suite |
+| M6 | **Staff and time** | 1–2 | Per-person length and price, branch time zones, time off over bookings (AP.17, with AP.11 limited to bookings), the external-calendar warning, the DST suite |
 | M7 | **Front desk** | 1 | `/calendar/desk`, `started_at`/`finished_at`, side panel, running late (both kinds), phone list |
 | M8 | **Waitlist** | 1 | `calendar_waitlist`, public join, offers, first-taker-wins |
 | M9 | **Intake forms and the visit record** | 2 | `calendar_service_forms`, `booking_id` on submissions, kiosk fill, `calendar_visit_notes`, `calendar:visit_notes`, Finish visit |

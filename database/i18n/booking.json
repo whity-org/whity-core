@@ -20,6 +20,7 @@
         "done.requestDescription": "We’re holding this time while {workspace} looks at your request. We’ll email {email} when they accept it or suggest another time.",
         "done.requestTitle": "Request sent",
         "done.title": "You’re booked",
+        "error.alreadySent": "We already have this booking. Check your email for the details.",
         "error.bot": "We couldn’t confirm you are a person. Try again.",
         "error.generic": "We couldn’t take this booking. Try again.",
         "error.gone": "This booking page isn’t available any more.",

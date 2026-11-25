@@ -302,6 +302,28 @@ final class PublicBookingRealEngineTest extends TestCase
         self::assertContains('retry-after', array_map('strtolower', array_keys($limited->getHeaders())));
     }
 
+    public function testTheSameBookingSentTwiceIsBookedOnce(): void
+    {
+        $page = ['workspace' => 'example-bakery'];
+        // AP.17: a retry with the same key books nothing more.
+        $first = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['idempotency_key' => 'press-0001-abcd'])), $page);
+        self::assertSame(201, $first->getStatusCode(), $first->getBody());
+        $again = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['starts_at' => '2026-11-16T11:00:00+03:00', 'idempotency_key' => 'press-0001-abcd'])), $page);
+        self::assertSame(409, $again->getStatusCode(), $again->getBody());
+        self::assertSame('already_sent', self::data($again)['details']['code'] ?? self::data($again)['error']['details']['code'] ?? null, $again->getBody());
+        self::assertSame(1, (int) $this->scalar("SELECT COUNT(*) FROM calendar_bookings WHERE tenant_id = 1 AND status <> 'cancelled'"));
+
+        // A key whose booking failed is given back, so the customer can try again.
+        $taken = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['email' => 'other@example.com', 'idempotency_key' => 'press-0002-abcd'])), $page);
+        self::assertSame(409, $taken->getStatusCode(), 'The time is taken.');
+        $retry = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['email' => 'other@example.com', 'starts_at' => '2026-11-16T12:00:00+03:00', 'idempotency_key' => 'press-0002-abcd'])), $page);
+        self::assertSame(201, $retry->getStatusCode(), $retry->getBody());
+
+        // Without a key, or with one that isn't a key, nothing changes.
+        $plain = $this->handler->book(self::request('POST', '/x', $this->bookingBody(['email' => 'third@example.com', 'starts_at' => '2026-11-16T13:00:00+03:00', 'idempotency_key' => 'short'])), $page);
+        self::assertSame(201, $plain->getStatusCode(), $plain->getBody());
+    }
+
     public function testTheLinkShowsMovesAndCancelsAndAnOldLinkStopsWorking(): void
     {
         $made = self::data($this->handler->book(self::request('POST', '/x', $this->bookingBody()), ['workspace' => 'example-bakery']))['data'];
