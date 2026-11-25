@@ -17,7 +17,7 @@ namespace Whity\Sdk\Frontend;
  *
  * ```js
  * const ctx = await whity.ready();          // { locale, dir, theme, apiBase, audience, brand }
- * // audience is 'customer' inside a workspace's customer area (SDK 1.173), with its brand.
+ * // audience is 'customer' inside a workspace's customer area (SDK 1.174), with its brand.
  * const res = await whity.request('GET', '/api/bom/parts');
  * if (res.ok) render(res.body);
  * await whity.request('POST', '/api/bom/parts', { name: 'Bolt' });

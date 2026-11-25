@@ -11,7 +11,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Http\CustomerCall;
 
 /**
- * Plugin routes that serve a workspace's customers (SDK 1.173, WHIT-1424;
+ * Plugin routes that serve a workspace's customers (SDK 1.174, WHIT-1424;
  * design section 41 §9, CA.18): the ones declared `'customer' => true`.
  *
  * DENY BY DEFAULT. The customer area calls plugins only with a customer frame

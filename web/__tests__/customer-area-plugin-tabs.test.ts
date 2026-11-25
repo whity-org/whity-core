@@ -1,5 +1,5 @@
 /**
- * Plugin screens in the customer area (SDK 1.173, WHIT-1424): the phone bar
+ * Plugin screens in the customer area (SDK 1.174, WHIT-1424): the phone bar
  * keeps five slots (Home, three tabs, More), and a screen's token goes only to
  * its plugin's customer routes.
  */

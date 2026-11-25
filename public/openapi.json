@@ -32491,7 +32491,7 @@
         "/api/v1/customer-area/{handle}/x/{screen}": {
             "get": {
                 "operationId": "get_api_v1_customer_area_handle_x_screen",
-                "summary": "One plugin screen for customers (SDK 1.173)",
+                "summary": "One plugin screen for customers (SDK 1.174)",
                 "tags": [
                     "customer-area"
                 ],
@@ -32606,7 +32606,7 @@
         "/api/v1/customer-area/{handle}/x/{screen}/token": {
             "post": {
                 "operationId": "post_api_v1_customer_area_handle_x_screen_token",
-                "summary": "A five-minute token for a plugin screen (SDK 1.173)",
+                "summary": "A five-minute token for a plugin screen (SDK 1.174)",
                 "tags": [
                     "customer-area"
                 ],
@@ -116581,7 +116581,7 @@
                             "properties": {
                                 "id": {
                                     "type": "string",
-                                    "description": "`bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.173)."
+                                    "description": "`bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.174)."
                                 },
                                 "count": {
                                     "type": "integer"
@@ -116912,7 +116912,7 @@
                                 "api_paths"
                             ]
                         },
-                        "description": "Home cards from plugins (placement home, SDK 1.173)."
+                        "description": "Home cards from plugins (placement home, SDK 1.174)."
                     },
                     "waiting": {
                         "type": "array",

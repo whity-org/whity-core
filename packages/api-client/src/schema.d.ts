@@ -4699,7 +4699,7 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * One plugin screen for customers (SDK 1.173)
+         * One plugin screen for customers (SDK 1.174)
          * @description Only a screen whose permission the customer holds. Its blocks and embed call the plugin customer routes with the token from the route below.
          */
         get: operations["get_api_v1_customer_area_handle_x_screen"];
@@ -4721,7 +4721,7 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * A five-minute token for a plugin screen (SDK 1.173)
+         * A five-minute token for a plugin screen (SDK 1.174)
          * @description Bound to this workspace and marked for customers: it opens only the routes of that plugin declared customer, sent as a Bearer header. Takes no body.
          */
         post: operations["post_api_v1_customer_area_handle_x_screen_token"];
@@ -18568,7 +18568,7 @@ export interface components {
                 staff: boolean;
             } | null;
             tabs: {
-                /** @description `bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.173). */
+                /** @description `bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.174). */
                 id: string;
                 count: number;
                 /** @description A plugin tab label: a string or {en, ar}. */
@@ -18652,7 +18652,7 @@ export interface components {
             reason?: string;
         };
         CustomerAreaHome: {
-            /** @description Home cards from plugins (placement home, SDK 1.173). */
+            /** @description Home cards from plugins (placement home, SDK 1.174). */
             cards: {
                 id: string;
                 /** @description A string or {en, ar}. */

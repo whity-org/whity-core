@@ -6762,13 +6762,13 @@ $customerAreaHandler = new \Whity\Api\CustomerAreaApiHandler(
     $messagingService,
     new DatabaseSharedStore($db->getPdo()),
     $auditLogger,
-    // SDK 1.173 (WHIT-1424): the plugins' screens for customers, who may see
+    // SDK 1.174 (WHIT-1424): the plugins' screens for customers, who may see
     // one, and the customer token that opens only customer routes.
     static fn (): array => $pluginLoader->getCustomerScreens(),
     static fn (int $profileId, string $permission, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, $permission, $tenantId),
     $jwtParser,
 );
-// Who a customer is on a plugin's customer route (SDK 1.173, CA.18).
+// Who a customer is on a plugin's customer route (SDK 1.174, CA.18).
 \Whity\Core\Plugin\PluginCustomerRoutes::useResolver(
     static fn (int $profileId, int $tenantId): bool => $roleChecker->isCustomerOnly($profileId, $tenantId),
     static fn (int $tenantId, int $profileId): array => (new \Whity\Core\CustomerArea\CustomerRecords($db->getPdo()))->contactIds($tenantId, $profileId),

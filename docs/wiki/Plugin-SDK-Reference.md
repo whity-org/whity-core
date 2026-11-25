@@ -162,7 +162,7 @@ Implement the interface next to `PluginInterface`. Each one is optional, and the
 | `PluginDisplayNameInterface` | The name people read, `{en, ar}` | sdk/README |
 | `PluginAccessInterface`, `PluginEntitlementsInterface` | How the plugin is sold (free, paid, per seat) and the entitlements it checks | [Workspace-Plugins](Workspace-Plugins.md) |
 | `PluginRolesInterface`, `PluginCustomerPermissionsInterface` | Roles and their permissions; what customers may do | Plugin-Development |
-| `PluginCustomerScreensInterface` (1.173) | Screens in the customer area at /@handle, on routes declared `customer` | Plugin-Development |
+| `PluginCustomerScreensInterface` (1.174) | Screens in the customer area at /@handle, on routes declared `customer` | Plugin-Development |
 | `PluginFrontendInterface` | Screens: crud, action, blocks, embed | [Plugin-UI-Blocks](Plugin-UI-Blocks.md) |
 | `PluginDashboardInterface`, `PluginHomeCardInterface` | Dashboard setup points and widgets; the older single home card (deprecated 1.124, D5: use a `stat` widget) | [Plugin-Dashboard](Plugin-Dashboard.md) |
 | `PluginOnboardingInterface` | A guided setup | sdk/README |

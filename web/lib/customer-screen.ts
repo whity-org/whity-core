@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * A plugin screen's customer token in the customer area (SDK 1.173,
+ * A plugin screen's customer token in the customer area (SDK 1.174,
  * WHIT-1424; design section 41 §9, CA.18).
  *
  * The area never calls a plugin with the person's session cookie: each

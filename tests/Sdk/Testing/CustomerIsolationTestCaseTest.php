@@ -11,7 +11,7 @@ use Whity\Sdk\Http\Response;
 use Whity\Sdk\Testing\CustomerIsolationTestCase;
 
 /**
- * The SDK's customer isolation helper (SDK 1.173, WHIT-1424): it passes a
+ * The SDK's customer isolation helper (SDK 1.174, WHIT-1424): it passes a
  * route that keeps each customer to their own rows, and fails one that
  * answers another customer's row.
  */

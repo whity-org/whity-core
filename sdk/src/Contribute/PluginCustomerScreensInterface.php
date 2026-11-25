@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Contribute;
 
 /**
- * Optional (SDK 1.173, WHIT-1424; design section 41 §9, CA.17–CA.19): screens
+ * Optional (SDK 1.174, WHIT-1424; design section 41 §9, CA.17–CA.19): screens
  * your plugin shows to a workspace's CUSTOMERS in their customer area at
  * `/@handle`: a tab, a card on their Home, or a page reached from a link.
  *
@@ -54,7 +54,7 @@ namespace Whity\Sdk\Contribute;
  *     {@see \Whity\Sdk\Testing\CustomerIsolationTestCase}.
  *
  * A screen that breaks a rule is dropped with a logged reason; the rest of the
- * plugin keeps loading. A host older than 1.173 ignores this interface and the
+ * plugin keeps loading. A host older than 1.174 ignores this interface and the
  * `customer` route key.
  */
 interface PluginCustomerScreensInterface

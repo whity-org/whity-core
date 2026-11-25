@@ -1162,7 +1162,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     private array $dashboards = [];
 
     /**
-     * Each plugin's screens for the workspace's customers (SDK 1.173,
+     * Each plugin's screens for the workspace's customers (SDK 1.174,
      * WHIT-1424), validated: id, label, placement, screen, permission, icon,
      * order, and blocks, embed or count.
      *
@@ -1172,7 +1172,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
 
     /**
      * The customer screens of every plugin that is running and on for the
-     * current workspace (SDK 1.173, WHIT-1424), each with its plugin's name
+     * current workspace (SDK 1.174, WHIT-1424), each with its plugin's name
      * and route namespace. Who may see one is the caller's to check.
      *
      * @return list<array<string, mixed>>
@@ -1198,7 +1198,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
-     * Validate a plugin's customer screens (SDK 1.173). Each is first checked
+     * Validate a plugin's customer screens (SDK 1.174). Each is first checked
      * exactly like a staff screen of kind blocks or embed (id, label,
      * permission, blocks and their routes), then:
      *  - `placement` is tab, home or page (home: blocks only);
@@ -4679,7 +4679,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
         // requiredPermission with the block's. Merging the two maps removes a
         // duplicated fact rather than adding a permission.
         $registeredWriteRoutes = [];
-        // Paths declared `'customer' => true` (SDK 1.173), as the plugin wrote them.
+        // Paths declared `'customer' => true` (SDK 1.174), as the plugin wrote them.
         /** @var array<string, true> $customerRoutePaths */
         $customerRoutePaths = [];
         // GET path => the SAME wrapped handler passed to Router::register(),
@@ -4747,7 +4747,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
                 }
             }
 
-            // A CUSTOMER route (SDK 1.173, WHIT-1424): the only kind the
+            // A CUSTOMER route (SDK 1.174, WHIT-1424): the only kind the
             // customer area's token opens. Refused, never quietly made
             // private or public, when the declaration is off.
             $wantsCustomer = array_key_exists('customer', $declared) && $declared['customer'] !== false;
@@ -5371,7 +5371,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
             $registeredWriteRoutes
         );
 
-        // 4a'. Screens for the workspace's customers (SDK 1.173, WHIT-1424):
+        // 4a'. Screens for the workspace's customers (SDK 1.174, WHIT-1424):
         //      checked like staff screens, and every route they touch must
         //      be one of the plugin's customer routes.
         $this->customerScreens[$pluginKey] = $this->collectCustomerScreens($plugin, $pluginKey, $registeredGetRoutes, $registeredWriteRoutes, $customerRoutePaths);
@@ -6689,7 +6689,7 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     private function wrapHandler(string $pluginKey, callable $handler, bool $public = false, bool $publicForm = false, bool $publicRead = false, bool $service = false, bool $customer = false): callable
     {
         return function (Request $request, array $params = []) use ($pluginKey, $handler, $public, $publicForm, $publicRead, $service, $customer): Response {
-            // SDK 1.173 (WHIT-1424): the customer area's token opens only
+            // SDK 1.174 (WHIT-1424): the customer area's token opens only
             // customer routes; on one, who the customer is goes on the request.
             if ($request instanceof \Whity\Core\Request) {
                 $refused = \Whity\Core\Plugin\PluginCustomerRoutes::guard($request, $customer);

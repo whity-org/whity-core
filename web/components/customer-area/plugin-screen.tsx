@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * A plugin's screen in the customer area (SDK 1.173, WHIT-1424; design
+ * A plugin's screen in the customer area (SDK 1.174, WHIT-1424; design
  * section 41 §9, CA.17): its blocks, drawn by the same renderer as staff
  * screens, or its embed page in a sandboxed frame. Either way the plugin is
  * called only with the screen's customer token (lib/customer-screen.ts).

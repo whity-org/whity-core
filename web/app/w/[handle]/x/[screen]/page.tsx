@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * A plugin's screen in the customer area (SDK 1.173, WHIT-1424; design
+ * A plugin's screen in the customer area (SDK 1.174, WHIT-1424; design
  * section 41 §9): `/@handle/x/{screen}`. Core answers it only when the
  * customer holds the screen's permission; the screen then calls its plugin
  * with the screen's customer token.

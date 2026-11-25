@@ -149,13 +149,13 @@ final class CustomerAreaApiSchemas
                 'responses' => [201 => self::json('The message', self::data(SchemaBuilder::ref('CustomerAreaMessage')))] + $common + $refused,
             ]),
             $route('GET', '/x/{screen:[a-z][a-z0-9-]{0,63}}', [
-                'summary' => 'One plugin screen for customers (SDK 1.173)',
+                'summary' => 'One plugin screen for customers (SDK 1.174)',
                 'description' => 'Only a screen whose permission the customer holds. Its blocks and embed call the plugin customer routes with the token from the route below.',
                 'parameters' => [$handle, ['name' => 'screen', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']]],
                 'responses' => [200 => self::json('The screen', self::data(SchemaBuilder::ref('CustomerAreaScreen')))] + $common,
             ]),
             $route('POST', '/x/{screen:[a-z][a-z0-9-]{0,63}}/token', [
-                'summary' => 'A five-minute token for a plugin screen (SDK 1.173)',
+                'summary' => 'A five-minute token for a plugin screen (SDK 1.174)',
                 'description' => 'Bound to this workspace and marked for customers: it opens only the routes of that plugin declared customer, sent as a Bearer header. Takes no body.',
                 'parameters' => [$handle, ['name' => 'screen', 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']]],
                 'responses' => [200 => self::json('The token', self::data(self::object(['token' => self::str(), 'expires_in' => self::int()], ['token', 'expires_in'])))] + $common,
@@ -224,7 +224,7 @@ final class CustomerAreaApiSchemas
                     'staff' => self::bool(),
                 ], ['name', 'email', 'state', 'staff']) + ['nullable' => true],
                 'tabs' => ['type' => 'array', 'items' => self::object([
-                    'id' => self::str() + ['description' => '`bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.173).'],
+                    'id' => self::str() + ['description' => '`bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.174).'],
                     'count' => self::int(),
                     'label' => ['description' => 'A plugin tab label: a string or {en, ar}.'],
                     'icon' => self::str(true),
@@ -237,7 +237,7 @@ final class CustomerAreaApiSchemas
                 'cards' => ['type' => 'array', 'items' => self::object([
                     'id' => self::str(), 'label' => ['description' => 'A string or {en, ar}.'], 'blocks' => ['type' => 'array', 'items' => ['type' => 'object']],
                     'api_paths' => ['type' => 'array', 'items' => self::str()],
-                ], ['id', 'label', 'blocks', 'api_paths']), 'description' => 'Home cards from plugins (placement home, SDK 1.173).'],
+                ], ['id', 'label', 'blocks', 'api_paths']), 'description' => 'Home cards from plugins (placement home, SDK 1.174).'],
                 'waiting' => ['type' => 'array', 'items' => SchemaBuilder::ref('CustomerAreaBill')],
                 'time_zone' => self::str(),
                 'next_booking' => SchemaBuilder::ref('CustomerAreaBookingRow') + ['nullable' => true],

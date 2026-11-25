@@ -137,7 +137,7 @@ interface PluginInterface
      *   before your handler runs. It is on top of the deployment's own limits,
      *   never instead of them. Any other value is ignored with a logged warning
      *   and the route registers without its own limit.
-     * - 'customer' (bool, optional, SDK 1.173, WHIT-1424): the route serves a
+     * - 'customer' (bool, optional, SDK 1.174, WHIT-1424): the route serves a
      *   workspace's CUSTOMERS in their customer area (design section 41). The
      *   area calls a plugin only with a short-lived customer token, and that
      *   token opens ONLY routes declaring `'customer' => true`; every other

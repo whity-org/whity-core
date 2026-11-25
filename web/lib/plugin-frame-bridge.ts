@@ -63,9 +63,9 @@ export interface FrameBridgeOptions {
     locale: string;
     dir: 'ltr' | 'rtl';
     theme: 'light' | 'dark';
-    /** SDK 1.173: `customer` inside a workspace's customer area. */
+    /** SDK 1.174: `customer` inside a workspace's customer area. */
     audience?: 'staff' | 'customer';
-    /** SDK 1.173: the workspace's brand, so a frame can match its look. */
+    /** SDK 1.174: the workspace's brand, so a frame can match its look. */
     brand?: { name: string; color: string | null; logo: string | null };
   };
   onResize: (height: number) => void;

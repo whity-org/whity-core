@@ -89,7 +89,7 @@ final class CustomerAreaApiHandler
         private readonly MessagingService $messaging,
         private readonly SharedStoreInterface $store,
         private readonly ?AuditLogger $audit = null,
-        /** @var (\Closure(): list<array<string, mixed>>)|null the plugins' customer screens (SDK 1.173) */
+        /** @var (\Closure(): list<array<string, mixed>>)|null the plugins' customer screens (SDK 1.174) */
         private readonly ?\Closure $pluginScreens = null,
         /** @var (\Closure(int, string, int): bool)|null whether a profile holds a permission in a workspace */
         private readonly ?\Closure $hasPermission = null,
@@ -463,7 +463,7 @@ final class CustomerAreaApiHandler
         });
     }
 
-    // ---- Plugin screens (SDK 1.173, CA.17) ----
+    // ---- Plugin screens (SDK 1.174, CA.17) ----
 
     /**
      * One plugin screen the customer may see: its blocks or embed page.

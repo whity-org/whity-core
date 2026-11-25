@@ -50,7 +50,7 @@ final class PluginFrameTokens
 
     /** Claims of the session that are never copied onto a frame token. */
     /**
-     * The customer area's tokens (SDK 1.173, WHIT-1424) carry this claim set
+     * The customer area's tokens (SDK 1.174, WHIT-1424) carry this claim set
      * to {@see self::AUDIENCE_CUSTOMER}: they open only the plugin's routes
      * declared for customers ({@see PluginCustomerRoutes}), in the workspace
      * of the area's address.
@@ -101,7 +101,7 @@ final class PluginFrameTokens
     }
 
     /**
-     * A token for one plugin screen in a workspace's customer area (SDK 1.173,
+     * A token for one plugin screen in a workspace's customer area (SDK 1.174,
      * WHIT-1424; design section 41 §9). Like {@see self::issue()}, but bound to
      * the workspace of the area's address instead of the session's active one,
      * and marked for customers, so it opens only that plugin's customer routes.

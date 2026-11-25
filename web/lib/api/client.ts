@@ -160,7 +160,7 @@ export async function apiFetch(url: string, init: RequestInit = {}): Promise<Res
 }
 
 /**
- * A token that stands in for the session on some paths (SDK 1.173,
+ * A token that stands in for the session on some paths (SDK 1.174,
  * WHIT-1424): while a customer area screen is open, its plugin's customer
  * routes are called with the screen's customer token instead of the cookie.
  * Each registration answers only the paths it `matches`.

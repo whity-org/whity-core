@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Whity\Sdk\Http;
 
 /**
- * The customer calling one of your customer routes (SDK 1.173, WHIT-1424;
+ * The customer calling one of your customer routes (SDK 1.174, WHIT-1424;
  * design section 41 §9, CA.18).
  *
  * The host sets it on a route declared `'customer' => true` when the caller

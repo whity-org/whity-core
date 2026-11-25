@@ -17,7 +17,7 @@ use Whity\Core\Tenant\TenantContext;
 use Whity\Sdk\Http\CustomerCall;
 
 /**
- * Plugin screens for customers and the routes they may use (SDK 1.173,
+ * Plugin screens for customers and the routes they may use (SDK 1.174,
  * WHIT-1424; design section 41 §9, CA.17, CA.18).
  */
 final class PluginCustomerScreensTest extends TestCase

@@ -397,7 +397,7 @@ final class CustomerAreaApiHandlerRealEngineTest extends TestCase
             $messaging,
             new DatabaseSharedStore($pdo),
             new AuditLogger($pdo, new NullLogger()),
-            // SDK 1.173: one plugin with a tab and a Home card, open to
+            // SDK 1.174: one plugin with a tab and a Home card, open to
             // holders of courses_course:read (Ahmad, 31, only).
             static fn (): array => [
                 ['id' => 'courses', 'label' => ['en' => 'Courses', 'ar' => 'الدورات'], 'placement' => 'tab', 'screen' => 'blocks', 'requiredPermission' => 'courses_course:read', 'icon' => 'document', 'order' => 5, 'blocks' => [['type' => 'text', 'text' => 'Hi']], 'plugin' => 'Courses', 'namespace' => 'Courses'],

@@ -64,7 +64,7 @@ export function useCustomerTabs(area: CustomerAreaData): Tab[] {
   const middle: Tab[] = area.tabs.map((tab) => {
     const id = tab.id as CustomerTabId;
     if (id.startsWith('x:')) {
-      // A plugin's tab (SDK 1.173): its own label and icon, its own page.
+      // A plugin's tab (SDK 1.174): its own label and icon, its own page.
       const label = typeof tab.label === 'string' ? tab.label : name(tab.label as Record<string, string> | null);
       return { id, label, icon: (tab.icon as IconName | null) ?? 'plugin', href: areaHref(handle, `x/${id.slice(2)}`), count: tab.count };
     }
@@ -79,7 +79,7 @@ export function useCustomerTabs(area: CustomerAreaData): Tab[] {
 }
 
 /**
- * A plugin tab's count (SDK 1.173): its `count` route, called with that
+ * A plugin tab's count (SDK 1.174): its `count` route, called with that
  * screen's customer token, answers `{"count": n}`.
  */
 function usePluginCounts(area: CustomerAreaData): Record<string, number> {

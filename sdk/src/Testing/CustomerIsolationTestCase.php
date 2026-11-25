@@ -11,7 +11,7 @@ use Whity\Sdk\Http\Response;
 
 /**
  * Prove your customer routes keep each customer to their own records (SDK
- * 1.173, WHIT-1424; design section 41 §9, CA.18).
+ * 1.174, WHIT-1424; design section 41 §9, CA.18).
  *
  * The host only lets the customer area reach routes you declared
  * `'customer' => true`, and tells you who is calling with
