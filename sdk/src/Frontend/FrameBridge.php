@@ -16,7 +16,8 @@ namespace Whity\Sdk\Frontend;
  * the global it defines:
  *
  * ```js
- * const ctx = await whity.ready();          // { locale, dir, theme, apiBase }
+ * const ctx = await whity.ready();          // { locale, dir, theme, apiBase, audience, brand }
+ * // audience is 'customer' inside a workspace's customer area (SDK 1.173), with its brand.
  * const res = await whity.request('GET', '/api/bom/parts');
  * if (res.ok) render(res.body);
  * await whity.request('POST', '/api/bom/parts', { name: 'Bolt' });
@@ -67,7 +68,7 @@ final class FrameBridge
     var d = e.data;
     if (e.source !== parentWin || !d || d.whity !== P) return;
     if (d.type === 'init') {
-      ctx = { locale: d.locale, dir: d.dir, theme: d.theme, apiBase: d.apiBase };
+      ctx = { locale: d.locale, dir: d.dir, theme: d.theme, apiBase: d.apiBase, audience: d.audience || 'staff', brand: d.brand || null };
       onCtx.splice(0).forEach(function (f) { f(ctx); });
     } else if (d.type === 'response' && waiting[d.id]) {
       var w = waiting[d.id]; delete waiting[d.id]; clearTimeout(w.t);

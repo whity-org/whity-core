@@ -16,7 +16,8 @@ import { useCurrentLanguage, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { UserText } from '@/components/ui/user-text';
 import type { components } from '@whity/api-client';
-import { LoadState, Outcome, PageTitle, useAreaLoad } from '@/components/customer-area/area-parts';
+import { LoadState, Outcome, PageTitle, useAreaLoad, useLocalized } from '@/components/customer-area/area-parts';
+import { ScreenBlocks } from '@/components/customer-area/plugin-screen';
 import { BillLine, BookingLine } from '@/components/customer-area/area-rows';
 
 type Home = components['schemas']['CustomerAreaHome'];
@@ -24,6 +25,7 @@ type Home = components['schemas']['CustomerAreaHome'];
 export default function CustomerHome() {
   const t = useTranslation('customer');
   const dates = useDateDisplay();
+  const localized = useLocalized();
   const { handle, phase } = useCustomerArea();
   const { currentLanguage } = useCurrentLanguage();
   const [state, retry] = useAreaLoad<Home>(() => api.GET('/api/v1/customer-area/{handle}/home', { params: { path: { handle } } }), [handle]);
@@ -39,6 +41,16 @@ export default function CustomerHome() {
       <LoadState state={state} onRetry={retry} />
       {state.kind === 'ready' && (
         <>
+          {state.data.cards.map((card) => (
+            <Card key={card.id} data-testid="customer-home-card">
+              <CardHeader>
+                <CardTitle>{typeof card.label === 'string' ? card.label : localized(card.label as Record<string, string> | null)}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ScreenBlocks handle={handle} screenId={card.id} apiPaths={card.api_paths} blocks={card.blocks} />
+              </CardContent>
+            </Card>
+          ))}
           {state.data.waiting.length > 0 && (
             <Card data-testid="customer-home-waiting">
               <CardHeader>
@@ -77,7 +89,7 @@ export default function CustomerHome() {
               </CardContent>
             </Card>
           )}
-          {state.data.waiting.length === 0 && !state.data.next_booking && !state.data.latest_message && (
+          {state.data.cards.length === 0 && state.data.waiting.length === 0 && !state.data.next_booking && !state.data.latest_message && (
             <Outcome
               icon="success"
               tone="ok"

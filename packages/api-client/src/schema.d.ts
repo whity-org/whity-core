@@ -4691,6 +4691,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/customer-area/{handle}/x/{screen}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One plugin screen for customers (SDK 1.173)
+         * @description Only a screen whose permission the customer holds. Its blocks and embed call the plugin customer routes with the token from the route below.
+         */
+        get: operations["get_api_v1_customer_area_handle_x_screen"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/customer-area/{handle}/x/{screen}/token": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A five-minute token for a plugin screen (SDK 1.173)
+         * @description Bound to this workspace and marked for customers: it opens only the routes of that plugin declared customer, sent as a Bearer header. Takes no body.
+         */
+        post: operations["post_api_v1_customer_area_handle_x_screen_token"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/data-types": {
         parameters: {
             query?: never;
@@ -18528,9 +18568,14 @@ export interface components {
                 staff: boolean;
             } | null;
             tabs: {
-                /** @enum {string} */
-                id: "bookings" | "bills" | "messages";
+                /** @description `bookings`, `bills`, `messages`, or `x:<screen id>` for a plugin tab (SDK 1.173). */
+                id: string;
                 count: number;
+                /** @description A plugin tab label: a string or {en, ar}. */
+                label?: unknown;
+                icon?: string | null;
+                /** @description The count route of a plugin tab, called with the screen token; it answers {"count": n}. */
+                count_path?: string | null;
             }[];
         };
         CustomerAreaAccount: {
@@ -18607,6 +18652,14 @@ export interface components {
             reason?: string;
         };
         CustomerAreaHome: {
+            /** @description Home cards from plugins (placement home, SDK 1.173). */
+            cards: {
+                id: string;
+                /** @description A string or {en, ar}. */
+                label: unknown;
+                blocks: Record<string, never>[];
+                api_paths: string[];
+            }[];
             waiting: components["schemas"]["CustomerAreaBill"][];
             time_zone: string;
             next_booking: components["schemas"]["CustomerAreaBookingRow"];
@@ -18689,6 +18742,26 @@ export interface components {
             total_minor: number;
             method?: string;
             reference?: string;
+        };
+        CustomerAreaScreen: {
+            id: string;
+            /** @description A string or {en, ar}. */
+            label: unknown;
+            /** @enum {string} */
+            placement: "tab" | "home" | "page";
+            /** @enum {string} */
+            screen: "blocks" | "embed";
+            icon?: string | null;
+            /** @description The plugin customer routes this screen token opens, as path patterns. */
+            api_paths?: string[];
+            blocks?: Record<string, never>[];
+            embed?: {
+                path: string;
+                fullScreen?: boolean;
+            };
+            count?: {
+                apiPath: string;
+            };
         };
         CustomerAreaSettings: {
             enabled: boolean;
@@ -52357,6 +52430,151 @@ export interface operations {
             };
             /** @description A value that doesn't look right */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_customer_area_handle_x_screen: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace's @handle. */
+                handle: string;
+                screen: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The screen */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerAreaScreen"];
+                    };
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not here, not yours, or the area is off */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many requests */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_customer_area_handle_x_screen_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace's @handle. */
+                handle: string;
+                screen: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The token */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            token: string;
+                            expires_in: number;
+                        };
+                    };
+                };
+            };
+            /** @description Not signed in */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not here, not yours, or the area is off */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };

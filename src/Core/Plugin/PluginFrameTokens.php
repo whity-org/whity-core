@@ -49,7 +49,17 @@ final class PluginFrameTokens
     public const TTL = 300;
 
     /** Claims of the session that are never copied onto a frame token. */
-    private const NOT_COPIED = ['jti', 'type', 'iat', 'exp', 'nbf', 'plugin_ns', 'feature', 'session_jti'];
+    /**
+     * The customer area's tokens (SDK 1.173, WHIT-1424) carry this claim set
+     * to {@see self::AUDIENCE_CUSTOMER}: they open only the plugin's routes
+     * declared for customers ({@see PluginCustomerRoutes}), in the workspace
+     * of the area's address.
+     */
+    public const AUDIENCE_CLAIM = 'audience';
+
+    public const AUDIENCE_CUSTOMER = 'customer';
+
+    private const NOT_COPIED = ['jti', 'type', 'iat', 'exp', 'nbf', 'plugin_ns', 'feature', 'session_jti', self::AUDIENCE_CLAIM];
 
     private function __construct()
     {
@@ -91,6 +101,44 @@ final class PluginFrameTokens
     }
 
     /**
+     * A token for one plugin screen in a workspace's customer area (SDK 1.173,
+     * WHIT-1424; design section 41 §9). Like {@see self::issue()}, but bound to
+     * the workspace of the area's address instead of the session's active one,
+     * and marked for customers, so it opens only that plugin's customer routes.
+     * The caller has already checked the person's active membership there.
+     *
+     * @param array<string, mixed> $sessionClaims Claims of a live `access` token.
+     * @return array{token: string, expiresIn: int}
+     */
+    public static function issueForCustomer(
+        JwtParser $jwt,
+        array $sessionClaims,
+        string $screenId,
+        string $namespacePrefix,
+        int $workspaceId
+    ): array {
+        if ($workspaceId <= 0) {
+            throw new \InvalidArgumentException('A customer frame token needs a workspace.');
+        }
+        if (($sessionClaims['type'] ?? null) !== 'access') {
+            throw new \InvalidArgumentException('A frame token is issued only from a session access token.');
+        }
+        $sessionJti = $sessionClaims['jti'] ?? null;
+        if (!is_string($sessionJti) || $sessionJti === '' || $namespacePrefix === '') {
+            throw new \InvalidArgumentException('A frame token needs a session id and a plugin namespace.');
+        }
+
+        $claims = array_diff_key($sessionClaims, array_flip(self::NOT_COPIED));
+        $claims['plugin_ns'] = $namespacePrefix;
+        $claims['feature'] = $screenId;
+        $claims['session_jti'] = $sessionJti;
+        $claims['active_tenant_id'] = $workspaceId;
+        $claims[self::AUDIENCE_CLAIM] = self::AUDIENCE_CUSTOMER;
+
+        return ['token' => $jwt->create($claims, self::TTL, self::TYPE), 'expiresIn' => self::TTL];
+    }
+
+    /**
      * Whether a frame token's claims may act on this request.
      *
      * @param array<string, mixed> $claims Parsed claims with `type` = {@see self::TYPE}.
@@ -116,6 +164,11 @@ final class PluginFrameTokens
 
         $route = $router->match($request);
         if ($route === null || ($route['namespacePrefix'] ?? null) !== $namespace) {
+            return false;
+        }
+        // A customer area token opens only the plugin's customer routes (CA.18).
+        if (($claims[self::AUDIENCE_CLAIM] ?? null) === self::AUDIENCE_CUSTOMER
+            && !PluginCustomerRoutes::admits($request, $router, $namespace)) {
             return false;
         }
 

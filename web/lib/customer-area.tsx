@@ -17,7 +17,8 @@ import type { WorkspaceBrand } from '@/lib/branding-context';
 export type CustomerAreaData = Omit<components['schemas']['CustomerArea'], 'workspace'> & {
   workspace: { name: string; handle: string; brand: WorkspaceBrand };
 };
-export type CustomerTabId = 'home' | 'bookings' | 'bills' | 'messages' | 'account';
+/** A core tab, or `x:<screen id>` for a plugin's tab (SDK 1.173), or `more` on a phone. */
+export type CustomerTabId = 'home' | 'bookings' | 'bills' | 'messages' | 'account' | 'more' | `x:${string}`;
 
 export type CustomerAreaPhase =
   | { kind: 'loading' }

@@ -129,6 +129,8 @@
         "receipt.method.cheque": "Cheque",
         "receipt.method.cliq": "CliQ",
         "receipt.reference": "Reference",
+        "screen.close": "Close",
+        "screen.gone": "This page isn’t open to you",
         "state.busy": "Too many tries from here",
         "state.busyBody": "Wait a minute, then try again.",
         "state.failed": "This didn’t open",
@@ -142,6 +144,7 @@
         "tab.bills": "Bills",
         "tab.bookings": "Bookings",
         "tab.home": "Home",
-        "tab.messages": "Messages"
+        "tab.messages": "Messages",
+        "tab.more": "More"
     }
 }

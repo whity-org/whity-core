@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in sdk/CHANGELOG.md is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.172.0",
+    "sdk_version": "1.173.0",
     "core_version": "0.2.32",
     "updated": "2026-11-25",
     "ratings": {
@@ -1511,11 +1511,14 @@
                 {
                     "what": "Embedded screens call their own plugin's API through a message bridge (FrameBridge), with a five-minute token bound to the plugin's routes",
                     "since": "1.150"
+                },
+                {
+                    "what": "Screens for a workspace's customers in their customer area at /@handle (a tab, a Home card or a page), on routes declared customer, with CustomerCall and CustomerIsolationTestCase (Contribute PluginCustomerScreensInterface)",
+                    "since": "1.173"
                 }
             ],
             "missing": [
-                "Native screens for store plugins (custom screens need a change in this repository)",
-                "Blocks outside /admin/x pages"
+                "Native screens for store plugins (custom screens need a change in this repository)"
             ],
             "security": "Embedded screens run in a sandboxed frame with no origin of their own (0.2.30). Since SDK 1.150 they reach the API only through the app's message bridge, with a short-lived token that works on their own plugin's routes alone. Native screens for store plugins still need a design.",
             "plan": "later"
