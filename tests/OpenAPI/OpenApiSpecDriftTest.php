@@ -99,6 +99,8 @@ final class OpenApiSpecDriftTest extends TestCase
         self::copyDirectory($source . '/DemoCatalog', self::$referencePluginsDir . '/DemoCatalog');
         // Glossary is the committed reference for translatable fields (#521).
         self::copyDirectory($source . '/Glossary', self::$referencePluginsDir . '/Glossary');
+        // MyCourses is the committed reference for the customer area (WHIT-1426).
+        self::copyDirectory($source . '/MyCourses', self::$referencePluginsDir . '/MyCourses');
     }
 
     public static function tearDownAfterClass(): void

@@ -1088,6 +1088,27 @@ bridge and inherits the app's theme, direction and every renderer improvement.
 
 ---
 
+### Screens for your customers (SDK 1.174)
+
+A workspace's customers sign in to their own **customer area** at `/@handle` (design section 41). Your plugin can add a tab, a card on their Home, or a page there with `Contribute\PluginCustomerScreensInterface`. `plugins/MyCourses` is the working reference: a Courses tab with a count, a "Continue learning" card and a full-screen lesson player.
+
+1. **List the permissions that only ever reach the caller's own records** in `PluginCustomerPermissionsInterface::getCustomerPermissions()`. A screen needs one of them, and a customer sees it while their role holds it.
+2. **Mark the routes your screens use** `'customer' => true`, with that `requiredPermission`. The area calls your plugin only with a five-minute token for the workspace in the address, and that token opens these routes and nothing else. A screen that reads or writes any other route is dropped.
+3. **Scope by the customer the host names.** `Http\CustomerCall::from($request)` gives the profile, the workspace and the customer's contact ids. Filter every query by them, and answer another customer's id with 404, like one that does not exist:
+
+```php
+$call = CustomerCall::from($request);
+if ($call === null) {
+    return Response::error('Not found', 404);
+}
+// ... WHERE tenant_id = :workspace AND contact_id IN (...$call->contactIds)
+```
+
+4. **Declare the screens** in `getCustomerScreens()`: `placement` `tab`, `home` (blocks only) or `page`; `screen` `blocks` or `embed` (`fullScreen` for a player); optional `count` (`{"count": n}`), `icon` and `order`. An embed's frame gets `audience: 'customer'` and the workspace's `brand` from `whity.ready()`.
+5. **Prove it** with `Testing\CustomerIsolationTestCase`: call each customer route as one customer with another customer's ids and expect 404 (`tests/Plugins/MyCoursesCustomerIsolationTest.php`).
+
+Staff can still call your customer routes with their session; then there is no `CustomerCall`, and their permission decides as usual.
+
 ## Step 9 — Expose plugin routes as MCP tools
 
 Plugin routes become MCP tools automatically. No extra interface needs to be
