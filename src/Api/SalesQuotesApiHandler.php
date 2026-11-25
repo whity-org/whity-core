@@ -375,7 +375,7 @@ final class SalesQuotesApiHandler
             'total_minor' => (int) $quote['total_minor'],
             'currency' => (string) $quote['currency'],
             'valid_until' => (string) $quote['valid_until'],
-        ], $link);
+        ], $link, null, isset($quote['id']) ? (int) $quote['id'] : null);
     }
 
     /**

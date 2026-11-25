@@ -12829,6 +12829,9 @@ final class CoreApiSchemas
                 'password_sign_in' => self::bool(),
                 'inviter_name' => self::str(true),
                 'role_name' => self::str(true),
+                // WHIT-1428: an invitation to a customer's account, and its Home.
+                'customer_account' => self::bool(),
+                'customer_area_path' => self::str(true),
             ], ['email', 'tenant_name', 'requires_password', 'password_sign_in', 'inviter_name', 'role_name'])),
             // POST /api/invitations/accept — `password` is required ONLY when
             // the preview said so; supplied for an address that already has an

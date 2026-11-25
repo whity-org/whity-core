@@ -48,6 +48,8 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
         private readonly TenantHostRepository $tenants,
         private readonly string $manageUrlBase,
         private readonly ?LoggerInterface $logger = null,
+        /** WHIT-1428: "See it in your account" for customers who have one. */
+        private readonly ?\Whity\Core\CustomerArea\CustomerAreaLinks $accountLinks = null,
     ) {
     }
 
@@ -322,6 +324,11 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
                     language: $arabic ? 'ar' : 'en',
                     rowStyles: [0 => 'strong'],
                 );
+        }
+
+        // A cancelled booking has no page to open; every other kind does.
+        if ($kind !== 'cancelled' && $this->accountLinks !== null && is_int($booking['id'] ?? null)) {
+            $content = $content->withAccountLink($this->accountLinks->forEmail($tenantId, $email, 'bookings/' . $booking['id'], $arabic));
         }
 
         return [

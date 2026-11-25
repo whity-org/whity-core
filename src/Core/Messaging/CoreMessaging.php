@@ -64,6 +64,17 @@ final class CoreMessaging
 
                     return is_string($name) ? $name : null;
                 },
+                // WHIT-1428: "See it in your account" for customers who have one.
+                static function (int $tenantId, string $email, int $conversationId, bool $arabic) use ($pdo): ?array {
+                    $links = new \Whity\Core\CustomerArea\CustomerAreaLinks(
+                        $pdo,
+                        new \Whity\Core\Settings\SettingsService(new \Whity\Core\Settings\GlobalSettingsRepository($pdo), new \Whity\Core\Settings\TenantSettingsRepository($pdo)),
+                        new \Whity\Core\Branding\TenantHostRepository($pdo),
+                        \Whity\Core\Http\FrontendUrls::fromEnv()->base(),
+                    );
+
+                    return $links->forEmail($tenantId, $email, 'messages/' . $conversationId, $arabic);
+                },
             ));
         }
         if (!$channels->has(WebChatChannel::KEY)) {

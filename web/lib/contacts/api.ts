@@ -141,6 +141,12 @@ export const contactsApi = {
       await api.POST('/api/v1/contacts/{id}/archive', { params: { path: { id } }, body: {} as never }),
       'The contact could not be archived'
     ),
+  /** WHIT-1428: email the contact a link to their account in the customer area. */
+  invite: async (id: number) =>
+    send<{ result: string; email: string; expires_in_days: number }>(
+      await api.POST('/api/v1/contacts/{id}/invite', { params: { path: { id } }, body: {} as never }),
+      'The invitation was not sent'
+    ),
   restore: async (id: number) =>
     send<Contact>(
       await api.POST('/api/v1/contacts/{id}/restore', { params: { path: { id } }, body: {} as never }),

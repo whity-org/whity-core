@@ -98,6 +98,18 @@ final class ContactsApiSchemas
                 'tags' => $tags,
                 'responses' => [200 => self::json('The contact', $one)] + $notFound + self::auth(),
             ]),
+            self::route('POST', '/api/contacts/{id:\d+}/invite', 'contacts:write', [
+                // An invitation goes to a real person: staff decide, never an agent tool.
+                'mcp' => ['expose' => false],
+                'summary' => 'Invite a contact to their account in the customer area (WHIT-1428)',
+                'description' => 'Emails the contact a link to their account. Accepting makes a customer membership with the role customers get (Settings › Sign-up) and links this contact, whatever the public sign-up mode. Takes no body.',
+                'tags' => $tags,
+                'responses' => [
+                    202 => self::json('Sent', ['type' => 'object', 'properties' => ['data' => ['type' => 'object', 'properties' => ['result' => ['type' => 'string'], 'email' => ['type' => 'string'], 'expires_in_days' => ['type' => 'integer']]]]]),
+                    409 => ['description' => 'Archived, no email, already has an account, the customer area is off, or no customer role is chosen', 'content' => ['application/json' => ['schema' => SchemaBuilder::ref('Error')]]],
+                    429 => ['description' => 'Too many invitations', 'content' => ['application/json' => ['schema' => SchemaBuilder::ref('Error')]]],
+                ] + $notFound + self::auth(),
+            ]),
             self::route('POST', '/api/contacts/{id:\d+}/restore', 'contacts:write', [
                 'summary' => 'Bring an archived customer or supplier back',
                 'tags' => $tags,

@@ -52,6 +52,7 @@ final class CalendarServices
             new TenantHostRepository($pdo),
             $urls->linkOrPath(FrontendUrls::BOOKING_MANAGE),
             $logger,
+            new \Whity\Core\CustomerArea\CustomerAreaLinks($pdo, $settings, new TenantHostRepository($pdo), $urls->base()),
         ));
         if ($queue !== null) {
             $service->setQueue($queue);

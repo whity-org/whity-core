@@ -46,6 +46,13 @@ final class EmailChannel implements MessageChannel
         /** E2 `message-reply`: with the shared sender, the email is the workspace's HTML card. */
         private readonly ?BrandedEmailSender $sender = null,
         private readonly ?Closure $authorName = null,
+        /**
+         * WHIT-1428: "See it in your account" for a customer who has one:
+         * (tenant, email, conversation id, arabic) => {label, url} or null.
+         *
+         * @var (Closure(int, string, int, bool): ?array{label: string, url: string})|null
+         */
+        private readonly ?Closure $accountLink = null,
     ) {
     }
 
@@ -148,7 +155,7 @@ final class EmailChannel implements MessageChannel
         $address = $this->sender->workspaceContact($message->tenantId, $ar ? 'ar' : 'en')['address'];
         $preview = mb_substr(trim((string) preg_replace('/\s+/u', ' ', $message->body)), 0, 140);
 
-        return new EmailContent(
+        return (new EmailContent(
             heading: '',
             footnote: $repliesReturn ? ($ar
                 ? 'ردّ على هذه الرسالة للإجابة؛ تصل مباشرة إلى المحادثة نفسها.'
@@ -162,7 +169,7 @@ final class EmailChannel implements MessageChannel
                     ? ['before' => $answer ? 'ردّ ' : 'كتب ', 'strong' => $author, 'after' => ' من ' . $workspace . ':']
                     : ['before' => '', 'strong' => $author, 'after' => ' from ' . $workspace . ($answer ? ' replied:' : ' wrote:')]),
             quote: $message->body,
-        );
+        ))->withAccountLink($this->accountLink !== null ? ($this->accountLink)($message->tenantId, $message->to, $message->conversationId, $ar) : null);
     }
 
     public function receive(int $tenantId, string $rawBody, array $headers): array

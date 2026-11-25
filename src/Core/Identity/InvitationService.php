@@ -190,6 +190,87 @@ final class InvitationService
     }
 
     /**
+     * Staff invite one of the workspace's contacts to their customer account
+     * (WHIT-1428, design section 41 Q4, CA.6). Works whatever the public
+     * sign-up mode: staff decided. Accepting makes a customer membership with
+     * `$roleId` and links the contact to the person.
+     *
+     * An earlier invitation for the same contact is replaced (a resend). A
+     * person who already has an active membership here is not invited:
+     * `already_member` tells staff to link the contact instead.
+     *
+     * @return array{result: string, id: int, token: string}
+     */
+    public function inviteContact(
+        int $tenantId,
+        int $contactId,
+        string $email,
+        int $roleId,
+        int $inviterProfileId,
+        int $ttlDays = self::DEFAULT_TTL_DAYS,
+    ): array {
+        $rawToken = PublicToken::make(self::TOKEN_BYTES);
+        $expiresAt = gmdate('Y-m-d H:i:s', time() + $this->clampTtlDays($ttlDays) * 86400);
+
+        $ownTx = !$this->db->inTransaction();
+        if ($ownTx) {
+            $this->db->beginTransaction();
+        }
+
+        try {
+            $profileId = $this->profileIdForEmail($email);
+            if ($profileId !== null && $this->membershipStatuses($profileId, $tenantId)['active']) {
+                if ($ownTx) {
+                    $this->db->commit();
+                }
+
+                return ['result' => self::INVITE_ALREADY_MEMBER, 'id' => 0, 'token' => ''];
+            }
+
+            $this->db->prepare(
+                'UPDATE invitations
+                    SET status = :superseded, updated_at = NOW()
+                  WHERE tenant_id = :tenant_id AND contact_id = :contact_id AND status = :pending'
+            )->execute([
+                ':superseded' => self::STATUS_SUPERSEDED,
+                ':tenant_id' => $tenantId,
+                ':contact_id' => $contactId,
+                ':pending' => self::STATUS_PENDING,
+            ]);
+
+            $this->db->prepare(
+                'INSERT INTO invitations
+                     (tenant_id, email, role_id, ou_id, token_hash, status, invited_by, kind, contact_id,
+                      expires_at, created_at, updated_at)
+                 VALUES (:tenant_id, :email, :role_id, NULL, :hash, :status, :invited_by, :kind, :contact_id,
+                         :expires_at, NOW(), NOW())'
+            )->execute([
+                ':tenant_id' => $tenantId,
+                ':email' => $email,
+                ':role_id' => $roleId,
+                ':hash' => PublicToken::hash($rawToken),
+                ':status' => self::STATUS_PENDING,
+                ':invited_by' => $inviterProfileId,
+                ':kind' => self::KIND_CUSTOMER,
+                ':contact_id' => $contactId,
+                ':expires_at' => $expiresAt,
+            ]);
+            $id = (int) $this->db->lastInsertId();
+
+            if ($ownTx) {
+                $this->db->commit();
+            }
+
+            return ['result' => self::INVITE_CREATED, 'id' => $id, 'token' => $rawToken];
+        } catch (\Throwable $e) {
+            if ($ownTx && $this->db->inTransaction()) {
+                $this->db->rollBack();
+            }
+            throw $e;
+        }
+    }
+
+    /**
      * A customer invites a colleague into their own role, as a customer (#1872).
      *
      * The caller (the customer API) has already checked that customer invites
@@ -518,7 +599,7 @@ final class InvitationService
      * HERE and only here — the caller holds a valid single-use token, which is
      * the same proof of mailbox control a password-reset link demands.
      *
-     * @return array{tenant_id: int, tenant_name: string, email: string, requires_password: bool, inviter_name: string|null, role_name: string|null}|null
+     * @return array{tenant_id: int, tenant_name: string, email: string, requires_password: bool, inviter_name: string|null, role_name: string|null, customer_account: bool, customer_area_path: string|null}|null
      *         null for an unknown, expired, revoked, superseded or already-used
      *         token — the four are deliberately indistinguishable.
      */
@@ -537,6 +618,10 @@ final class InvitationService
             // TplAuthInvite: who invited you, to what, as which role.
             'inviter_name' => isset($row['inviter_name']) && $row['inviter_name'] !== '' ? (string) $row['inviter_name'] : null,
             'role_name' => isset($row['role_name']) ? (string) $row['role_name'] : null,
+            // WHIT-1428: an invitation to a customer's account, from a contact.
+            'customer_account' => ($isAccount = ($row['kind'] ?? self::KIND_MEMBER) === self::KIND_CUSTOMER && ($row['contact_id'] ?? null) !== null),
+            // Where the new customer lands: their account's Home.
+            'customer_area_path' => $isAccount && is_string($row['tenant_slug'] ?? null) && $row['tenant_slug'] !== '' ? '/@' . $row['tenant_slug'] . '/home' : null,
         ];
     }
 
@@ -569,6 +654,11 @@ final class InvitationService
             $email = (string) $invitation['email'];
             $profileId = $this->profileIdForEmail($email);
             $isCustomer = ($invitation['kind'] ?? self::KIND_MEMBER) === self::KIND_CUSTOMER;
+            // WHIT-1428: staff invited this contact to their account. Staff
+            // decided, so the rules for customers inviting colleagues (#1872)
+            // and an earlier turned-away sign-up don't apply.
+            $contactId = isset($invitation['contact_id']) ? (int) $invitation['contact_id'] : null;
+            $byStaff = $isCustomer && $contactId !== null;
 
             if ($profileId === null && ($passwordHash === null || $passwordHash === '')) {
                 // Nothing has been written yet, so the invitation survives and
@@ -602,8 +692,8 @@ final class InvitationService
                 $outcome = self::ACCEPT_ALREADY_MEMBER;
             } elseif ($isCustomer && (
                 $statuses['invited']
-                || $this->wasTurnedAway($tenantId, $email)
-                || !$this->customerInviteStillValid(
+                || (!$byStaff && $this->wasTurnedAway($tenantId, $email))
+                || !$byStaff && !$this->customerInviteStillValid(
                     $tenantId,
                     (int) $invitation['role_id'],
                     $invitation['invited_by'] !== null ? (int) $invitation['invited_by'] : null
@@ -678,6 +768,16 @@ final class InvitationService
                 }
 
                 return ['result' => self::ACCEPT_INVALID, 'tenant_id' => null, 'profile_id' => null];
+            }
+
+            // WHIT-1428: the contact the invitation named is now this person,
+            // so their bookings and bills show in their account at once. Never
+            // over a contact already linked to someone else.
+            if ($byStaff) {
+                $this->db->prepare(
+                    'UPDATE contacts SET profile_id = :profile_id, updated_at = NOW()
+                      WHERE id = :id AND tenant_id = :tenant_id AND (profile_id IS NULL OR profile_id = :same)'
+                )->execute([':profile_id' => $profileId, ':id' => $contactId, ':tenant_id' => $tenantId, ':same' => $profileId]);
             }
 
             $result = $this->finish($ownTx, [
@@ -771,8 +871,8 @@ final class InvitationService
 
         // Reached from the PUBLIC accept endpoint, which has no tenant context by construction — the 256-bit single-use token is the authority, and the row's own tenant_id is what the membership is then created in
         $stmt = $this->db->prepare(
-            'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, i.kind, i.annotations, i.invited_by,
-                    t.name AS tenant_name,
+            'SELECT i.id, i.tenant_id, i.email, i.role_id, i.ou_id, i.kind, i.annotations, i.invited_by, i.contact_id,
+                    t.name AS tenant_name, t.slug AS tenant_slug,
                     p.display_name AS inviter_name, r.name AS role_name
                FROM invitations i
                LEFT JOIN tenants t ON t.id = i.tenant_id

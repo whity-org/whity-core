@@ -94,6 +94,9 @@ final class InvitationAcceptHandler
             'password_sign_in' => PasswordSignIn::allowed($this->settings),
             'inviter_name' => $preview['inviter_name'],
             'role_name' => $preview['role_name'],
+            // WHIT-1428: an invitation to a customer's account, and where it lands.
+            'customer_account' => $preview['customer_account'],
+            'customer_area_path' => $preview['customer_area_path'],
         ]], 200);
     }
 

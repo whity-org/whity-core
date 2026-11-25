@@ -48,10 +48,18 @@ final class TradingEmails
         self::REMINDER => SettingsRegistry::SALES_EMAIL_REMINDER,
     ];
 
+    /** WHIT-1428: "See it in your account" for customers who have one. */
+    private ?\Whity\Core\CustomerArea\CustomerAreaLinks $accountLinks = null;
+
     public function __construct(
         private readonly BrandedEmailSender $sender,
         private readonly SettingsService $settings,
     ) {
+    }
+
+    public function setAccountLinks(\Whity\Core\CustomerArea\CustomerAreaLinks $links): void
+    {
+        $this->accountLinks = $links;
     }
 
     /** Whether the workspace sends this email. */
@@ -75,7 +83,7 @@ final class TradingEmails
      *
      * @param array{number: string, customer: string, what: string, total_minor: int, currency: string, valid_until: string} $quote
      */
-    public function quote(int $tenantId, string $to, array $quote, string $link, ?MailAttachment $pdf = null): bool
+    public function quote(int $tenantId, string $to, array $quote, string $link, ?MailAttachment $pdf = null, ?int $quoteId = null): bool
     {
         if (!$this->enabled($tenantId, self::QUOTE)) {
             return false;
@@ -101,7 +109,7 @@ final class TradingEmails
                 notice: $this->notice($tenantId, $ar),
                 language: $ar ? 'ar' : 'en',
                 rowStyles: [0 => 'strong'],
-            ), $pdf);
+            )->withAccountLink($quoteId !== null ? $this->accountLinks?->forEmail($tenantId, $to, 'bills/quotes/' . $quoteId, $ar) : null), $pdf);
     }
 
     /**
