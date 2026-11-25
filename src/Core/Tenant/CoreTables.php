@@ -286,6 +286,7 @@ final class CoreTables
         'tenant_handle_history' => '356_create_tenant_handle_history.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
         'workspace_template_runs' => '305_create_workspace_templates.php',
+        'workspace_template_parts' => '358_create_workspace_template_parts.php',
         // WHIT-1225: themes a workspace imported or installed from the store.
         'themes' => '323_create_themes.php',
         // WHIT-1225 (TH.25): every version of a workspace's own theme.

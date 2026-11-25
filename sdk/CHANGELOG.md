@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.169
+
+WORKSPACE TEMPLATES, PART 1 (design section 39): the engine that applies a workspace template moves from core into the SDK as `Templates\TemplateEngine`, working only through `Setup\WorkspaceSetup` and a new `Templates\TemplateLedger` (what each run made, and since this minor the version of each part it applied). Core's applier is a thin wrapper over it, so its rules are unchanged: add what is missing, never overwrite, never delete, never bring back what the person deleted, no more permissions than the person holds, each part fails alone. Each run now also reports every item with what happened to it (`add`, `keep`, `done`, `left`, `skip`). `Templates\DryRunWorkspaceSetup` and `Templates\MemoryLedger` plan without changing anything: core's new `POST /api/workspace/templates/{key}/preview` runs the same engine over them. Template authors test their manifests with `Testing\WorkspaceTemplateTestCase` (`assertTemplateValid`, `applyTemplate`, `assertIdempotent`, `assertUpgradeKeepsData`) against `Testing\FakeWorkspace`, a workspace in memory. `Templates\TemplateMoney` reads a price in the currency's own decimals (CU.1). Core migration 358 adds `workspace_template_parts` (WHIT-1409).
+
+Purely additive: new classes and one new interface that only the host and the SDK's own ledger implement. No existing interface or manifest key changes.
+
 ## 1.168
 
 ONE ENTRY POINT FOR PLUGIN FRONTENDS (decision D8, step 5d): the `@whity/ui` subpaths that nothing outside the package imports (the `editor/*` building blocks of `editor/doc-editor`, and `agent-run-status`, `beta-warning`, `collapsible`, `color-card`, `menu-bar`, `switcher`, `time-picker`, `top-nav`), and the root entry and `/expressions` of `@whity/features`, are marked internal in each package's README and changelog. A plugin frontend takes blocks, the client and test helpers from `@whity/plugin-sdk`. The entries stay in `exports` and leave at each package's next major (WHIT-1394) (WHIT-1396).

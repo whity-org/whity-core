@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in sdk/CHANGELOG.md is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.168.0",
+    "sdk_version": "1.169.0",
     "core_version": "0.2.32",
     "updated": "2026-11-25",
     "ratings": {
@@ -1741,6 +1741,10 @@
                 {
                     "what": "A workspace template turns on the walk-in queue (`calendar.settings.walkins_enabled`) and may give a role `calendar:front_desk`",
                     "since": "1.147"
+                },
+                {
+                    "what": "Workspace templates: the apply engine (Templates\\TemplateEngine), a dry run that changes nothing (Templates\\DryRunWorkspaceSetup, the preview route), the version of each part a run applied, and a test kit for template authors (Testing\\WorkspaceTemplateTestCase, Testing\\FakeWorkspace)",
+                    "since": "1.169"
                 },
                 {
                     "what": "WorkspaceCommissionExpenses (Contribute): book a closed commission period (CommissionClose) as an expense; event calendar.commission.closed",

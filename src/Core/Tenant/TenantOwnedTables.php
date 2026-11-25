@@ -280,6 +280,8 @@ final class TenantOwnedTables
         // it made, examples marked (migration 305).
         'workspace_template_runs' => '305_create_workspace_templates.php',
         'workspace_template_items' => '305_create_workspace_templates.php',
+        // WHIT-1409: the version of each part a template run applied (migration 358).
+        'workspace_template_parts' => '358_create_workspace_template_parts.php',
         // WHIT-1225: themes a workspace imported or installed from the store
         // (migration 323). Every query binds tenant_id.
         'themes' => '323_create_themes.php',
