@@ -124,9 +124,10 @@ final class DesktopPluginReleaseServiceTest extends TestCase
         $this->assertSame('HelloWorld', $entry['name']);
         $this->assertSame('2.1.0', $entry['latestVersion']);
         $version = $entry['versions'][0];
-        $this->assertSame(['version', 'sha256', 'sizeBytes', 'releasedAt'], array_keys($version));
+        $this->assertSame(['version', 'sha256', 'sizeBytes', 'releasedAt', 'attestation'], array_keys($version));
         $this->assertSame($result->sha256, $version['sha256']);
         $this->assertSame($result->sizeBytes, $version['sizeBytes']);
+        $this->assertNull($version['attestation'], 'no mark, no attestation');
 
         // download() — the served bytes must hash to exactly the catalog sha256.
         $download = $handler->download(new Request('GET', '/x'), ['name' => 'HelloWorld', 'version' => '2.1.0']);
@@ -134,6 +135,42 @@ final class DesktopPluginReleaseServiceTest extends TestCase
         $headers = array_change_key_case($download->getHeaders());
         $this->assertSame('application/zip', $headers['content-type']);
         $this->assertSame($result->sha256, hash('sha256', $download->getBody()));
+    }
+
+    /**
+     * WHIT-1420: a device verifies the attestation itself, so the catalogue
+     * carries the envelope core holds for exactly these bytes, and only while it
+     * stands; the accepted revocation list is relayed as the envelope it came in.
+     */
+    public function testCatalogCarriesTheAttestationForTheseBytesAndTheRevocationList(): void
+    {
+        $result = $this->service()->release($this->source, 'HelloWorld', '2.1.0');
+        $handler = new DesktopPluginsApiHandler($this->storageDir, $this->pdo);
+
+        $none = json_decode($handler->revocations(new Request('GET', '/x'))->getBody(), true);
+        $this->assertNull($none['data'], 'nothing accepted yet');
+
+        $insert = $this->pdo->prepare(
+            "INSERT INTO plugin_version_marks (plugin_name, version, package_sha256, manifest_hash, source, attestation, granted_at, revoked_at)
+             VALUES (?, ?, ?, ?, 'whity', ?, NOW(), ?)"
+        );
+        // A revoked mark for the same bytes says nothing; the live one is relayed.
+        $insert->execute(['HelloWorld', '2.1.0', $result->sha256, str_repeat('a', 64), '{"old":true}', '2026-01-01 00:00:00']);
+        $insert->execute(['HelloWorld', '2.1.0', $result->sha256, str_repeat('b', 64), '{"key":"k","payload":"p","signature":"s"}', null]);
+        // A mark for other bytes of the same version is not these bytes.
+        $insert->execute(['HelloWorld', '2.1.0', str_repeat('c', 64), str_repeat('d', 64), '{"other":true}', null]);
+
+        $data = json_decode($handler->catalog(new Request('GET', '/api/desktop-plugins'))->getBody(), true);
+        $this->assertSame('{"key":"k","payload":"p","signature":"s"}', $data['data'][0]['versions'][0]['attestation']);
+
+        $this->pdo->prepare(
+            'INSERT INTO plugin_revocation_state (id, sequence, issued_at, expires_at, body, applied_at) VALUES (1, 7, 1700000000, 1800000000, ?, NOW())'
+        )->execute(['{"key":"k","payload":"list","signature":"s"}']);
+        $list = json_decode($handler->revocations(new Request('GET', '/x'))->getBody(), true);
+        $this->assertSame(
+            ['sequence' => 7, 'issuedAt' => 1700000000, 'expiresAt' => 1800000000, 'envelope' => '{"key":"k","payload":"list","signature":"s"}'],
+            $list['data'],
+        );
     }
 
     public function testReleaseIsImmutableWithoutForce(): void
