@@ -81,8 +81,12 @@ The app is served on `http://localhost:8000` (mapped from container port 80).
 Migrations are run via the CLI entry point in `public/index.php`:
 
 ```bash
-docker compose exec frankenphp php public/index.php migrate
+docker compose exec -u www-data frankenphp php public/index.php migrate
 ```
+
+`-u www-data` because the app runs as `www-data`, and `docker compose exec`
+otherwise runs as root (see "Running commands in the app container" in the
+[deployment guide](DEPLOYMENT_GUIDE.md)).
 
 Migrating alone creates the **bootstrap administrator** — the system-tenant (id 0)
 account you first sign in with. Its address comes from `INITIAL_SYSTEM_ADMIN_EMAIL`

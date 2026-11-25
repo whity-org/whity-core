@@ -157,6 +157,29 @@ to `www-data` before running anything:
   (`CHOWN`, `DAC_OVERRIDE`, `FOWNER`, `SETUID`, `SETGID`) and set
   `no-new-privileges`. Once running, the process has no capabilities at all.
 
+### Running commands in the app container
+
+**Use `docker exec -u www-data` (or `docker compose exec -u www-data`) for any
+command you run inside the app or a worker container.** `docker exec` skips the
+image's entrypoint, so without `-u` it runs as root. A command that writes files
+(uploads, generated documents, a plugin install, a backup, a cache) would then
+leave root-owned files that the app, running as `www-data`, can't change later.
+
+```bash
+docker exec -u www-data <app>_frankenphp php bin/whity-cli render:check
+docker compose exec -u www-data frankenphp php public/index.php migrate run
+```
+
+- A one-off container (`docker compose run --rm frankenphp …`) goes through the
+  entrypoint and is already `www-data`; it needs no `-u`.
+- Reading only (logs, `ls`, `cat`) works either way.
+- If a root command did leave files behind, nothing is lost: restart the
+  container with `WHITY_RUN_AS_ROOT=1` once and then without it, and the
+  entrypoint hands everything back to `www-data` (or `chown -R 33:33` the
+  directory on the host).
+- The development stack (`docker-compose.yml`, the `base` stage with the
+  checkout bind-mounted) still runs as root; this applies to the release image.
+
 ### If writes fail after an upgrade
 
 The entrypoint logs `[entrypoint] WARNING: could not give <dir> to www-data`
