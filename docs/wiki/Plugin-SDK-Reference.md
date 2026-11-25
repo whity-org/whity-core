@@ -207,6 +207,7 @@ A plugin hands the host an object that does the work. The host decides when to c
 | `Notification\NotificationTransport` | core's `TransportRegistry` (no plugin registration path yet) | A delivery transport for notifications |
 | `Auth\ExternalAuthProvider` | core's OIDC engine (no plugin registration path yet, #1690) | A sign-in provider |
 | `Sync\SyncableResource` | your own routes, with `Sync\SyncController` | Makes one of your tables offline-first and two-way syncable: idempotent create, optimistic-concurrency update and delete, tombstones and a changes feed. The table carries `SyncController::SYNC_COLUMNS` and a unique `(tenant_id, client_uuid)`. |
+| `Sync\PluginSyncResourcesInterface` | `getSyncResources()` | Names the `/api/...` paths you serve through `Sync\SyncController`, so Whity Desktop keeps that data on the person's computer and relays changes both ways (SDK 1.173). |
 
 ## Errors
 

@@ -20,6 +20,7 @@ use Whity\Sdk\PluginInterface;
 use Whity\Sdk\PluginRequirementsInterface;
 use Whity\Sdk\Rbac\PluginResourceTypesInterface;
 use Whity\Sdk\Settings\PluginSettingsInterface;
+use Whity\Sdk\Sync\PluginSyncResourcesInterface;
 use Whity\Sdk\Tenant\PluginTablesInterface;
 
 /**
@@ -58,6 +59,7 @@ final class DemoCatalogPlugin implements
     PluginFrontendInterface,
     PluginResourceTypesInterface,
     PluginTablesInterface,
+    PluginSyncResourcesInterface,
     PluginDataTypesInterface,
     PluginSettingsInterface,
     PluginEntitlementsInterface
@@ -146,6 +148,18 @@ final class DemoCatalogPlugin implements
     public function getPluginDependencies(): array
     {
         return [];
+    }
+
+    /**
+     * The items are the sync resource (SDK 1.173): Whity Desktop keeps them on
+     * the person's computer too and relays changes both ways through the
+     * SyncController behind this path.
+     *
+     * @return list<string>
+     */
+    public function getSyncResources(): array
+    {
+        return ['/api/demo-catalog/items'];
     }
 
     /**

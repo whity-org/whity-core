@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.173
+
+DESKTOP DATA SYNC: `Sync\PluginSyncResourcesInterface`, optional, names the route paths a plugin serves through `Sync\SyncController` (`getSyncResources()` returns `/api/...` paths such as `/api/demo-catalog/items`). Whity Desktop runs the same plugin on the person's computer and relays each declared resource both ways between the device and the workspace through the sync wire contract the controller already speaks: the changes feed, idempotent create on `clientUuid`, optimistic update and delete, tombstones; a row changed on both ends is parked for a person to resolve. On the server the declaration does nothing. DemoCatalog declares its items (whity-desktop ADR 0001, decision 4) (WHIT-1422).
+
+Purely additive: one new optional interface. No existing interface changes.
+
 ## 1.172
 
 WORKSPACE TEMPLATES, PART 3 (design section 40 §3.3; owner, 25 Nov 2026, Q1 "Review routes now"): a template's `pipelines` (up to 5) are review routes in Flows for its forms. Each names its form (`for.form`) and its stages in order (up to 8); a stage names one of the template's roles by key and may turn off sending back (`sendBack: false`). People are never named, and there is no stage by permission, as Flows routes by role. Applying makes a route template through core's route-template API as the person, one decision stage per stage for the people holding its role, and sends the form's answers through it when the form has none yet; a route the person chose stays. Without `route_templates:write` the pipeline is skipped with the reason. Pipelines compose by key like the other lists (`remove.pipelines` drops one, an extension may add one), and "Use the template's version" of a pipeline makes a new route, named with the template's version, and moves the form to it only while the form still uses the route the template made. `WorkspaceTemplateValidator::pipelineErrors()` checks one; `FakeWorkspace` keeps `routes`, and `assertUpgradeKeepsData()` checks them too (WHIT-1419).
