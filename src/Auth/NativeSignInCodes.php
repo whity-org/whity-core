@@ -69,9 +69,6 @@ final class NativeSignInCodes
      */
     public function consume(string $code): ?array
     {
-        // Every exchange also sweeps what nobody collected: a code that expired
-        // is dead whether or not it is ever presented.
-        $this->pruneExpired();
         $hash = hash('sha256', $code);
         $select = $this->pdo->prepare(
             'SELECT profile_id, email, provider_id, provider_tenant_id, tenant_trust, code_challenge, expires_at
@@ -80,10 +77,16 @@ final class NativeSignInCodes
         $select->execute([$hash]);
         $row = $select->fetch(PDO::FETCH_ASSOC);
         if ($row === false) {
+            $this->pruneExpired();
+
             return null;
         }
         $delete = $this->pdo->prepare('DELETE FROM native_sign_in_codes WHERE code_hash = ?');
         $delete->execute([$hash]);
+        // Every exchange also sweeps what nobody collected. After the lookup, so
+        // a code presented just past its minute is still reported as expired,
+        // not as unknown.
+        $this->pruneExpired();
         if ($delete->rowCount() !== 1) {
             return null;
         }

@@ -1257,30 +1257,6 @@ final class SsoAuthHandlerRealEngineTest extends TestCase
         self::assertSame(self::APP_URL . '/dashboard', $this->location($res), $res->getBody());
         self::assertNull($this->phoneOf($this->profileId));
     }
-}
-
-/**
- * Stub OIDC HTTP client: canned discovery (getJson) + token response (postForm).
- */
-final class StubOidcHttp implements HttpClient
-{
-    /** @var array<string, mixed>|null */
-    public ?array $discovery = null;
-    /** @var array<string, mixed>|null */
-    public ?array $tokenResponse = null;
-
-    public function getJson(string $url): ?array
-    {
-        return $this->discovery;
-    }
-
-    public function postForm(string $url, array $params): ?array
-    {
-        return $this->tokenResponse;
-    }
-
-    // ── native sign-in return (WHIT-1406) ────────────────────────────────────
-
     private const NATIVE_VERIFIER = 'native-verifier-0123456789abcdefghijklmnopqrstuvwxyz-ABCDEF';
 
     /** @return array{port: int, challenge: string, state: string} */
@@ -1333,13 +1309,15 @@ final class StubOidcHttp implements HttpClient
         $_GET = ['mode' => 'native', 'port' => (string) $target['port'], 'code_challenge' => $target['challenge'], 'state' => $target['state']];
         $res = $this->handler->start(new Request('GET', '/api/v1/auth/sso/google/start', [], ''), ['provider' => 'google']);
 
+        // The flow cookie is sent as a header, which this harness can't read; the
+        // callback tests build the same flow and prove what the claims do.
         self::assertSame(302, $res->getStatusCode());
-        self::assertStringStartsWith('https://accounts.google.com/', $this->location($res));
-        $flow = $this->jwtParser->parse($_COOKIE['sso_flow_token']);
-        self::assertSame(43127, $flow['native_port']);
-        self::assertSame($target['challenge'], $flow['native_challenge']);
-        self::assertSame($target['state'], $flow['native_state']);
-        self::assertStringNotContainsString($target['state'], $this->location($res), "the app's state is not the provider's state");
+        $loc = $this->location($res);
+        self::assertStringStartsWith('https://accounts.google.com/', $loc);
+        self::assertStringContainsString('code_challenge_method=S256', $loc);
+        self::assertStringNotContainsString($target['state'], $loc, "the app's state is not the provider's state");
+        self::assertStringNotContainsString($target['challenge'], $loc, "the app's challenge is not the provider's challenge");
+        self::assertStringNotContainsString('43127', $loc, 'the loopback port stays inside the signed flow cookie');
     }
 
     public function testNativeStartRefusesAnythingButALoopbackPortAChallengeAndAState(): void
@@ -1410,8 +1388,8 @@ final class StubOidcHttp implements HttpClient
         // Replay.
         $again = $this->exchange($code);
         self::assertSame(401, $again->getStatusCode());
-        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_logs WHERE action = 'auth.native.exchange_refused'"));
-        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_logs WHERE action = 'auth.native.exchanged'"));
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.native.exchange_refused'"));
+        self::assertSame(1, (int) $this->col("SELECT COUNT(*) FROM audit_log WHERE action = 'auth.native.exchanged'"));
     }
 
     public function testAWrongVerifierSpendsTheCodeAndGetsNothing(): void
@@ -1428,7 +1406,7 @@ final class StubOidcHttp implements HttpClient
         self::assertSame(401, $this->exchange($code)->getStatusCode());
         self::assertSame(
             'wrong_verifier',
-            json_decode((string) $this->col("SELECT metadata FROM audit_logs WHERE action = 'auth.native.exchange_refused' ORDER BY id ASC LIMIT 1"), true)['reason'] ?? null,
+            json_decode((string) $this->col("SELECT metadata FROM audit_log WHERE action = 'auth.native.exchange_refused' ORDER BY id ASC LIMIT 1"), true)['reason'] ?? null,
         );
     }
 
@@ -1443,7 +1421,7 @@ final class StubOidcHttp implements HttpClient
         self::assertSame(401, $res->getStatusCode());
         self::assertSame(
             'expired',
-            json_decode((string) $this->col("SELECT metadata FROM audit_logs WHERE action = 'auth.native.exchange_refused' ORDER BY id DESC LIMIT 1"), true)['reason'] ?? null,
+            json_decode((string) $this->col("SELECT metadata FROM audit_log WHERE action = 'auth.native.exchange_refused' ORDER BY id DESC LIMIT 1"), true)['reason'] ?? null,
         );
     }
 
@@ -1485,15 +1463,39 @@ final class StubOidcHttp implements HttpClient
         self::assertSame(0, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'));
         self::assertSame(401, $this->exchange($stale)->getStatusCode(), 'and it cannot be used afterwards');
 
-        // The daily job covers an instance nobody exchanges on.
-        $codes = new \Whity\Auth\NativeSignInCodes($this->pdo, fn (): int => $this->now);
-        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', -1);
+        // The daily job covers an instance nobody exchanges on. It runs on the
+        // real clock, so these rows are dated against it.
+        $codes = new \Whity\Auth\NativeSignInCodes($this->pdo);
         $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', 60);
+        $codes->issue($this->profileId, 'alice@acme.test', $this->providerId, 0, false, 'challenge-0123456789012345678901234567890123', -1);
         ob_start();
         (new \Whity\Commands\RevokedTokensCleanupCommand($this->pdo))->execute();
         $output = (string) ob_get_clean();
         self::assertStringContainsString('Cleaned 1 expired native sign-in codes', $output);
         self::assertSame(1, (int) $this->col('SELECT COUNT(*) FROM native_sign_in_codes'), 'the live one stays');
     }
+}
+
+/**
+ * Stub OIDC HTTP client: canned discovery (getJson) + token response (postForm).
+ */
+final class StubOidcHttp implements HttpClient
+{
+    /** @var array<string, mixed>|null */
+    public ?array $discovery = null;
+    /** @var array<string, mixed>|null */
+    public ?array $tokenResponse = null;
+
+    public function getJson(string $url): ?array
+    {
+        return $this->discovery;
+    }
+
+    public function postForm(string $url, array $params): ?array
+    {
+        return $this->tokenResponse;
+    }
+
+    // ── native sign-in return (WHIT-1406) ────────────────────────────────────
 
 }
