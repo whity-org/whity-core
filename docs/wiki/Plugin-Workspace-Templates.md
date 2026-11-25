@@ -40,6 +40,7 @@ Checked by `Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors()`. A template
 | `roles` | no | Up to 6: `key`, `name`, `description`, `permissions` (slugs) |
 | `forms` | no | Up to 5: `key` (the form key), `name`, `description`, `fields` (`key`, `type`, `label`, `help`, `required`, `options` for select and multiselect), `publish` |
 | `documents` | no | Up to 5: `key`, `kind` (`note`, `letter`, `template`, `label`), `title`, `blocks` as `{en: [...], ar: [...]}` editor blocks |
+| `pipelines` | no | SDK 1.172: up to 5 review routes in Flows for the template's forms, see below |
 | `examples` | no | Up to 10 `contacts` (`key`, `name`, an `@example.com` `email`, `phone`, `notes`) and 10 `bookings` (`key`, `service`, `contact`, `inDays` 1-14, `time` HH:MM) |
 | `setup` | no | The guided setup: `title`, `description`, and 1 to 8 `steps`, each an `id`, a `kind`, a `title` and a `why` |
 | `theme` | no | The theme that suits this business, by id (`templates.market`), usually one your plugin ships with `PluginThemesInterface` (SDK 1.125). SDK 1.131: older hosts refuse a manifest with it, so require `^1.131`. See below |
@@ -170,8 +171,32 @@ Bump `version` on every change, and say what changed in `changes`, newest first:
   - a service gets its names, duration and price in the workspace's currency;
   - a form gets the template's labels and help, plus the questions it is missing (the person's own questions stay);
   - a role gets the template's permissions it is missing, only those the person holds;
-  - a document gets a new copy beside the workspace's.
+  - a document gets a new copy beside the workspace's;
+  - a pipeline gets a new review route named with the template's version ("Intake review, version 2"). Its form moves to the new route only while it still uses the route the template made; the old route stays in Flows.
 - **Nothing comes back.** An item the person deleted is never made again and has nothing to adopt.
+
+## Pipelines: review routes in Flows (SDK 1.172)
+
+A pipeline is a review route in Flows for one of the template's forms: each answer to the form goes through its stages in order. Each stage is a decision by the people holding one of the template's roles; an approval moves it on to the next stage.
+
+```json
+"pipelines": [{
+  "key": "intake-review",
+  "name": {"en": "Intake review", "ar": "مراجعة الاستقبال"},
+  "description": {"en": "Reception checks each intake, then a doctor approves it.", "ar": "يدقق الاستقبال كل نموذج ثم يعتمده الطبيب."},
+  "for": {"form": "patient-intake"},
+  "stages": [
+    {"key": "reception", "name": {"en": "Reception checks", "ar": "تدقيق الاستقبال"}, "role": "reception"},
+    {"key": "doctor", "name": {"en": "Doctor approves", "ar": "اعتماد الطبيب"}, "role": "doctor", "sendBack": false}
+  ]
+}]
+```
+
+- `for.form` is the key of one of the template's forms, and each stage's `role` the key of one of its roles. People are never named. A stage cannot name a permission, as Flows routes by role.
+- Up to 5 pipelines, each with 1 to 8 stages. `sendBack: false` stops that stage sending an answer back to the person who sent it.
+- **Applying** makes the route template as the person, through core's own route-template API, and sends the form's answers through it when the form has no route yet. A route the person already chose for the form stays, and the preview says so. The person needs `route_templates:write`; without it, the pipeline is skipped with the reason and everything else is still made.
+- Pipelines compose by key like the other lists: a template built on another can drop one with `remove.pipelines`, and an extension can add one for its target's forms and roles.
+- Older hosts refuse a manifest with `pipelines`, so require `^1.172`.
 
 ## The theme
 

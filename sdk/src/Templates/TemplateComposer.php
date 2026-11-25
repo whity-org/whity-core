@@ -40,7 +40,7 @@ final class TemplateComposer
 {
     public const MAX_DEPTH = 3;
 
-    private const BY_KEY = ['services', 'roles', 'forms', 'documents'];
+    private const BY_KEY = ['services', 'roles', 'forms', 'documents', 'pipelines'];
 
     private function __construct()
     {

@@ -247,9 +247,9 @@ final class SdkPackageContractTest extends TestCase
     public function testSdkVersionIsPinnedAndItsChangelogEntryIsOnTop(): void
     {
         $this->assertSame(
-            '1.170.0',
+            '1.172.0',
             \Whity\Sdk\Sdk::VERSION,
-            'SDK 1.170: workspace templates build on each other, take extensions from other plugins, ship from plugin.json and offer updates item by item (Templates\\TemplateComposer, Contribute\\PluginWorkspaceTemplateExtensionsInterface, WHIT-1413). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
+            'SDK 1.172: a workspace template\'s pipelines become review routes in Flows for its forms (WorkspaceTemplateValidator::pipelineErrors, Templates\\TemplateEngine, WHIT-1419). What each minor added is in sdk/CHANGELOG.md; add a new minor\'s entry there.'
         );
 
         $changelog = (string) file_get_contents(self::SDK_DIR . '/CHANGELOG.md');

@@ -50,6 +50,10 @@ namespace Whity\Sdk\Manifest;
  * each version added. {@see self::extensionErrors()} checks the pieces a
  * plugin adds to another plugin's template. Older hosts refuse these keys, so
  * a plugin using them requires `^1.170`.
+ *
+ * SDK 1.172 (WHIT-1419, design section 40.3): `pipelines` are review routes in
+ * Flows for the template's forms. Each stage names one of the template's roles
+ * by key; people are never named. A plugin using them requires `^1.172`.
  */
 final class WorkspaceTemplateValidator
 {
@@ -62,6 +66,8 @@ final class WorkspaceTemplateValidator
     public const MAX_EXAMPLES = 10;
     public const MAX_STEPS = 8;
     public const MAX_OFFER_LINES = 6;
+    public const MAX_PIPELINES = 5;
+    public const MAX_STAGES = 8;
 
     /** The longest trial a template may give, the same cap as a plugin's own. */
     public const MAX_TRIAL_DAYS = 90;
@@ -86,13 +92,13 @@ final class WorkspaceTemplateValidator
 
     public const DOCUMENT_KINDS = ['note', 'letter', 'template', 'label'];
 
-    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'examples', 'setup', 'offer', 'theme', 'extends', 'remove', 'hidesParent', 'changes'];
+    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup', 'offer', 'theme', 'extends', 'remove', 'hidesParent', 'changes'];
 
     /** What a template that extends another may drop from it (SDK 1.170), by list. */
-    public const REMOVABLE = ['services', 'roles', 'forms', 'documents', 'steps'];
+    public const REMOVABLE = ['services', 'roles', 'forms', 'documents', 'pipelines', 'steps'];
 
     /** The parts an extension may add to another plugin's template (SDK 1.170). */
-    private const EXTENSION_KEYS = ['key', 'version', 'target', 'setsUp', 'services', 'roles', 'forms', 'documents', 'examples', 'setup'];
+    private const EXTENSION_KEYS = ['key', 'version', 'target', 'setsUp', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup'];
 
     public const MAX_CHANGES = 20;
     private const KEY_PATTERN = '/^[a-z][a-z0-9-]{0,40}$/';
@@ -160,6 +166,11 @@ final class WorkspaceTemplateValidator
         if (array_key_exists('documents', $template)) {
             array_push($errors, ...self::listOf($template['documents'], 'template.documents', 0, self::MAX_DOCUMENTS, [self::class, 'documentErrors']));
             array_push($errors, ...self::duplicateKeys($template['documents'], 'template.documents'));
+        }
+        if (array_key_exists('pipelines', $template)) {
+            $refs = $partial ? null : ['roles' => self::keysOf($template['roles'] ?? []), 'forms' => self::keysOf($template['forms'] ?? [])];
+            array_push($errors, ...self::listOf($template['pipelines'], 'template.pipelines', 0, self::MAX_PIPELINES, static fn (mixed $pipeline, string $path): array => self::pipelineErrors($pipeline, $path, $refs)));
+            array_push($errors, ...self::duplicateKeys($template['pipelines'], 'template.pipelines'));
         }
         if (array_key_exists('examples', $template)) {
             array_push($errors, ...self::exampleErrors($template['examples'], $partial ? null : $services));
@@ -423,6 +434,56 @@ final class WorkspaceTemplateValidator
     }
 
     /**
+     * A review route in Flows for one of the template's forms (SDK 1.172):
+     * `{key, name, description?, for: {form}, stages: [{key, name, role, sendBack?}]}`.
+     * Stages run in order; each is a decision by the people holding its role,
+     * and an approval moves on to the next.
+     *
+     * @param array{roles: list<string>, forms: list<string>}|null $refs the template's role and form keys; null when they may come from a parent or the target, so references are checked on the composed template
+     * @return list<string>
+     */
+    public static function pipelineErrors(mixed $pipeline, string $path, ?array $refs = null): array
+    {
+        if (!is_array($pipeline) || array_is_list($pipeline)) {
+            return ["{$path}: must be an object"];
+        }
+        $errors = self::unknownKeys($pipeline, ['key', 'name', 'description', 'for', 'stages'], $path);
+        array_push($errors, ...self::keyErrors($pipeline['key'] ?? null, "{$path}.key"));
+        array_push($errors, ...self::textErrors($pipeline['name'] ?? null, "{$path}.name", 80));
+        if (isset($pipeline['description'])) {
+            array_push($errors, ...self::textErrors($pipeline['description'], "{$path}.description", 200));
+        }
+        $for = $pipeline['for'] ?? null;
+        if (!is_array($for) || array_is_list($for) || array_keys($for) !== ['form'] || !is_string($for['form'])) {
+            $errors[] = "{$path}.for: required, {form: the key of one of the template's forms}";
+        } elseif ($refs !== null && !in_array($for['form'], $refs['forms'], true)) {
+            $errors[] = "{$path}.for.form: {$for['form']} is not one of the template's forms";
+        }
+        array_push($errors, ...self::listOf($pipeline['stages'] ?? null, "{$path}.stages", 1, self::MAX_STAGES, static function (mixed $stage, string $p) use ($refs): array {
+            if (!is_array($stage) || array_is_list($stage)) {
+                return ["{$p}: must be an object"];
+            }
+            $errors = self::unknownKeys($stage, ['key', 'name', 'role', 'sendBack'], $p);
+            array_push($errors, ...self::keyErrors($stage['key'] ?? null, "{$p}.key"));
+            array_push($errors, ...self::textErrors($stage['name'] ?? null, "{$p}.name", 80));
+            $role = $stage['role'] ?? null;
+            if (!is_string($role) || preg_match(self::KEY_PATTERN, $role) !== 1) {
+                $errors[] = "{$p}.role: required, the key of one of the template's roles";
+            } elseif ($refs !== null && !in_array($role, $refs['roles'], true)) {
+                $errors[] = "{$p}.role: {$role} is not one of the template's roles";
+            }
+            if (isset($stage['sendBack']) && !is_bool($stage['sendBack'])) {
+                $errors[] = "{$p}.sendBack: true or false";
+            }
+
+            return $errors;
+        }));
+        array_push($errors, ...self::duplicateKeys($pipeline['stages'] ?? null, "{$path}.stages"));
+
+        return $errors;
+    }
+
+    /**
      * Examples: made-up contacts and bookings, marked and removable in one click.
      *
      * @param list<string>|null $services the template's own service keys; null when they may come from a parent or the target (SDK 1.170), so references are not checked here
@@ -607,7 +668,7 @@ final class WorkspaceTemplateValidator
     /**
      * Everything wrong with one extension (SDK 1.170): pieces a plugin adds to
      * another plugin's template, `target` naming it. Only additive parts:
-     * services, roles, forms, documents, examples, guided setup steps and
+     * services, roles, forms, documents, pipelines (1.172), examples, guided setup steps and
      * lines the card lists. Its examples may use the target's services and
      * contacts; those references are checked on the template core composes.
      *
@@ -627,7 +688,7 @@ final class WorkspaceTemplateValidator
         if (array_key_exists('setsUp', $extension)) {
             array_push($errors, ...self::listOf($extension['setsUp'], 'extension.setsUp', 0, 4, static fn (mixed $line, string $path): array => self::textErrors($line, $path, 80)));
         }
-        foreach (['services' => [self::MAX_SERVICES, 'serviceErrors'], 'roles' => [self::MAX_ROLES, 'roleErrors'], 'forms' => [self::MAX_FORMS, 'formErrors'], 'documents' => [self::MAX_DOCUMENTS, 'documentErrors']] as $list => [$max, $check]) {
+        foreach (['services' => [self::MAX_SERVICES, 'serviceErrors'], 'roles' => [self::MAX_ROLES, 'roleErrors'], 'forms' => [self::MAX_FORMS, 'formErrors'], 'documents' => [self::MAX_DOCUMENTS, 'documentErrors'], 'pipelines' => [self::MAX_PIPELINES, 'pipelineErrors']] as $list => [$max, $check]) {
             if (array_key_exists($list, $extension)) {
                 array_push($errors, ...self::listOf($extension[$list], "extension.{$list}", 0, $max, [self::class, $check]));
                 array_push($errors, ...self::duplicateKeys($extension[$list], "extension.{$list}"));
