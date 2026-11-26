@@ -21460,8 +21460,9 @@ final class CoreApiSchemas
                 'changes' => ['type' => 'array', 'items' => self::object(['version' => self::int(), 'summary' => self::str() + ['nullable' => true]], ['version', 'summary'])],
             ], ['from', 'to', 'parts', 'changes']),
             'WorkspaceTemplateItem' => self::object([
-                'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents or examples'],
+                'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents, pipelines or examples'],
                 'key' => self::str() + ['description' => 'The template\'s key for the item'],
+                'label' => self::str() + ['description' => 'The item\'s name in the reader\'s language, as the template writes it, when it has one (WHIT-1429); settings, the theme and the calendar have none'],
                 'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'changed', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template\'s version, SDK 1.170); left: not ticked; skip: not done, see reason'],
                 'reason' => self::str(),
             ], ['part', 'key', 'action']),

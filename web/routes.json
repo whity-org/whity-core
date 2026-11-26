@@ -1543,6 +1543,14 @@
       "since": "0.2.29"
     },
     {
+      "path": "/setup/template/:key/update",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
       "path": "/status",
       "kind": "page",
       "area": "public",
