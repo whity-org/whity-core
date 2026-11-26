@@ -5113,6 +5113,26 @@ export interface paths {
         patch: operations["patch_api_v1_demo_catalog_items_id"];
         trace?: never;
     };
+    "/api/v1/desktop-app-updates/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether a newer build of the desktop app exists for this device
+         * @description The server decides. 204 when the device is current, when its target is unknown, or when the request is malformed (an unparseable request never resolves to "update"). `channel` is `stable` (the default) or `beta`; a beta device is also offered stable releases.
+         */
+        get: operations["get_api_v1_desktop_app_updates_latest"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/desktop-plugins": {
         parameters: {
             query?: never;
@@ -19705,6 +19725,18 @@ export interface components {
         };
         DemoCatalogItemResponse: {
             data: components["schemas"]["DemoCatalogItem"];
+        };
+        DesktopAppUpdateManifest: {
+            /** @description The newer version, bare semver */
+            version: string;
+            /** @description Release notes, possibly empty */
+            notes: string;
+            /** @description When it was published */
+            pub_date: string;
+            /** @description Where the signed installer is */
+            url: string;
+            /** @description The minisign signature over the installer, checked against the key built into the app */
+            signature: string;
         };
         DesktopPluginCatalogueEntry: {
             name: string;
@@ -55411,6 +55443,85 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DemoCatalogConflictResponse"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_desktop_app_updates_latest: {
+        parameters: {
+            query: {
+                /** @description The platform key tauri-plugin-updater reports, such as `windows-x86_64`. */
+                target: string;
+                /** @description The version the device runs, bare semver. */
+                current_version: string;
+                /** @description The release channel the device follows. */
+                channel?: "stable" | "beta";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A newer release, in the shape tauri-plugin-updater expects */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DesktopAppUpdateManifest"];
+                };
+            };
+            /** @description The device is current, or the request was not understood */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
                 };
             };
             /** @description Internal server error */

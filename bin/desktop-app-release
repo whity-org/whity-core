@@ -34,6 +34,8 @@ declare(strict_types=1);
  *   --url               Required. Public URL of the signed installer artifact.
  *   --signature-file    Required. Path to the .sig file `tauri-action` produced
  *                       alongside the installer — its CONTENTS (not the path) are stored.
+ *   --channel           Optional: `stable` (default) or `beta`. A stable device is offered
+ *                       stable releases only; a beta device is offered both.
  *   --notes             Optional release notes shown by the updater UI.
  *   --pub-date          Optional ISO 8601 publish date; defaults to now.
  *   --force             Update an existing (version, target) row instead of refusing.
@@ -131,6 +133,7 @@ $version = is_string($options['version'] ?? null) ? trim($options['version']) : 
 $target = is_string($options['target'] ?? null) ? trim($options['target']) : '';
 $url = is_string($options['url'] ?? null) ? trim($options['url']) : '';
 $signatureFile = is_string($options['signature-file'] ?? null) ? trim($options['signature-file']) : '';
+$channel = is_string($options['channel'] ?? null) ? trim($options['channel']) : 'stable';
 $notes = is_string($options['notes'] ?? null) ? $options['notes'] : null;
 $pubDate = is_string($options['pub-date'] ?? null) ? trim($options['pub-date']) : null;
 $force = isset($options['force']);
@@ -143,6 +146,9 @@ if (preg_match('/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/', $version) !== 1) {
 }
 if (preg_match('/^[a-z0-9][a-z0-9_-]{0,63}$/', $target) !== 1) {
     fail("Invalid --target '{$target}': must match ^[a-z0-9][a-z0-9_-]{0,63}$ (the key tauri-plugin-updater reports for the platform).");
+}
+if (!isset(\Whity\Api\DesktopAppUpdateApiHandler::CHANNELS[$channel])) {
+    fail("Invalid --channel '{$channel}': stable or beta.");
 }
 if (!is_file($signatureFile)) {
     fail("Signature file not found: {$signatureFile}");
@@ -179,22 +185,23 @@ $pubDateSql = $pubDate !== null && $pubDate !== '' ? date('c', (int) strtotime($
 
 if ($force) {
     $stmt = $pdo->prepare(
-        'INSERT INTO desktop_app_releases (version, target, url, signature, notes, pub_date, released_at)
-         VALUES (:version, :target, :url, :signature, :notes, :pub_date, NOW())
+        'INSERT INTO desktop_app_releases (version, target, channel, url, signature, notes, pub_date, released_at)
+         VALUES (:version, :target, :channel, :url, :signature, :notes, :pub_date, NOW())
          ON CONFLICT (version, target) DO UPDATE SET
-             url = EXCLUDED.url, signature = EXCLUDED.signature,
+             channel = EXCLUDED.channel, url = EXCLUDED.url, signature = EXCLUDED.signature,
              notes = EXCLUDED.notes, pub_date = EXCLUDED.pub_date'
     );
 } else {
     $stmt = $pdo->prepare(
-        'INSERT INTO desktop_app_releases (version, target, url, signature, notes, pub_date, released_at)
-         VALUES (:version, :target, :url, :signature, :notes, :pub_date, NOW())
+        'INSERT INTO desktop_app_releases (version, target, channel, url, signature, notes, pub_date, released_at)
+         VALUES (:version, :target, :channel, :url, :signature, :notes, :pub_date, NOW())
          ON CONFLICT (version, target) DO NOTHING'
     );
 }
 $stmt->execute([
     ':version' => $version,
     ':target' => $target,
+    ':channel' => $channel,
     ':url' => $url,
     ':signature' => $signature,
     ':notes' => $notes,
@@ -205,4 +212,4 @@ if ($stmt->rowCount() === 0 && !$force) {
     fail("Release {$version}@{$target} already exists. Pass --force to overwrite it.");
 }
 
-fwrite(STDOUT, "Registered desktop app release {$version} ({$target}).\n");
+fwrite(STDOUT, "Registered desktop app release {$version} ({$target}, {$channel}).\n");

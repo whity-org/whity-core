@@ -148,11 +148,6 @@ final class RouteCatalogueCompletenessTest extends TestCase
         'PATCH /api/errors/{id}',
         'GET /api/settings/error-tracking',
         'PUT /api/settings/error-tracking/dsn',
-        // WC-desktop-app-updates: the desktop app's self-update feed (latest
-        // published app release), consumed by the desktop app (not the web UI).
-        // OpenAPI components land with the desktop-updates documentation task,
-        // per the KNOWN_UNDOCUMENTED-first path this file establishes.
-        'GET /api/desktop-app-updates/latest',
     ];
 
     public function testEveryLiveRouteIsDocumentedOrOptedOut(): void

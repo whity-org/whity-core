@@ -35639,6 +35639,120 @@
                 ]
             }
         },
+        "/api/v1/desktop-app-updates/latest": {
+            "get": {
+                "operationId": "get_api_v1_desktop_app_updates_latest",
+                "summary": "Whether a newer build of the desktop app exists for this device",
+                "tags": [
+                    "desktop"
+                ],
+                "description": "The server decides. 204 when the device is current, when its target is unknown, or when the request is malformed (an unparseable request never resolves to \"update\"). `channel` is `stable` (the default) or `beta`; a beta device is also offered stable releases.",
+                "parameters": [
+                    {
+                        "name": "target",
+                        "in": "query",
+                        "required": true,
+                        "description": "The platform key tauri-plugin-updater reports, such as `windows-x86_64`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "current_version",
+                        "in": "query",
+                        "required": true,
+                        "description": "The version the device runs, bare semver.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "channel",
+                        "in": "query",
+                        "required": false,
+                        "description": "The release channel the device follows.",
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "stable",
+                                "beta"
+                            ],
+                            "default": "stable"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "A newer release, in the shape tauri-plugin-updater expects",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DesktopAppUpdateManifest"
+                                }
+                            }
+                        }
+                    },
+                    "204": {
+                        "description": "The device is current, or the request was not understood"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/desktop-plugins": {
             "get": {
                 "operationId": "get_api_v1_desktop_plugins",
@@ -121704,6 +121818,38 @@
                         "$ref": "#/components/schemas/DemoCatalogItem"
                     }
                 }
+            },
+            "DesktopAppUpdateManifest": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string",
+                        "description": "The newer version, bare semver"
+                    },
+                    "notes": {
+                        "type": "string",
+                        "description": "Release notes, possibly empty"
+                    },
+                    "pub_date": {
+                        "type": "string",
+                        "description": "When it was published"
+                    },
+                    "url": {
+                        "type": "string",
+                        "description": "Where the signed installer is"
+                    },
+                    "signature": {
+                        "type": "string",
+                        "description": "The minisign signature over the installer, checked against the key built into the app"
+                    }
+                },
+                "required": [
+                    "version",
+                    "notes",
+                    "pub_date",
+                    "url",
+                    "signature"
+                ]
             },
             "DesktopPluginCatalogueEntry": {
                 "type": "object",
