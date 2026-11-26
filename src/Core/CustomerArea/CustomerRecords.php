@@ -132,7 +132,7 @@ final class CustomerRecords
                FROM calendar_bookings b
                LEFT JOIN calendar_services s ON s.id = b.service_id AND s.tenant_id = b.tenant_id
                LEFT JOIN profiles p ON p.id = b.profile_id
-               LEFT JOIN calendar_rooms r ON r.id = b.room_id AND r.tenant_id = b.tenant_id
+               LEFT JOIN calendar_resources r ON r.id = b.room_id AND r.tenant_id = b.tenant_id
               WHERE b.tenant_id = :tid AND ' . $mine . ' AND ' . $timeCond . '
               ORDER BY ' . $order . ' LIMIT ' . self::LIMIT
         );

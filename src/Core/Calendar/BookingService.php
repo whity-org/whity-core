@@ -255,14 +255,13 @@ final class BookingService
                 $busy[$person] = Interval::merge($this->busyFor($tenantId, $person, $wideFrom, $wideTo, $now, $exceptBookingId));
             }
         }
-        $roomBusy = [];
-        foreach ($plan['services'] as $service) {
-            $roomId = $service['room_id'] ?? null;
-            if (is_int($roomId) && !isset($roomBusy[$roomId])) {
-                $roomBusy[$roomId] = Interval::merge($this->rooms()->busy($tenantId, $roomId, $wideFrom, $wideTo, $now, $exceptBookingId));
-            }
+        // WHIT-1439 (AP.18): what each service needs, and each resource's busy time, read once.
+        $needs = [];
+        foreach ($plan['services'] as $k => $service) {
+            $needs[$k] = $this->needs($tenantId, $service);
         }
-        $free = static function (int $person, int $k, DateTimeImmutable $at) use ($plan, $windows, $busy, $roomBusy): bool {
+        $busyOf = $this->busyReader($tenantId, $wideFrom, $wideTo, $now, $exceptBookingId);
+        $free = static function (int $person, int $k, DateTimeImmutable $at) use ($plan, $windows, $busy, $needs, $busyOf): bool {
             $service = $plan['services'][$k];
             $minutes = (int) $service['duration_minutes'];
             if (!Availability::withinWindows($at, $minutes, $windows[$person] ?? [])) {
@@ -271,9 +270,8 @@ final class BookingService
             if (Availability::clashes($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes'], $busy[$person] ?? [])) {
                 return false;
             }
-            $roomId = $service['room_id'] ?? null;
 
-            return !is_int($roomId) || !Availability::clashes($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes'], $roomBusy[$roomId] ?? []);
+            return $needs[$k] === [] || self::choose($needs[$k], Availability::blockFor($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes']), $busyOf) !== null;
         };
 
         // Start times step from the start of each open window of whoever may
@@ -389,8 +387,10 @@ final class BookingService
                     if ($why !== null) {
                         return null;
                     }
+                    // WHIT-1439 (AP.18): the first free resource for each need.
+                    $chosen = $this->chooseFor($tenantId, $service, $start, $now, null) ?? [];
 
-                    return $this->bookings->insert($tenantId, [
+                    $newId = $this->bookings->insert($tenantId, [
                         'service_id' => $service['id'],
                         'profile_id' => $candidate,
                         'customer_profile_id' => $request['customer_profile_id'],
@@ -408,9 +408,14 @@ final class BookingService
                         'currency' => $service['currency'],
                         'reminder_due_at' => $asRequest ? null : $this->reminderDue($start, $settings, $now),
                         'created_by_profile_id' => $request['created_by_profile_id'],
-                        'room_id' => $service['room_id'] ?? null,
+                        'room_id' => $chosen[0] ?? null,
                         'overlap_ok' => $bookAnyway && $this->personClashes($tenantId, $candidate, $service, $start, $now, null),
                     ]);
+                    if ($chosen !== []) {
+                        $this->bookings->setResources($tenantId, $newId, self::resourceRows([$chosen], [$block]));
+                    }
+
+                    return $newId;
                 }, $room);
             } catch (CalendarRejectedException $e) {
                 // The database refused it (AP.11): try the next person.
@@ -500,14 +505,18 @@ final class BookingService
             }
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
             try {
-                $id = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $plan, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
+                $id = $this->underLocks($tenantId, $people, $this->resourceIds($tenantId, $plan['services']), function () use ($tenantId, $plan, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
                     $overlapOk = false;
+                    $chosen = [];
                     foreach ($parts as $k => $part) {
                         $why = $this->whyNotFree($tenantId, $part['profile_id'], $plan['services'][$k], $settings, $part['starts_at'], $now, null, $checkHours, $bookAnyway);
                         if ($why !== null) {
                             return null;
                         }
                         $overlapOk = $overlapOk || ($bookAnyway && $this->personClashes($tenantId, $part['profile_id'], $plan['services'][$k], $part['starts_at'], $now, null));
+                        // WHIT-1439 (AP.18): each part's own resources.
+                        $chosen[$k] = $this->chooseFor($tenantId, $plan['services'][$k], $part['starts_at'], $now, null) ?? [];
+                        $parts[$k]['room_id'] = $chosen[$k][0] ?? null;
                     }
                     $id = $this->bookings->insert($tenantId, [
                         'service_id' => $parts[0]['service_id'],
@@ -531,6 +540,7 @@ final class BookingService
                         'overlap_ok' => $overlapOk,
                     ]);
                     $this->bookings->insertItems($tenantId, $id, $parts);
+                    $this->bookings->setResources($tenantId, $id, self::resourceRows($chosen, array_column($parts, 'block')));
 
                     return $id;
                 });
@@ -971,7 +981,10 @@ final class BookingService
                 return false;
             }
             $overlapOk = $bookAnyway && $this->personClashes($tenantId, $to, $service, $start, $now, $bookingId);
+            // WHIT-1439 (AP.18): keep what it held when that is still free.
+            $chosen = $this->chooseFor($tenantId, $service, $start, $now, $bookingId, $this->bookings->resourcesOf($tenantId, $bookingId)[0] ?? []) ?? [];
             $this->bookings->move($tenantId, $bookingId, $to, $start, $end, $block, $isRequest ? null : $this->reminderDue($start, $settings, $now), $overlapOk);
+            $this->bookings->setResources($tenantId, $bookingId, self::resourceRows([$chosen], [$block]));
 
             return true;
         }, $this->roomLock($tenantId, $service));
@@ -1037,17 +1050,22 @@ final class BookingService
         }
 
         $why = null;
-        $moved = $this->underLocks($tenantId, $people, self::roomsOf($parts), function () use ($tenantId, $bookingId, $parts, $services, $settings, $start, $now, $enforceHours, $withinHours, $isRequest, $bookAnyway, &$why): bool {
+        $moved = $this->underLocks($tenantId, $people, array_merge(self::roomsOf($parts), $this->resourceIds($tenantId, $services)), function () use ($tenantId, $bookingId, $parts, $services, $settings, $start, $now, $enforceHours, $withinHours, $isRequest, $bookAnyway, &$why): bool {
             $overlapOk = false;
+            $held = $this->bookings->resourcesOf($tenantId, $bookingId);
+            $chosen = [];
             foreach ($parts as $k => $part) {
                 $why = $this->whyNotFree($tenantId, $part['profile_id'], $services[$k], $settings, $part['starts_at'], $now, $bookingId, $enforceHours || $withinHours, $bookAnyway);
                 if ($why !== null) {
                     return false;
                 }
                 $overlapOk = $overlapOk || ($bookAnyway && $this->personClashes($tenantId, $part['profile_id'], $services[$k], $part['starts_at'], $now, $bookingId));
+                $chosen[$k] = $this->chooseFor($tenantId, $services[$k], $part['starts_at'], $now, $bookingId, $held[$k] ?? []) ?? [];
+                $parts[$k]['room_id'] = $chosen[$k][0] ?? null;
             }
             $this->bookings->move($tenantId, $bookingId, $parts[0]['profile_id'], $start, $parts[count($parts) - 1]['ends_at'], self::span($parts), $isRequest ? null : $this->reminderDue($start, $settings, $now), $overlapOk);
             $this->bookings->moveItems($tenantId, $bookingId, $parts);
+            $this->bookings->setResources($tenantId, $bookingId, self::resourceRows($chosen, array_column($parts, 'block')));
 
             return true;
         });
@@ -1374,6 +1392,13 @@ final class BookingService
         $booking['reminders'] = $this->bookings->reminderLog($tenantId, $id);
         // WHIT-1427 (AP.8): the customer's flag.
         $booking = $this->withCustomerFlags($tenantId, [$booking])[0];
+        // WHIT-1439 (AP.18): every resource it holds, by part.
+        $booking['resources'] = [];
+        foreach ($this->bookings->resourcesOf($tenantId, $id) as $part => $resources) {
+            foreach ($resources as $resource) {
+                $booking['resources'][] = ['part' => $part, 'resource_id' => $resource];
+            }
+        }
         // WHIT-1173: a booking of several services reads as one to everything
         // that shows a booking's service (the emails, reminders, calendar
         // files, the customer's page): their names joined, the whole length
@@ -1503,6 +1528,62 @@ final class BookingService
     }
 
     /**
+     * The desk changes the resources a booking of one service holds (WHIT-1439,
+     * AP.18): one for each need, in order, each one that can meet that need
+     * and is free then. Under the locks, like a booking.
+     *
+     * @param list<int> $resourceIds
+     * @return array<string, mixed>
+     */
+    public function changeResources(int $tenantId, int $bookingId, array $resourceIds): array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if (!in_array($row['status'], BookingRepository::LIVE, true)) {
+            throw new CalendarRejectedException('Only a booking that is still on can change its room or equipment.', 422);
+        }
+        if ($this->bookings->itemsFor($tenantId, [$bookingId]) !== []) {
+            throw new CalendarRejectedException('A booking of several services keeps the room and equipment chosen for each.', 422);
+        }
+        $service = $this->service($tenantId, (int) $row['service_id'], false);
+        $needs = $this->needs($tenantId, $service);
+        if (count($resourceIds) !== count($needs) || count(array_unique($resourceIds)) !== count($resourceIds)) {
+            throw new CalendarRejectedException('Choose one room or piece of equipment for each thing the service needs.', 422);
+        }
+        foreach ($needs as $k => $candidates) {
+            if (!in_array($resourceIds[$k], $candidates, true)) {
+                throw new CalendarRejectedException('That room or equipment can\'t be used for this service.', 422);
+            }
+        }
+        $block = new Interval(Interval::fromDb((string) $row['blocks_from']), Interval::fromDb((string) $row['blocks_until']));
+        $now = $this->now();
+        $ok = $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $resourceIds, $block, $now): bool {
+            $busyOf = $this->busyReader($tenantId, $block->start->modify('-1 day'), $block->end->modify('+1 day'), $now, $bookingId);
+            if (self::choose(array_map(static fn (int $r): array => [$r], $resourceIds), $block, $busyOf) === null) {
+                return false;
+            }
+            $this->bookings->setResources($tenantId, $bookingId, self::resourceRows([$resourceIds], [$block]));
+
+            return true;
+        }, array_map(static fn (int $r): array => [$tenantId, $r], self::sorted($resourceIds)));
+        if (!$ok) {
+            throw CalendarRejectedException::notFree(CalendarRejectedException::ROOM_TAKEN);
+        }
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * @param list<int> $ids
+     * @return list<int>
+     */
+    private static function sorted(array $ids): array
+    {
+        sort($ids);
+
+        return array_values(array_unique($ids));
+    }
+
+    /**
      * The customer pressed I'm coming on their page (WHIT-1417, AP.15).
      * Pressing it again changes nothing.
      *
@@ -1615,9 +1696,9 @@ final class BookingService
             $latest->modify('+' . $service['duration_minutes'] . ' minutes'),
         );
 
-        return Availability::slots(
+        $slots = Availability::slots(
             $windows,
-            $this->busyFor($tenantId, $profileId, $from, $to, $now, $exceptBookingId, $service['room_id'] ?? null),
+            $this->busyFor($tenantId, $profileId, $from, $to, $now, $exceptBookingId),
             $service['duration_minutes'],
             $service['buffer_before_minutes'],
             $service['buffer_after_minutes'],
@@ -1625,6 +1706,18 @@ final class BookingService
             $earliest,
             $latest,
         );
+        // WHIT-1439 (AP.18): a time is free only when every need can be met.
+        $needs = $this->needs($tenantId, $service);
+        if ($needs === []) {
+            return $slots;
+        }
+        $busyOf = $this->busyReader($tenantId, $from, $to, $now, $exceptBookingId);
+
+        return array_values(array_filter($slots, static fn (DateTimeImmutable $at): bool => self::choose(
+            $needs,
+            Availability::blockFor($at, (int) $service['duration_minutes'], (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes']),
+            $busyOf,
+        ) !== null));
     }
 
     /**
@@ -1654,8 +1747,8 @@ final class BookingService
         $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
         $from = $block->start->modify('-1 day');
         $to = $block->end->modify('+1 day');
-        $roomId = $service['room_id'] ?? null;
-        if (is_int($roomId) && Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $this->rooms()->busy($tenantId, $roomId, $from, $to, $now, $exceptBookingId))) {
+        // WHIT-1439 (AP.18): every need met by a free resource, or the room is taken.
+        if ($this->chooseFor($tenantId, $service, $start, $now, $exceptBookingId) === null) {
             return CalendarRejectedException::ROOM_TAKEN;
         }
         if (!$bookAnyway && Availability::clashes($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes'], $this->busyFor($tenantId, $profileId, $from, $to, $now, $exceptBookingId))) {
@@ -1763,12 +1856,12 @@ final class BookingService
      * @template T
      * @param list<array{0: int, 1: int}> $locks [tenantId, profileId] pairs
      * @param callable(): T $work
-     * @param array{0: int, 1: int}|null $room [tenantId, roomId], locked after the people
+     * @param list<array{0: int, 1: int}> $rooms [tenantId, resourceId] pairs in id order, locked after the people
      * @return T
      */
-    private function underLock(array $locks, callable $work, ?array $room = null): mixed
+    private function underLock(array $locks, callable $work, array $rooms = []): mixed
     {
-        return $this->locked($locks, $room !== null ? [$room] : [], $work);
+        return $this->locked($locks, $rooms, $work);
     }
 
     /**
@@ -2090,14 +2183,148 @@ final class BookingService
     }
 
     /**
+     * The locks for every resource a service could take (AP.18), in id order:
+     * every candidate of a group, so two bookings choosing from one group
+     * queue rather than both taking the same chair.
+     *
      * @param array<string, mixed> $service
-     * @return array{0: int, 1: int}|null
+     * @return list<array{0: int, 1: int}>
      */
-    private function roomLock(int $tenantId, array $service): ?array
+    private function roomLock(int $tenantId, array $service): array
     {
-        $roomId = $service['room_id'] ?? null;
+        return array_map(static fn (int $r): array => [$tenantId, $r], $this->resourceIds($tenantId, [$service]));
+    }
 
-        return is_int($roomId) ? [$tenantId, $roomId] : null;
+    /**
+     * Every resource these services could take, without repeats, in id order.
+     *
+     * @param list<array<string, mixed>> $services
+     * @return list<int>
+     */
+    private function resourceIds(int $tenantId, array $services): array
+    {
+        $ids = [];
+        foreach ($services as $service) {
+            foreach ($this->needs($tenantId, $service) as $candidates) {
+                foreach ($candidates as $id) {
+                    $ids[$id] = $id;
+                }
+            }
+        }
+        ksort($ids);
+
+        return array_values($ids);
+    }
+
+    /**
+     * What a service needs (AP.18): for each need, the resources that can
+     * meet it, in the order to try them.
+     *
+     * @param array<string, mixed> $service
+     * @return list<list<int>>
+     */
+    private function needs(int $tenantId, array $service): array
+    {
+        if (!is_int($service['id'] ?? null)) {
+            return is_int($service['room_id'] ?? null) ? [[$service['room_id']]] : [];
+        }
+
+        return $this->rooms()->needsFor($tenantId, $service['id'], is_int($service['room_id'] ?? null) ? $service['room_id'] : null);
+    }
+
+    /**
+     * Each resource's busy time in `[from, to)`, read once per resource.
+     *
+     * @return \Closure(int): list<Interval>
+     */
+    private function busyReader(int $tenantId, DateTimeImmutable $from, DateTimeImmutable $to, DateTimeImmutable $now, ?int $exceptBookingId): \Closure
+    {
+        $read = [];
+
+        return function (int $resourceId) use (&$read, $tenantId, $from, $to, $now, $exceptBookingId): array {
+            return $read[$resourceId] ??= $this->rooms()->busy($tenantId, $resourceId, $from, $to, $now, $exceptBookingId);
+        };
+    }
+
+    /**
+     * The resources a service would take at `$start`, one for each need, or
+     * null when a need can't be met. `$prefer` (what a booking already holds)
+     * is tried first, so moving a booking keeps its chair when it can.
+     *
+     * @param array<string, mixed> $service
+     * @param list<int> $prefer
+     * @return list<int>|null
+     */
+    private function chooseFor(int $tenantId, array $service, DateTimeImmutable $start, DateTimeImmutable $now, ?int $exceptBookingId, array $prefer = []): ?array
+    {
+        $needs = $this->needs($tenantId, $service);
+        if ($needs === []) {
+            return [];
+        }
+        $block = Availability::blockFor($start, (int) $service['duration_minutes'], (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes']);
+
+        return self::choose($needs, $block, $this->busyReader($tenantId, $block->start->modify('-1 day'), $block->end->modify('+1 day'), $now, $exceptBookingId), $prefer);
+    }
+
+    /**
+     * For each need in order, the first of its resources that is free over
+     * `$block` and not already taken by an earlier need; null when one can't
+     * be met. Resources in `$prefer` go first.
+     *
+     * @param list<list<int>> $needs
+     * @param callable(int): list<Interval> $busyOf
+     * @param list<int> $prefer
+     * @return list<int>|null
+     */
+    private static function choose(array $needs, Interval $block, callable $busyOf, array $prefer = []): ?array
+    {
+        $chosen = [];
+        foreach ($needs as $candidates) {
+            usort($candidates, static fn (int $a, int $b): int => (in_array($b, $prefer, true) <=> in_array($a, $prefer, true)));
+            $pick = null;
+            foreach ($candidates as $resource) {
+                if (in_array($resource, $chosen, true)) {
+                    continue;
+                }
+                $free = true;
+                foreach ($busyOf($resource) as $busy) {
+                    if ($busy->start < $block->end && $busy->end > $block->start) {
+                        $free = false;
+                        break;
+                    }
+                }
+                if ($free) {
+                    $pick = $resource;
+                    break;
+                }
+            }
+            if ($pick === null) {
+                return null;
+            }
+            $chosen[] = $pick;
+        }
+
+        return $chosen;
+    }
+
+    /**
+     * Rows for {@see BookingRepository::setResources()}: each part's chosen
+     * resources over that part's block.
+     *
+     * @param array<int, list<int>> $chosen part => resources
+     * @param array<int, Interval> $blocks part => block
+     * @return list<array{resource_id: int, part: int, block: Interval}>
+     */
+    private static function resourceRows(array $chosen, array $blocks): array
+    {
+        $rows = [];
+        foreach ($chosen as $part => $resources) {
+            foreach ($resources as $resource) {
+                $rows[] = ['resource_id' => $resource, 'part' => (int) $part, 'block' => $blocks[$part]];
+            }
+        }
+
+        return $rows;
     }
 
     /** @param array<string, mixed> $booking */

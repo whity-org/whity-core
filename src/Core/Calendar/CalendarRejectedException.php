@@ -44,7 +44,7 @@ final class CalendarRejectedException extends \RuntimeException
     {
         $message = match ($reason) {
             self::PERSON_BUSY => 'That person is busy then.',
-            self::ROOM_TAKEN => 'The room is taken then.',
+            self::ROOM_TAKEN => 'That room or equipment is taken then.',
             self::CLOSED => 'That is outside their working hours.',
             default => 'That time was just taken. Pick another time.',
         };

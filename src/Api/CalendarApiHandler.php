@@ -363,7 +363,10 @@ final class CalendarApiHandler
 
     public function listServices(Request $request): Response
     {
-        return $this->run($request, 'services', fn (int $tenantId): Response => Response::json(['data' => $this->services->list($tenantId)]));
+        return $this->run($request, 'services', fn (int $tenantId): Response => Response::json(['data' => array_map(
+            fn (array $service): array => $this->withNeeds($tenantId, $service),
+            $this->services->list($tenantId),
+        )]));
     }
 
     /** @param array<string, string> $params */
@@ -372,7 +375,7 @@ final class CalendarApiHandler
         return $this->run($request, 'services', function (int $tenantId) use ($params): Response {
             $service = $this->services->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Service');
 
-            return Response::json(['data' => $service]);
+            return Response::json(['data' => $this->withNeeds($tenantId, $service)]);
         });
     }
 
@@ -381,14 +384,18 @@ final class CalendarApiHandler
         return $this->run($request, 'services', function (int $tenantId, int $actor) use ($request): Response {
             $body = JsonBody::parsed($request);
             $values = $this->serviceValues($tenantId, $body, null);
+            $needs = $this->serviceNeeds($tenantId, $body);
             $id = $this->services->insert($tenantId, $values);
             $this->services->replaceStaff($tenantId, $id, $values['staff_profile_ids']);
+            if ($needs !== null) {
+                $this->roomRepo()->replaceRequirements($tenantId, $id, $needs);
+            }
             foreach ($values['staff_profile_ids'] as $profileId) {
                 $this->calendar->ensureStaff($tenantId, $profileId);
             }
             $this->syncItem($tenantId, $id, $actor);
 
-            return Response::json(['data' => $this->services->find($tenantId, $id)], 201);
+            return Response::json(['data' => $this->withNeeds($tenantId, $this->services->find($tenantId, $id) ?? [])], 201);
         });
     }
 
@@ -397,15 +404,20 @@ final class CalendarApiHandler
     {
         return $this->run($request, 'services', function (int $tenantId, int $actor) use ($request, $params): Response {
             $existing = $this->services->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Service');
-            $values = $this->serviceValues($tenantId, JsonBody::parsed($request), $existing);
+            $body = JsonBody::parsed($request);
+            $values = $this->serviceValues($tenantId, $body, $existing);
+            $needs = $this->serviceNeeds($tenantId, $body);
             $this->services->update($tenantId, $existing['id'], $values);
             $this->services->replaceStaff($tenantId, $existing['id'], $values['staff_profile_ids']);
+            if ($needs !== null) {
+                $this->roomRepo()->replaceRequirements($tenantId, $existing['id'], $needs);
+            }
             foreach ($values['staff_profile_ids'] as $profileId) {
                 $this->calendar->ensureStaff($tenantId, $profileId);
             }
             $this->syncItem($tenantId, $existing['id'], $actor);
 
-            return Response::json(['data' => $this->services->find($tenantId, $existing['id'])]);
+            return Response::json(['data' => $this->withNeeds($tenantId, $this->services->find($tenantId, $existing['id']) ?? [])]);
         });
     }
 
@@ -594,6 +606,23 @@ final class CalendarApiHandler
     public function checkIn(Request $request, array $params): Response
     {
         return $this->run($request, 'bookings', fn (int $tenantId, int $actor): Response => Response::json(['data' => $this->booking->checkIn($tenantId, (int) $params['id'], $request->getMethod() !== 'DELETE', $actor)]));
+    }
+
+    /**
+     * The desk changes the room or equipment a booking holds (WHIT-1439, AP.18).
+     *
+     * @param array<string, string> $params
+     */
+    public function changeBookingResources(Request $request, array $params): Response
+    {
+        return $this->run($request, 'resources', function (int $tenantId) use ($request, $params): Response {
+            $ids = JsonBody::parsed($request)['resource_ids'] ?? null;
+            if (!is_array($ids) || !array_is_list($ids) || array_filter($ids, 'is_int') !== $ids) {
+                throw new CalendarRejectedException('resource_ids is a list of ids, one for each need', 422);
+            }
+
+            return Response::json(['data' => $this->booking->changeResources($tenantId, (int) $params['id'], $ids)]);
+        });
     }
 
     /**
@@ -1180,12 +1209,80 @@ final class CalendarApiHandler
             throw new CalendarRejectedException('sort_order must be a whole number from 0 to 100000', 422);
         }
 
+        // WHIT-1439 (AP.18): what it is, and the group it belongs to.
+        $kind = $pick('kind', $existing['kind'] ?? 'room');
+        if (!is_string($kind) || !in_array($kind, ['room', 'chair', 'equipment', 'other'], true)) {
+            throw new CalendarRejectedException('kind is room, chair, equipment or other', 422);
+        }
+        $group = $pick('group_key', $existing['group_key'] ?? '');
+        if (!is_string($group) || mb_strlen(trim($group)) > 80) {
+            throw new CalendarRejectedException('group_key is a short name, up to 80 characters', 422);
+        }
+
         return [
             'name' => LocalizedText::label($pick('name', $existing['name'] ?? null), 'name'),
             'unit_id' => array_key_exists('unit_id', $body) ? $this->unitOrNull($tenantId, $body['unit_id']) : ($existing['unit_id'] ?? null),
             'active' => $pick('active', $existing['active'] ?? true) === true,
             'sort_order' => $sort,
+            'kind' => $kind,
+            'group_key' => trim($group),
         ];
+    }
+
+    /**
+     * A service's needs from its body (WHIT-1439, AP.18): `resources`, each a
+     * specific `resource_id` or any one from a `group_key`, in order; or, from
+     * a client that knows only rooms, `room_id` as the one need. Null when the
+     * body says neither (nothing changes).
+     *
+     * @param array<string, mixed> $body
+     * @return list<array{resource_id: ?int, group_key: ?string}>|null
+     */
+    private function serviceNeeds(int $tenantId, array $body): ?array
+    {
+        if (array_key_exists('resources', $body)) {
+            $raw = $body['resources'];
+            if (!is_array($raw) || count($raw) > 8) {
+                throw new CalendarRejectedException('resources is a list of up to 8 needs', 422);
+            }
+            $groups = $this->roomRepo()->groups($tenantId);
+            $needs = [];
+            foreach ($raw as $need) {
+                $resource = is_array($need) ? ($need['resource_id'] ?? null) : null;
+                $group = is_array($need) ? ($need['group_key'] ?? null) : null;
+                if (is_int($resource) && $group === null) {
+                    $this->roomRepo()->find($tenantId, $resource) ?? throw CalendarRejectedException::notFound('Room or equipment');
+                    $needs[] = ['resource_id' => $resource, 'group_key' => null];
+                } elseif (is_string($group) && $resource === null && in_array(trim($group), $groups, true)) {
+                    $needs[] = ['resource_id' => null, 'group_key' => trim($group)];
+                } else {
+                    throw new CalendarRejectedException('Each need is a resource_id, or the group_key of an existing group', 422);
+                }
+            }
+
+            return $needs;
+        }
+        if (array_key_exists('room_id', $body)) {
+            return is_int($body['room_id']) ? [['resource_id' => $body['room_id'], 'group_key' => null]] : [];
+        }
+
+        return null;
+    }
+
+    /**
+     * A service with its needs, as the API shows it.
+     *
+     * @param array<string, mixed> $service
+     * @return array<string, mixed>
+     */
+    private function withNeeds(int $tenantId, array $service): array
+    {
+        $service['resources'] = $this->roomRepo()->requirements($tenantId, (int) $service['id']);
+        if ($service['resources'] === [] && is_int($service['room_id'] ?? null)) {
+            $service['resources'] = [['resource_id' => $service['room_id'], 'group_key' => null]];
+        }
+
+        return $service;
     }
 
     /** @return array{0: DateTimeImmutable, 1: DateTimeImmutable} */

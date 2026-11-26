@@ -552,7 +552,9 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
                     ? t('booking.checkedInToast', '{name} checked in', { name: changed.customer.name ?? '' })
                     : what === 'notCheckedIn'
                       ? t('booking.checkInUndone', 'Check-in undone')
-                      : t('booking.moved', 'Booking moved'),
+                      : what === 'resourcesChanged'
+                        ? t('booking.resourcesChanged', 'Room or equipment changed')
+                        : t('booking.moved', 'Booking moved'),
             'success'
           );
           refetch();

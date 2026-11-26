@@ -29,6 +29,7 @@ import { useFetch } from '@/hooks/useFetch';
 import { useToast } from '@/lib/toast-context';
 import { useWorkspaceCurrency } from '@/lib/branding-context';
 import { Alert, AlertDescription } from '@whity/ui/alert';
+import { Button } from '@whity/ui/button';
 import { BilingualInput, type BilingualValue } from '@whity/ui/bilingual-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { Checkbox } from '@whity/ui/checkbox';
@@ -53,13 +54,25 @@ interface Draft {
   currency: string;
   bookableOnline: boolean;
   needsApproval: boolean;
-  /** The room it needs, as the select's value: a room id, or NO_ROOM. */
-  room: string;
+  /**
+   * WHIT-1439 (AP.18): what it needs, in order, each as a select's value:
+   * `r:<id>` for a specific room or piece of equipment, `g:<group>` for any
+   * free one from a group.
+   */
+  needs: string[];
   active: boolean;
   staff: number[];
 }
 
-const NO_ROOM = 'none';
+/** A need as the select's value. */
+function needValue(need: { resource_id?: number | null; group_key?: string | null }): string {
+  return need.resource_id !== null && need.resource_id !== undefined ? `r:${need.resource_id}` : `g:${need.group_key ?? ''}`;
+}
+
+/** A select's value as the API's need. */
+function needOf(value: string): { resource_id: number | null; group_key: string | null } {
+  return value.startsWith('r:') ? { resource_id: Number(value.slice(2)), group_key: null } : { resource_id: null, group_key: value.slice(2) };
+}
 
 function draftOf(service: CalendarService): Draft {
   return {
@@ -72,7 +85,7 @@ function draftOf(service: CalendarService): Draft {
     currency: service.currency,
     bookableOnline: service.bookable_online,
     needsApproval: service.needs_approval ?? false,
-    room: service.room_id === null || service.room_id === undefined ? NO_ROOM : String(service.room_id),
+    needs: (service.resources ?? (service.room_id ? [{ resource_id: service.room_id, group_key: null }] : [])).map(needValue),
     active: service.active,
     staff: [...service.staff_profile_ids].sort((a, b) => a - b),
   };
@@ -121,7 +134,7 @@ export default function CalendarServicePage() {
     if (current.price !== saved.price || current.currency !== saved.currency) changes.push(t('services.field.price', 'Price'));
     if (current.bookableOnline !== saved.bookableOnline || current.active !== saved.active || current.needsApproval !== saved.needsApproval)
       changes.push(t('services.field.offered', 'Where it is offered'));
-    if (current.room !== saved.room) changes.push(t('services.field.room', 'Room it needs'));
+    if (current.needs.join('|') !== saved.needs.join('|')) changes.push(t('services.field.needs', 'Rooms and equipment it needs'));
     if (current.staff.join(',') !== saved.staff.join(',')) changes.push(t('services.field.staff', 'Who provides it'));
   }
 
@@ -178,7 +191,7 @@ export default function CalendarServicePage() {
       currency,
       bookable_online: current.bookableOnline,
       needs_approval: current.needsApproval,
-      room_id: current.room === NO_ROOM ? null : Number(current.room),
+      resources: current.needs.map(needOf),
       active: current.active,
       staff_profile_ids: current.staff,
     };
@@ -197,6 +210,15 @@ export default function CalendarServicePage() {
   };
 
   const title = data ? words.serviceName(data.service) : t('services.title', 'Services');
+  // WHIT-1439: any free one from each group, then each active room or piece of equipment.
+  const needOptions = (keep: string): { value: string; label: string }[] => {
+    const rooms = data?.rooms ?? [];
+    const groups = [...new Set(rooms.filter((r) => r.active && r.group_key).map((r) => r.group_key as string))].sort();
+    return [
+      ...groups.map((group) => ({ value: `g:${group}`, label: t('services.needs.anyOf', 'Any free one from {group}', { group }) })),
+      ...rooms.filter((r) => r.active || `r:${r.id}` === keep).map((r) => ({ value: `r:${r.id}`, label: words.label(r.name) })),
+    ];
+  };
 
   return (
     <div className="space-y-4 pb-16">
@@ -390,31 +412,65 @@ export default function CalendarServicePage() {
 
             <Card>
               <CardHeader>
-                <CardTitle>{t('services.field.room', 'Room it needs')}</CardTitle>
+                <CardTitle>{t('services.field.needs', 'Rooms and equipment it needs')}</CardTitle>
                 <CardDescription>
-                  {t('services.card.roomHint', 'Booking this service also books the room, so two people can’t use it at the same time.')}
+                  {t(
+                    'services.card.needsHint',
+                    'Booking this service also books each of these, so two people can’t use one at the same time. For a group, the first free one is taken; customers never choose.'
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <ChangedField changed={current.room !== saved.room}>
-                  <label htmlFor="service-room" className="sr-only">
-                    {t('services.field.room', 'Room it needs')}
-                  </label>
-                  <FieldSelect
-                    id="service-room"
-                    value={current.room}
-                    onChange={(room) => update({ room })}
-                    options={[
-                      { value: NO_ROOM, label: t('services.room.none', 'No room') },
-                      ...data.rooms
-                        .filter((room) => room.active || String(room.id) === current.room)
-                        .map((room) => ({ value: String(room.id), label: words.label(room.name) })),
-                    ]}
-                  />
+                <ChangedField changed={current.needs.join('|') !== saved.needs.join('|')}>
+                  {current.needs.length === 0 ? (
+                    <p className="text-sm text-muted-foreground" data-testid="service-needs-none">
+                      {t('services.needs.none', 'Nothing: only the person is booked.')}
+                    </p>
+                  ) : (
+                    <ul className="space-y-2" data-testid="service-needs">
+                      {current.needs.map((value, index) => (
+                        <li key={index} className="flex items-center gap-2">
+                          <div className="min-w-0 flex-1">
+                            <label htmlFor={`service-need-${index}`} className="sr-only">
+                              {t('services.needs.label', 'Need {n}', { n: index + 1 })}
+                            </label>
+                            <FieldSelect
+                              id={`service-need-${index}`}
+                              value={value}
+                              disabled={readOnly}
+                              onChange={(next) => update({ needs: current.needs.map((v, i) => (i === index ? next : v)) })}
+                              options={needOptions(value)}
+                            />
+                          </div>
+                          {!readOnly && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => update({ needs: current.needs.filter((_, i) => i !== index) })}
+                              data-testid={`service-need-remove-${index}`}
+                            >
+                              {t('services.needs.remove', 'Remove')}
+                            </Button>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </ChangedField>
+                {!readOnly && data.rooms.some((room) => room.active) && current.needs.length < 8 && (
+                  <Button
+                    className="mt-3"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => update({ needs: [...current.needs, needOptions('')[0]?.value ?? ''] })}
+                    data-testid="service-need-add"
+                  >
+                    {t('services.needs.add', 'Add a room or equipment')}
+                  </Button>
+                )}
                 {data.rooms.length === 0 && (
                   <p className="mt-2 text-sm text-muted-foreground">
-                    {t('services.room.noRooms', 'No rooms yet. Add them under Rooms.')}
+                    {t('services.needs.noRooms', 'No rooms or equipment yet. Add them under Rooms and equipment.')}
                   </p>
                 )}
               </CardContent>

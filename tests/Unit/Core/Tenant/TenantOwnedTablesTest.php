@@ -120,6 +120,23 @@ final class TenantOwnedTablesTest extends TestCase
                 }
             }
 
+            // A table renamed by a forward migration lives on under its new
+            // name (WHIT-1439: calendar_rooms became calendar_resources).
+            if (preg_match_all(
+                '/ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?\s+RENAME\s+TO\s+["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?/i',
+                $upSql,
+                $renames,
+                PREG_SET_ORDER
+            )) {
+                foreach ($renames as $rename) {
+                    $from = strtolower($rename[1]);
+                    if (isset($tables[$from])) {
+                        unset($tables[$from]);
+                        $tables[strtolower($rename[2])] = true;
+                    }
+                }
+            }
+
             // 2. Track tables dropped by a forward migration.
             if (preg_match_all(
                 '/DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?["`]?([A-Za-z_][A-Za-z0-9_]*)["`]?/i',

@@ -5718,6 +5718,8 @@ $hookManager->listen('navigation.register', function ($data, $context) use ($cal
 $router->register('GET',    '/api/calendar/today',                          [$calendarHandler, 'today'],           null, null, CorePermissions::CALENDAR_READ);
 // WHIT-1427 (design section 39 §4): did they come.
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/attendance',   [$calendarHandler, 'markAttendance'],  null, null, CorePermissions::CALENDAR_WRITE);
+// WHIT-1439 (AP.18): the desk changes the room or equipment a booking holds.
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/resources',    [$calendarHandler, 'changeBookingResources'], null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/attendance/unmarked',            [$calendarHandler, 'unmarkedAttendance'], null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/attendance',                     [$calendarHandler, 'attendanceRates'], null, null, CorePermissions::CALENDAR_READ);
 // WHIT-1437 (AP.7, AP.8): Reports › Appointments, JSON or CSV.

@@ -2686,6 +2686,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Change the room or equipment a booking holds: one for each thing its service needs (WHIT-1439) */
+        post: operations["post_api_v1_calendar_bookings_id_resources"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/suggest": {
         parameters: {
             query?: never;
@@ -17406,6 +17423,8 @@ export interface components {
              */
             cancel_kind?: "early" | "late" | "business" | null;
             customer_flag?: components["schemas"]["CalendarCustomerFlag"];
+            /** @description Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first. */
+            resources?: components["schemas"]["CalendarBookingResource"][];
             /** @description In lists: the room's name, language code => text. */
             room_name?: {
                 [key: string]: string;
@@ -17495,6 +17514,15 @@ export interface components {
              */
             outcome: "sent" | "failed" | "no_address";
             sent_at: string | null;
+        };
+        CalendarBookingResource: {
+            /** @description The service's position in a booking of several; 0 for one. */
+            part: number;
+            resource_id: number;
+        };
+        CalendarBookingResourcesRequest: {
+            /** @description One resource for each thing the service needs, in the order of its `resources`. */
+            resource_ids: number[];
         };
         CalendarBookingServiceChoice: {
             service_id: number;
@@ -17711,6 +17739,13 @@ export interface components {
             unit_id: number | null;
             active: boolean;
             sort_order: number;
+            /**
+             * @description What it is (WHIT-1439).
+             * @enum {string}
+             */
+            kind: "room" | "chair" | "equipment" | "other";
+            /** @description The group it belongs to, such as "Chairs"; empty for none. A service can need any one from a group. */
+            group_key: string;
         };
         CalendarRoomRequest: {
             /** @description Text, or a `{ar, en}` map. */
@@ -17721,6 +17756,13 @@ export interface components {
             active?: boolean;
             /** @description Position in lists; lower comes first. */
             sort_order?: number;
+            /**
+             * @description What it is. Default: room.
+             * @enum {string}
+             */
+            kind?: "room" | "chair" | "equipment" | "other";
+            /** @description The group it belongs to, such as "Chairs"; empty for none. */
+            group_key?: string;
         };
         CalendarService: {
             id: number;
@@ -17736,12 +17778,20 @@ export interface components {
             active: boolean;
             sort_order: number;
             staff_profile_ids: number[];
-            /** @description The room it needs; booked with the person. */
+            /** @description The first specific room it needs; booked with the person. `resources` lists every need. */
             room_id?: number | null;
+            /** @description What it needs, in order: specific rooms and equipment, or any one from a group (WHIT-1439). */
+            resources?: components["schemas"]["CalendarServiceNeed"][];
             /** @description A customer's booking is a request staff accept first. */
             needs_approval?: boolean;
             /** @description The inventory service item that holds its name and price (WHIT-1334). */
             item_id?: number | null;
+        };
+        CalendarServiceNeed: {
+            /** @description A specific room or piece of equipment. */
+            resource_id: number | null;
+            /** @description Or any free one from this group, such as "Chairs". */
+            group_key: string | null;
         };
         CalendarServiceRequest: {
             /** @description Text, or a `{ar, en}` map. */
@@ -17766,8 +17816,10 @@ export interface components {
             sort_order?: number;
             /** @description The staff who provide it; the list replaces what is there. */
             staff_profile_ids?: number[];
-            /** @description The room it needs; null for none. */
+            /** @description Older clients: the one room it needs; null for none. Left out when `resources` is sent. */
             room_id?: number | null;
+            /** @description What it needs, in order: each a `resource_id`, or a `group_key` for any free one from that group (WHIT-1439). */
+            resources?: components["schemas"]["CalendarServiceNeed"][];
             /** @description Customers send a request instead of booking. */
             needs_approval?: boolean;
         };
@@ -42145,6 +42197,106 @@ export interface operations {
                 };
             };
             /** @description A cancelled booking, or outside the booking window */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_resources: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarBookingResourcesRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That room or equipment is taken then */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not one for each need, not one the service can use, or a booking of several services */
             422: {
                 headers: {
                     [name: string]: unknown;

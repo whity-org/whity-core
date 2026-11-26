@@ -163,19 +163,20 @@ final class BookingRepository
     /**
      * Move the services of a booking of several: each to its new time and person.
      *
-     * @param list<array{profile_id: int, starts_at: DateTimeImmutable, ends_at: DateTimeImmutable, block: Interval}> $items in position order
+     * @param list<array{profile_id: int, room_id: ?int, starts_at: DateTimeImmutable, ends_at: DateTimeImmutable, block: Interval}> $items in position order
      */
     public function moveItems(int $tenantId, int $bookingId, array $items): void
     {
         $stmt = $this->db->prepare(
             'UPDATE calendar_booking_services
-                SET profile_id = :profile_id, starts_at = :starts_at, ends_at = :ends_at,
+                SET profile_id = :profile_id, room_id = :room_id, starts_at = :starts_at, ends_at = :ends_at,
                     blocks_from = :blocks_from, blocks_until = :blocks_until
               WHERE tenant_id = :tenant_id AND booking_id = :booking_id AND position = :position'
         );
         foreach ($items as $position => $item) {
             $stmt->execute([
                 ':profile_id' => $item['profile_id'],
+                ':room_id' => $item['room_id'],
                 ':starts_at' => Interval::toDb($item['starts_at']),
                 ':ends_at' => Interval::toDb($item['ends_at']),
                 ':blocks_from' => Interval::toDb($item['block']->start),
@@ -237,7 +238,7 @@ final class BookingRepository
                   FROM calendar_bookings b
                   JOIN calendar_services s ON s.id = b.service_id AND s.tenant_id = b.tenant_id
                   JOIN profiles p ON p.id = b.profile_id
-                  LEFT JOIN calendar_rooms r ON r.id = b.room_id AND r.tenant_id = b.tenant_id
+                  LEFT JOIN calendar_resources r ON r.id = b.room_id AND r.tenant_id = b.tenant_id
                  WHERE b.tenant_id = :tenant_id AND b.starts_at < :to AND b.ends_at > :from';
         $params = [':tenant_id' => $tenantId, ':from' => Interval::toDb($from), ':to' => Interval::toDb($to)];
         if ($unitId !== null) {
@@ -399,6 +400,66 @@ final class BookingRepository
     }
 
     /**
+     * Every resource a booking holds (WHIT-1439, AP.18), replacing what it
+     * held: one row for each resource of each part (`part` is the service's
+     * position; 0 for a booking of one service), over that part's time with
+     * buffers. The first resource of each part stays its `room_id`, for
+     * everything that reads rooms.
+     *
+     * @param list<array{resource_id: int, part: int, block: Interval}> $rows
+     */
+    public function setResources(int $tenantId, int $bookingId, array $rows): void
+    {
+        $this->db->prepare('DELETE FROM calendar_booking_resources WHERE tenant_id = :tenant_id AND booking_id = :booking_id')
+            ->execute([':tenant_id' => $tenantId, ':booking_id' => $bookingId]);
+        $insert = $this->db->prepare(
+            'INSERT INTO calendar_booking_resources (tenant_id, booking_id, resource_id, part, blocks_from, blocks_until)
+             VALUES (:tenant_id, :booking_id, :resource_id, :part, :blocks_from, :blocks_until)'
+        );
+        $firsts = [];
+        foreach ($rows as $row) {
+            $insert->execute([
+                ':tenant_id' => $tenantId,
+                ':booking_id' => $bookingId,
+                ':resource_id' => $row['resource_id'],
+                ':part' => $row['part'],
+                ':blocks_from' => Interval::toDb($row['block']->start),
+                ':blocks_until' => Interval::toDb($row['block']->end),
+            ]);
+            $firsts[$row['part']] ??= $row['resource_id'];
+        }
+        $this->db->prepare('UPDATE calendar_bookings SET room_id = :room_id WHERE tenant_id = :tenant_id AND id = :id')
+            ->execute([':room_id' => $firsts[0] ?? null, ':tenant_id' => $tenantId, ':id' => $bookingId]);
+        $part = $this->db->prepare(
+            'UPDATE calendar_booking_services SET room_id = :room_id WHERE tenant_id = :tenant_id AND booking_id = :booking_id AND position = :position'
+        );
+        foreach ($this->itemsFor($tenantId, [$bookingId])[$bookingId] ?? [] as $item) {
+            $position = (int) $item['position'];
+            $part->execute([':room_id' => $firsts[$position] ?? null, ':tenant_id' => $tenantId, ':booking_id' => $bookingId, ':position' => $position]);
+        }
+    }
+
+    /**
+     * The resources a booking holds, by part, in the order they were chosen.
+     *
+     * @return array<int, list<int>> part => resource ids
+     */
+    public function resourcesOf(int $tenantId, int $bookingId): array
+    {
+        $stmt = $this->db->prepare(
+            'SELECT part, resource_id FROM calendar_booking_resources
+              WHERE tenant_id = :tenant_id AND booking_id = :booking_id ORDER BY part, id'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':booking_id' => $bookingId]);
+        $out = [];
+        foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
+            $out[(int) $r['part']][] = (int) $r['resource_id'];
+        }
+
+        return $out;
+    }
+
+    /**
      * Record whether the customer came (WHIT-1427, AP.3), or clear it. Only a
      * confirmed booking. `$by` is the person; null with `$auto` is Whity at the
      * end of the day. Returns false when the booking is not confirmed.
@@ -454,7 +515,7 @@ final class BookingRepository
         $unit = '';
         $params = [':tenant_id' => $tenantId];
         if ($unitId !== null) {
-            $unit = ' AND (EXISTS (SELECT 1 FROM calendar_rooms r WHERE r.tenant_id = b.tenant_id AND r.id = b.room_id AND r.unit_id = :unit_id)
+            $unit = ' AND (EXISTS (SELECT 1 FROM calendar_resources r WHERE r.tenant_id = b.tenant_id AND r.id = b.room_id AND r.unit_id = :unit_id)
                        OR EXISTS (SELECT 1 FROM calendar_staff cs WHERE cs.tenant_id = b.tenant_id AND cs.profile_id = b.profile_id AND cs.unit_id = :unit_id2))';
             $params[':unit_id'] = $unitId;
             $params[':unit_id2'] = $unitId;
