@@ -219,7 +219,25 @@ final class PublicFormsApiHandler
         // READINESS TM-20: the instance's bot check, the one booking and chat
         // use. Null (tests, a host that wires none): the trap field only.
         private readonly ?BotCheck $bot = null,
+        // WHIT-1443 (AP.20): a booking's intake link. Null: no intake forms.
+        private readonly ?\Whity\Core\Calendar\IntakeForms $intake = null,
     ) {
+    }
+
+    /**
+     * The booking an `intake` token stands for, when it is one for this
+     * form: the customer's own link, from their booking email.
+     *
+     * @param array<string, mixed> $form
+     * @return array{tenant_id: int, booking_id: int, contact_id: ?int, name: string, email: string, phone: string}|null
+     */
+    private function intakeFor(mixed $token, array $form): ?array
+    {
+        if ($this->intake === null || !is_string($token) || $token === '') {
+            return null;
+        }
+
+        return $this->intake->resolve($token, (int) $form['tenant_id'], (int) $form['id']);
     }
 
     /**
@@ -260,7 +278,15 @@ final class PublicFormsApiHandler
                 $this->fields->listForForm((int) $form['tenant_id'], (int) $form['id'])
             );
 
-            return Response::json(['data' => PublicFormView::form($form, $fields) + [
+            // WHIT-1443 (AP.20): from the customer's own booking link, what they
+            // gave when they booked, for the page to fill in. Nothing else.
+            $query = [];
+            parse_str((string) (parse_url($request->getPath(), PHP_URL_QUERY) ?? ''), $query);
+            $intake = $this->intakeFor($_GET['intake'] ?? $query['intake'] ?? null, $form);
+
+            return Response::json(['data' => PublicFormView::form($form, $fields) + ($intake === null ? [] : [
+                'intake' => ['name' => $intake['name'], 'email' => $intake['email'], 'phone' => $intake['phone']],
+            ]) + [
                 'built_on_whity' => $this->branding?->showsBuiltOnWhity((int) $form['tenant_id']) ?? true,
                 // The page shows the check above the send button only when
                 // the submit will ask for its token.
@@ -491,6 +517,11 @@ final class PublicFormsApiHandler
             );
 
             $submission = $result['submission'];
+            // WHIT-1443 (AP.20): sent from a booking's link, it belongs to that booking and customer.
+            $intake = $this->intakeFor($body['intake'] ?? null, $form);
+            if ($intake !== null && is_numeric($submission['id'] ?? null)) {
+                $this->intake?->attach($tenantId, (int) $submission['id'], $intake['booking_id'], $intake['contact_id']);
+            }
 
             return Response::json([
                 // NOT the submission row. It carries `id`, `tenant_id`,

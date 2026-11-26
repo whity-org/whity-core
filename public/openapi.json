@@ -17967,6 +17967,138 @@
                 ]
             }
         },
+        "/api/v1/calendar/bookings/{id}/intake/{formId}": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_intake_formid",
+                "summary": "Send a booking's intake form again, or get a link to fill it in at the desk (WHIT-1443)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "formId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarIntakeLinkRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Sent, or the link",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarIntakeLink"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a form this booking asks for, the form has no public link, or the customer has no email",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/bookings/{id}/late": {
             "post": {
                 "operationId": "post_api_v1_calendar_bookings_id_late",
@@ -18468,6 +18600,565 @@
                     },
                     "422": {
                         "description": "Not a request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/visit": {
+            "get": {
+                "operationId": "get_api_v1_calendar_bookings_id_visit",
+                "summary": "A booking's visit record: notes, corrections, forms and files. Only with calendar:visit_notes or as the person treating the customer; an agent needs the permission. Every read is audited (WHIT-1443)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The record",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarVisitRecord"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the treating person, and no calendar:visit_notes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_calendar_bookings_id_visit",
+                "summary": "Write the visit notes; refused once the visit is finished (WHIT-1443); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarVisitNotesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The record",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarVisitRecord"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the treating person, and no calendar:visit_notes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The visit is finished: add a correction",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/visit/corrections": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_visit_corrections",
+                "summary": "Add a dated correction to a finished visit (WHIT-1443); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarVisitCorrectionRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The record",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarVisitRecord"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the treating person, and no calendar:visit_notes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "The visit is not finished yet, or nothing written",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/visit/files": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_visit_files",
+                "summary": "Keep a file on a visit: a PDF, a photo or a text file up to 20 MB, in the tenant's own storage (WHIT-1443); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "multipart/form-data with the file in `file`. The type is read from the file itself.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "The file",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarVisitFile"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the treating person, and no calendar:visit_notes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Empty, too large or not a type kept on visits",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/visit/finish": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_visit_finish",
+                "summary": "Finish visit: the notes are signed and never change again (WHIT-1443); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The record",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarVisitRecord"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the treating person, and no calendar:visit_notes",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "Already finished",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No notes yet",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22087,6 +22778,228 @@
                 ]
             }
         },
+        "/api/v1/calendar/services/{id}/forms": {
+            "get": {
+                "operationId": "get_api_v1_calendar_services_id_forms",
+                "summary": "The forms a service asks customers to fill in (WHIT-1443)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The forms",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarServiceForm"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "put": {
+                "operationId": "put_api_v1_calendar_services_id_forms",
+                "summary": "Set the forms a service asks for: on booking or before the visit, for new customers or every visit, required or not (WHIT-1443)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarServiceFormsRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The forms",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarServiceForm"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such service or form",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A bad value, or more than 8 forms",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/settings": {
             "get": {
                 "operationId": "get_api_v1_calendar_settings",
@@ -23520,6 +24433,85 @@
                     },
                     "403": {
                         "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/visit-files/{id}": {
+            "get": {
+                "operationId": "get_api_v1_calendar_visit_files_id",
+                "summary": "A visit file's bytes, for someone allowed to see the visit. Audited (WHIT-1443)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The file's bytes, with its type"
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not the treating person, and no calendar:visit_notes",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -85777,6 +86769,15 @@
                         "schema": {
                             "type": "string"
                         }
+                    },
+                    {
+                        "name": "intake",
+                        "in": "query",
+                        "required": false,
+                        "description": "WHIT-1443: the token from the form link in a booking email; the answer then carries `intake`, what the customer gave when they booked.",
+                        "schema": {
+                            "type": "string"
+                        }
                     }
                 ],
                 "responses": {
@@ -115482,6 +116483,9 @@
                         "type": "string",
                         "description": "`expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441)."
                     },
+                    "intake": {
+                        "$ref": "#/components/schemas/CalendarIntakeStatus"
+                    },
                     "customer_flag": {
                         "$ref": "#/components/schemas/CalendarCustomerFlag"
                     },
@@ -116467,6 +117471,95 @@
                     "hours"
                 ]
             },
+            "CalendarIntakeLink": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "Fill in at the desk: the form page in kiosk mode."
+                    },
+                    "sent": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Send again: sent, failed or no_address."
+                    }
+                }
+            },
+            "CalendarIntakeLinkRequest": {
+                "type": "object",
+                "properties": {
+                    "send": {
+                        "type": "boolean",
+                        "description": "True: email the customer the link (Send again). False: return a link to fill it in at the desk."
+                    }
+                }
+            },
+            "CalendarIntakeStatus": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "done",
+                            "not_done",
+                            "not_needed"
+                        ],
+                        "description": "Every required form sent, one missing, or none asked for (WHIT-1443). A missing form never blocks check-in."
+                    },
+                    "forms": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "form_id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "names": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "description": "Its name in each language."
+                                },
+                                "required": {
+                                    "type": "boolean"
+                                },
+                                "fill_when": {
+                                    "type": "string",
+                                    "enum": [
+                                        "on_booking",
+                                        "before_visit"
+                                    ]
+                                },
+                                "done": {
+                                    "type": "boolean"
+                                },
+                                "submission_id": {
+                                    "type": "integer",
+                                    "nullable": true
+                                },
+                                "submitted_at": {
+                                    "type": "string",
+                                    "nullable": true
+                                }
+                            },
+                            "required": [
+                                "form_id",
+                                "name",
+                                "required",
+                                "done"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "status",
+                    "forms"
+                ]
+            },
             "CalendarItem": {
                 "type": "object",
                 "properties": {
@@ -116875,6 +117968,98 @@
                     "active",
                     "sort_order",
                     "staff_profile_ids"
+                ]
+            },
+            "CalendarServiceForm": {
+                "type": "object",
+                "properties": {
+                    "form_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "names": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Its name in each language."
+                    },
+                    "fill_when": {
+                        "type": "string",
+                        "enum": [
+                            "on_booking",
+                            "before_visit"
+                        ]
+                    },
+                    "who": {
+                        "type": "string",
+                        "enum": [
+                            "new",
+                            "every"
+                        ],
+                        "description": "`new`: only a customer's first visit."
+                    },
+                    "required": {
+                        "type": "boolean"
+                    },
+                    "public": {
+                        "type": "boolean",
+                        "description": "The form has a public link, so customers can fill it in."
+                    }
+                },
+                "required": [
+                    "form_id",
+                    "name",
+                    "fill_when",
+                    "who",
+                    "required"
+                ]
+            },
+            "CalendarServiceFormsRequest": {
+                "type": "object",
+                "properties": {
+                    "forms": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "description": "The forms, in order; the list replaces what is there.",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "form_id": {
+                                    "type": "integer",
+                                    "description": "A form of this workspace."
+                                },
+                                "fill_when": {
+                                    "type": "string",
+                                    "enum": [
+                                        "on_booking",
+                                        "before_visit"
+                                    ],
+                                    "description": "Default before_visit."
+                                },
+                                "who": {
+                                    "type": "string",
+                                    "enum": [
+                                        "new",
+                                        "every"
+                                    ],
+                                    "description": "Default every."
+                                },
+                                "required": {
+                                    "type": "boolean",
+                                    "description": "Default true."
+                                }
+                            },
+                            "required": [
+                                "form_id"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "forms"
                 ]
             },
             "CalendarServiceNeed": {
@@ -117569,6 +118754,191 @@
                         "description": "The person opened the app's sidebar on the calendar, so it stays open there."
                     }
                 }
+            },
+            "CalendarVisitCorrectionRequest": {
+                "type": "object",
+                "properties": {
+                    "body": {
+                        "type": "string",
+                        "maxLength": 20000,
+                        "description": "What is added to a finished visit, dated and signed."
+                    }
+                },
+                "required": [
+                    "body"
+                ]
+            },
+            "CalendarVisitFile": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "filename": {
+                        "type": "string"
+                    },
+                    "content_type": {
+                        "type": "string"
+                    },
+                    "byte_size": {
+                        "type": "integer"
+                    },
+                    "added_by": {
+                        "$ref": "#/components/schemas/CalendarVisitPerson"
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "filename",
+                    "content_type",
+                    "byte_size",
+                    "created_at"
+                ]
+            },
+            "CalendarVisitNotesRequest": {
+                "type": "object",
+                "properties": {
+                    "body": {
+                        "type": "string",
+                        "maxLength": 20000,
+                        "description": "The notes, as text. Refused once the visit is finished."
+                    }
+                },
+                "required": [
+                    "body"
+                ]
+            },
+            "CalendarVisitPerson": {
+                "type": "object",
+                "nullable": true,
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "name"
+                ]
+            },
+            "CalendarVisitRecord": {
+                "type": "object",
+                "properties": {
+                    "booking_id": {
+                        "type": "integer"
+                    },
+                    "notes": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "body": {
+                                "type": "string"
+                            },
+                            "author": {
+                                "$ref": "#/components/schemas/CalendarVisitPerson"
+                            },
+                            "created_at": {
+                                "type": "string"
+                            },
+                            "updated_at": {
+                                "type": "string"
+                            },
+                            "finished_at": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "finished_by": {
+                                "$ref": "#/components/schemas/CalendarVisitPerson"
+                            }
+                        }
+                    },
+                    "finished": {
+                        "type": "boolean",
+                        "description": "Finish visit was pressed: the notes never change; corrections are added."
+                    },
+                    "corrections": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "body": {
+                                    "type": "string"
+                                },
+                                "author": {
+                                    "$ref": "#/components/schemas/CalendarVisitPerson"
+                                },
+                                "created_at": {
+                                    "type": "string"
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "body",
+                                "created_at"
+                            ]
+                        }
+                    },
+                    "files": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarVisitFile"
+                        }
+                    },
+                    "forms": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "integer"
+                                },
+                                "form_id": {
+                                    "type": "integer"
+                                },
+                                "name": {
+                                    "type": "string"
+                                },
+                                "names": {
+                                    "type": "object",
+                                    "additionalProperties": {
+                                        "type": "string"
+                                    },
+                                    "description": "Its name in each language."
+                                },
+                                "submitted_at": {
+                                    "type": "string"
+                                },
+                                "printout_path": {
+                                    "type": "string",
+                                    "description": "The form's printout (FP.1)."
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "form_id",
+                                "name",
+                                "submitted_at",
+                                "printout_path"
+                            ]
+                        }
+                    }
+                },
+                "required": [
+                    "booking_id",
+                    "finished",
+                    "corrections",
+                    "files",
+                    "forms"
+                ]
             },
             "CalendarWaitlistEntry": {
                 "type": "object",
@@ -130989,6 +132359,10 @@
                         "type": "object",
                         "additionalProperties": true,
                         "description": "Answers keyed by field key, each typed by its field: text, number, boolean, or a list for multiselect."
+                    },
+                    "intake": {
+                        "type": "string",
+                        "description": "The public page only (WHIT-1443): the `intake` token from a booking's form link, so the submission records that booking and customer. Ignored when it is not one for this form."
                     }
                 },
                 "required": [
@@ -143619,6 +144993,22 @@
                             "built_on_whity": {
                                 "type": "boolean",
                                 "description": "Whether the page shows \"Built on Whity\"."
+                            },
+                            "intake": {
+                                "type": "object",
+                                "nullable": true,
+                                "description": "With `?intake=` from a booking's form link: what the customer gave when they booked, to fill in. Left out otherwise.",
+                                "properties": {
+                                    "name": {
+                                        "type": "string"
+                                    },
+                                    "email": {
+                                        "type": "string"
+                                    },
+                                    "phone": {
+                                        "type": "string"
+                                    }
+                                }
                             }
                         },
                         "required": [

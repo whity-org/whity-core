@@ -12,6 +12,7 @@
         "closed.title": "This booking page isn’t available",
         "done.description": "We’ve sent the details to {email}.",
         "done.holdUntil": "If it isn’t paid by {time}, the time is given back.",
+        "done.intake": "Before your visit, please fill in:",
         "done.keepLink": "Keep the email we sent: its link lets you move or cancel this booking.",
         "done.owed": "To pay now:",
         "done.pay": "Go to payment",

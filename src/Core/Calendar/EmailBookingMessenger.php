@@ -34,7 +34,7 @@ use Whity\Core\Settings\SettingsService;
  * A booking with no email address gets nothing. Delivery failures are logged
  * and never thrown.
  */
-final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDelivery, WaitlistMessenger
+final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDelivery, WaitlistMessenger, IntakeMessenger
 {
     private const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
     private const AR_DAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
@@ -121,6 +121,50 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
             'ics' => $message['ics'],
             'method' => $message['method'],
         ];
+    }
+
+    /**
+     * The link to an intake form for a booking, sent again from the desk
+     * (WHIT-1443, AP.20). In the workspace's language.
+     *
+     * @param array{to: string, name: string, form: string, url: string, service: array<string, string>, starts_at: string, time_zone: ?string} $intake
+     */
+    public function intakeForm(int $tenantId, array $intake): string
+    {
+        try {
+            $checked = \Whity\Http\Validation\FieldValidator::check(['to' => $intake['to']], ['to' => \Whity\Http\Validation\Field::email()->required()]);
+            if ($checked->first() !== null) {
+                return BookingRepository::REMINDER_NO_ADDRESS;
+            }
+            $effective = $this->settings->effective($tenantId);
+            $calendar = CalendarSettings::fromSettings($effective);
+            $arabic = str_starts_with((string) ($effective[SettingsRegistry::LOCALE] ?? 'en'), 'ar');
+            $t = $arabic ? self::AR : self::EN;
+            $zoneName = BranchZones::valid($intake['time_zone']);
+            $zone = $zoneName !== null ? new \DateTimeZone($zoneName) : $calendar->zone;
+            $when = self::when((Interval::fromApi($intake['starts_at']) ?? new DateTimeImmutable())->setTimezone($zone), $arabic);
+            $workspace = $this->sender->branding($tenantId)->siteName;
+            ['address' => $address, 'replyTo' => $replyTo] = $this->sender->workspaceContact($tenantId, $arabic ? 'ar' : 'en');
+            $footer = implode(' · ', array_filter([$workspace, $address, $replyTo !== null ? $t['foot.reply'] : null], static fn (?string $v): bool => $v !== null && $v !== ''));
+            $content = new EmailContent(
+                heading: sprintf($t['intake.heading'], $intake['form']),
+                paragraphs: [trim($intake['name']) !== '' ? sprintf($t['intake.hello'], trim($intake['name'])) : $t['intake.lead']],
+                ctaLabel: $t['intake.cta'],
+                ctaUrl: $intake['url'],
+                footnote: null,
+                rows: [[$t['row.what'], self::label($intake['service'], $arabic)], [$t['row.when'], $when]],
+                notice: $footer,
+                language: $arabic ? 'ar' : 'en',
+                rowStyles: [0 => 'strong'],
+            );
+            $this->sender->deliver($tenantId, $checked->value('to'), sprintf($t['intake.subject'], $intake['form']), $content, new EmailOptions(replyTo: $replyTo));
+
+            return BookingRepository::REMINDER_SENT;
+        } catch (\Throwable $e) {
+            $this->logger?->warning('[calendar] could not send an intake form', ['error' => $e->getMessage()]);
+
+            return BookingRepository::REMINDER_FAILED;
+        }
     }
 
     /**
@@ -269,6 +313,15 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
             case 'confirmed':
                 $subject = sprintf($t['confirmed.subject'], $serviceName, $when);
                 $paragraphs = [$name !== '' ? sprintf($t['confirmed.hello'], $name) : $t['confirmed.soon']];
+                // WHIT-1443 (AP.20): the forms to fill before the visit.
+                foreach (is_array($booking['intake_forms'] ?? null) ? $booking['intake_forms'] : [] as $i => $form) {
+                    if ($i === 0) {
+                        $paragraphs[] = $t['intake.lead'];
+                    }
+                    if (is_array($form) && is_string($form['url'] ?? null)) {
+                        $paragraphs[] = (string) ($form['name'] ?? '') . ': ' . $form['url'];
+                    }
+                }
                 if ($manage === null && ($booking['payment_ref'] ?? null) !== null) {
                     $paragraphs[] = $t['confirmed.paid'];
                 }
@@ -536,6 +589,12 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
     private const EN = [
         'row.what' => 'What',
         'row.when' => 'When',
+        // WHIT-1443 (AP.20).
+        'intake.lead' => 'Before your visit, please fill in:',
+        'intake.subject' => 'Please fill in: %s',
+        'intake.heading' => 'Please fill in %s before your visit',
+        'intake.hello' => 'Hello %s, please fill this in before your visit. It takes a few minutes.',
+        'intake.cta' => 'Fill it in',
         // WHIT-1442 (AP.23): a freed time for someone on the waitlist.
         'offer.subject' => 'A time is free: %s, %s',
         'offer.heading' => 'A time you wanted is free',
@@ -603,6 +662,12 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
     private const AR = [
         'row.what' => 'ماذا',
         'row.when' => 'متى',
+        // WHIT-1443 (AP.20).
+        'intake.lead' => 'قبل زيارتك، يُرجى تعبئة:',
+        'intake.subject' => 'يُرجى تعبئة: %s',
+        'intake.heading' => 'يُرجى تعبئة %s قبل زيارتك',
+        'intake.hello' => 'مرحبًا %s، يُرجى تعبئة هذا قبل زيارتك. يستغرق بضع دقائق.',
+        'intake.cta' => 'املأه الآن',
         // WHIT-1442 (AP.23).
         'offer.subject' => 'موعد متاح: %s، %s',
         'offer.heading' => 'موعد كنت تريده أصبح متاحًا',

@@ -513,6 +513,14 @@ function BookingLine({ booking, timeZone }: { booking: CalendarBooking; timeZone
         </Badge>
       ) : null}
       {booking.customer_flag ? <CustomerFlag flag={booking.customer_flag} /> : null}
+      {/* WHIT-1443 (AP.20): a form still to fill; it never blocks check-in. */}
+      {booking.intake?.status === 'not_done' ? (
+        <Badge variant="warning" data-testid={`desk-intake-${booking.id}`}>
+          {t('desk.formNotDone', 'Form not done')}
+        </Badge>
+      ) : booking.intake?.status === 'done' ? (
+        <Badge variant="success">{t('desk.formDone', 'Form done')}</Badge>
+      ) : null}
     </span>
   );
 }

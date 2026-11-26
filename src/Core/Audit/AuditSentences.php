@@ -187,6 +187,13 @@ final class AuditSentences
         'auth.2fa.disabled' => '{actor} turned off two-step sign-in',
         'calendar.attendance.marked' => '{actor} marked whether a customer came',
         'calendar.attendance.reset' => '{actor} started a customer\'s count again',
+        // WHIT-1443 (AP.21): every read and change of a visit record.
+        'calendar.visit.viewed' => '{actor} opened a visit record',
+        'calendar.visit.written' => '{actor} wrote a visit\'s notes',
+        'calendar.visit.finished' => '{actor} finished a visit',
+        'calendar.visit.corrected' => '{actor} added a correction to a visit',
+        'calendar.visit.file_added' => '{actor} added a file to a visit',
+        'calendar.visit.file_read' => '{actor} opened a file on a visit',
         'auth.2fa.enabled' => '{actor} turned on two-step sign-in',
         'auth.2fa.verify_failure' => '{actor} entered a wrong two-step code',
         'auth.2fa.verify_success' => '{actor} confirmed a two-step code',

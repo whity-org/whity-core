@@ -502,6 +502,11 @@ final class CorePermissions
     // no-show and late-cancel rates. Granted by capability to roles holding
     // calendar:manage (migration 364). Everyone sees their own rate without it.
     public const CALENDAR_REPORTS = 'calendar:reports';
+    // WHIT-1443 (design section 39 §7.3, AP.21): see and write visit records
+    // (notes, forms and files for a booking). Granted to NO role: an admin
+    // grants it to the roles that need it. The treating staff member always
+    // sees their own visits; an agent only through a grant of this.
+    public const CALENDAR_VISIT_NOTES = 'calendar:visit_notes';
 
     // CONTACTS (migrations 261 and 262, design 3.3 A8). Customers and
     // suppliers as one record, with tags and spreadsheet import. Read and
@@ -700,6 +705,7 @@ final class CorePermissions
             self::CALENDAR_FRONT_DESK,
             self::CALENDAR_COMMISSION,
             self::CALENDAR_REPORTS,
+            self::CALENDAR_VISIT_NOTES,
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,

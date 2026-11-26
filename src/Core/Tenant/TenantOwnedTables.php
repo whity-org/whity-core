@@ -145,6 +145,11 @@ final class TenantOwnedTables
         'calendar_busy_check_failures' => '367_add_calendar_staff_and_time.php',
         'calendar_waitlist' => '369_create_calendar_waitlist.php',
         'calendar_waitlist_offers' => '369_create_calendar_waitlist.php',
+        'calendar_service_forms' => '370_create_calendar_intake_forms.php',
+        'calendar_intake_links' => '370_create_calendar_intake_forms.php',
+        'calendar_visit_notes' => '371_create_calendar_visit_records.php',
+        'calendar_visit_corrections' => '371_create_calendar_visit_records.php',
+        'calendar_visit_files' => '371_create_calendar_visit_records.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
         'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_event_people' => '284_extend_calendar_events.php',

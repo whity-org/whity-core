@@ -81,6 +81,9 @@ final class BookingService
     private ?RoomRepository $rooms = null;
     private ?BranchZones $zones = null;
     private ?Waitlist $waitlist = null;
+    private ?IntakeForms $intake = null;
+    private ?VisitRecords $visits = null;
+    private ?\Whity\Storage\StorageDriverInterface $storage = null;
 
     /** WHIT-1427: every attendance mark is audited (AP.3). */
     private ?\Whity\Core\Audit\AuditLoggerInterface $audit = null;
@@ -144,6 +147,7 @@ final class BookingService
     public function setAudit(\Whity\Core\Audit\AuditLoggerInterface $audit): void
     {
         $this->audit = $audit;
+        $this->visits = null;
     }
 
     public function attendanceRepository(): AttendanceRepository
@@ -156,6 +160,8 @@ final class BookingService
     {
         $this->manageUrlBase = $base;
         $this->waitlist = null;
+        $this->intake = null;
+        $this->visits = null;
     }
 
     /** Reminders are queued here when set ({@see BookingReminderJob}). */
@@ -597,6 +603,8 @@ final class BookingService
         if ($requirement !== null && $hold !== null && $step !== null) {
             return $this->startPayment($tenantId, $booking, $quote, $requirement, $hold, $step);
         }
+        // WHIT-1443 (AP.20): the forms to fill, linked from the email and the page.
+        $booking['intake_forms'] = $this->intakeLinks($tenantId, $booking);
         if ($asRequest) {
             $this->announceBooking(CalendarEventNames::BOOKING_CREATED, $tenantId, $booking);
             $this->tell('requested', $tenantId, $booking);
@@ -647,6 +655,113 @@ final class BookingService
         $this->offerFreed($tenantId, $before);
 
         return $booking;
+    }
+
+    /** Where visit files are kept: the tenant's own storage (WHIT-1443, AP.21). */
+    public function setStorage(\Whity\Storage\StorageDriverInterface $storage): void
+    {
+        $this->storage = $storage;
+        $this->visits = null;
+    }
+
+    /** Forms to fill before a visit (WHIT-1443, AP.20). */
+    public function intake(): IntakeForms
+    {
+        // The public form page sits beside the manage page: `/booking` → `/f`.
+        $base = $this->manageUrlBase !== '' ? (preg_replace('#/booking/?$#', '/f', rtrim($this->manageUrlBase, '/')) ?? '') : '';
+
+        return $this->intake ??= new IntakeForms($this->db, $base);
+    }
+
+    /** Visit records (WHIT-1443, AP.21). */
+    public function visits(): VisitRecords
+    {
+        return $this->visits ??= new VisitRecords($this->db, $this->intake(), $this->storage, $this->audit, fn (): DateTimeImmutable => $this->now());
+    }
+
+    /**
+     * Each booking with the intake forms it needs, read once for a whole list.
+     *
+     * @param list<array<string, mixed>> $bookings
+     * @return list<array<string, mixed>>
+     */
+    public function withIntake(int $tenantId, array $bookings): array
+    {
+        $status = $this->intake()->statusFor($tenantId, $bookings);
+        foreach ($bookings as $i => $b) {
+            $bookings[$i]['intake'] = $status[(int) $b['id']] ?? ['status' => IntakeForms::NOT_NEEDED, 'forms' => []];
+        }
+
+        return $bookings;
+    }
+
+    /**
+     * A link to each intake form a booking still needs (WHIT-1443, AP.20),
+     * for its confirmation and the page after booking.
+     *
+     * @param array<string, mixed> $booking
+     * @return list<array{form_id: int, name: string, url: string}>
+     */
+    public function intakeLinks(int $tenantId, array $booking): array
+    {
+        $links = [];
+        try {
+            foreach ($this->intake()->statusFor($tenantId, [$booking])[(int) $booking['id']]['forms'] ?? [] as $form) {
+                if ($form['done']) {
+                    continue;
+                }
+                $url = $this->intake()->linkFor($tenantId, (int) $booking['id'], $form['form_id'], $this->now());
+                if ($url !== null) {
+                    $links[] = ['form_id' => $form['form_id'], 'name' => $form['name'], 'url' => $url];
+                }
+            }
+        } catch (Throwable $e) {
+            ScrubbedErrorLog::failure('[calendar] could not make the intake form links', $e);
+        }
+
+        return $links;
+    }
+
+    /**
+     * A fresh link to one of a booking's intake forms (WHIT-1443, AP.20): for
+     * Send again (`$send`, emailed to the customer) or Fill in at the desk.
+     *
+     * @return array{url: string, sent: ?string}
+     */
+    public function intakeLink(int $tenantId, int $bookingId, int $formId, bool $send): array
+    {
+        $booking = $this->bookingOrFail($tenantId, $bookingId);
+        $form = null;
+        foreach ($booking['intake']['forms'] ?? [] as $f) {
+            if ($f['form_id'] === $formId) {
+                $form = $f;
+            }
+        }
+        if ($form === null) {
+            throw new CalendarRejectedException('This booking doesn\'t ask for that form.', 422);
+        }
+        $url = $this->intake()->linkFor($tenantId, $bookingId, $formId, $this->now())
+            ?? throw new CalendarRejectedException('That form has no public link. Turn on its link under Forms first.', 422, ['code' => 'form_not_public']);
+        $sent = null;
+        if ($send) {
+            if (!$this->messenger instanceof IntakeMessenger) {
+                throw new CalendarRejectedException('Email isn\'t set up here.', 503);
+            }
+            $sent = $this->messenger->intakeForm($tenantId, [
+                'to' => (string) ($booking['customer']['email'] ?? ''),
+                'name' => (string) ($booking['customer']['name'] ?? ''),
+                'form' => $form['name'],
+                'url' => $url,
+                'service' => is_array($booking['service']['name'] ?? null) ? $booking['service']['name'] : [],
+                'starts_at' => (string) $booking['starts_at'],
+                'time_zone' => is_string($booking['time_zone'] ?? null) ? $booking['time_zone'] : null,
+            ]);
+            if ($sent === BookingRepository::REMINDER_NO_ADDRESS) {
+                throw new CalendarRejectedException('This customer has no email. Fill it in at the desk instead.', 422, ['code' => 'no_email']);
+            }
+        }
+
+        return ['url' => $url, 'sent' => $sent];
     }
 
     /** The waitlist (WHIT-1442, AP.23). */
@@ -866,7 +981,7 @@ final class BookingService
             'time_zone' => $settings->zone->getName(),
             'now' => Interval::toApi($now),
             'full' => $since === null,
-            'bookings' => $this->withCustomerFlags($tenantId, $rows),
+            'bookings' => $this->withIntake($tenantId, $this->withCustomerFlags($tenantId, $rows)),
             // WHIT-1442 (AP.23): how many are on the waitlist.
             'waitlist_count' => $this->waitlist()->count($tenantId),
         ];
@@ -1680,6 +1795,8 @@ final class BookingService
         $booking['reminders'] = $this->bookings->reminderLog($tenantId, $id);
         // WHIT-1427 (AP.8): the customer's flag.
         $booking = $this->withCustomerFlags($tenantId, [$booking])[0];
+        // WHIT-1443 (AP.20): the intake forms it needs, done or not.
+        $booking['intake'] = $this->intake()->statusFor($tenantId, [$booking])[$id] ?? ['status' => IntakeForms::NOT_NEEDED, 'forms' => []];
         // WHIT-1439 (AP.18): every resource it holds, by part.
         $booking['resources'] = [];
         foreach ($this->bookings->resourcesOf($tenantId, $id) as $part => $resources) {

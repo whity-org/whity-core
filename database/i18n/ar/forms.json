@@ -346,6 +346,7 @@
         "fill.resent": "أُرسلت تعديلاتك على {title}. يظهر ضمن طلباتك.",
         "fill.resentTitle": "أُرسل مرة أخرى",
         "fill.send": "إرسال",
+        "fill.sentKiosk": "شكرًا لك. يُرجى إعادة الجهاز اللوحي إلى الاستقبال.",
         "fill.sentMember": "تم تسجيل {title}. ستجده ضمن طلباتك.",
         "fill.sentMemberTitle": "تم الإرسال",
         "fill.sentPublic": "تم إرسال {title} بنجاح. يمكنك إغلاق هذه الصفحة.",

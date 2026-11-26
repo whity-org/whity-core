@@ -5066,6 +5066,8 @@ $publicFormsHandler = new \Whity\Api\PublicFormsApiHandler(
     new \Whity\Core\Branding\BrandingService($settingsService, entitlements: $entitlementService),
     // READINESS TM-20: the same bot check booking and chat use.
     $publicFormBotCheck,
+    // WHIT-1443 (AP.20): a booking's intake link records the booking.
+    new \Whity\Core\Calendar\IntakeForms($db->getPdo(), ''),
 );
 $publicFormKeysHandler = new \Whity\Api\PublicFormKeysApiHandler(
     $publicFormKeyRepository,
@@ -5602,6 +5604,8 @@ $calendarBookingService = \Whity\Core\Calendar\CalendarServices::bookingService(
 $calendarBookingService->setReminders($eventReminders);
 // WHIT-1427 (AP.3): every attendance mark is audited.
 $calendarBookingService->setAudit($auditLogger);
+// WHIT-1443 (AP.21): visit files in the tenant's own storage.
+$calendarBookingService->setStorage($storageDriver);
 // SDK 1.98: a payment step settles held bookings, a sync plugin keeps outside
 // events, through these host services.
 \Whity\register_service(\Whity\Sdk\Calendar\Bookings::class, new \Whity\Core\Calendar\HostBookings($calendarBookingService));
@@ -5662,6 +5666,16 @@ $router->register('PATCH',  '/api/calendar/branches/{id:\d+}',              [$ca
 $router->register('GET',    '/api/calendar/busy-checks',                    [$calendarHandler, 'busyChecks'],      null, null, CorePermissions::CALENDAR_READ);
 // WHIT-1441 (AP.27-AP.29): the front desk: its day, the visit's steps, and running late.
 $router->register('GET',    '/api/calendar/desk',                           [$calendarHandler, 'desk'],            null, null, CorePermissions::CALENDAR_FRONT_DESK);
+// WHIT-1443 (AP.20, AP.21): intake forms, and the visit record (which checks calendar:visit_notes or the treating person itself).
+$router->register('GET',    '/api/calendar/services/{id:\d+}/forms',        [$calendarHandler, 'serviceForms'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/services/{id:\d+}/forms',        [$calendarHandler, 'putServiceForms'], null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/intake/{formId:\d+}', [$calendarHandler, 'intakeLink'], null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/bookings/{id:\d+}/visit',        [$calendarHandler, 'visit'],           null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/bookings/{id:\d+}/visit',        [$calendarHandler, 'putVisit'],        null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/finish', [$calendarHandler, 'finishVisit'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/corrections', [$calendarHandler, 'correctVisit'], null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/files',  [$calendarHandler, 'addVisitFile'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/visit-files/{id:\d+}',           [$calendarHandler, 'visitFile'],       null, null, CorePermissions::CALENDAR_READ);
 // WHIT-1442 (AP.23): the waitlist.
 $router->register('GET',    '/api/calendar/waitlist',                       [$calendarHandler, 'listWaitlist'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/waitlist',                       [$calendarHandler, 'addWaitlist'],     null, null, CorePermissions::CALENDAR_WRITE);

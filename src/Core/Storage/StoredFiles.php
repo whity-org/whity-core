@@ -35,8 +35,10 @@ final class StoredFiles
     public const DOCUMENT_SOURCE = 'document_source';
     public const DOCUMENT_ARTIFACT = 'document_artifact';
     public const CHAT_ATTACHMENT = 'chat_attachment';
+    /** WHIT-1443 (AP.21): a file on a visit record. */
+    public const VISIT_FILE = 'visit_file';
 
-    public const KINDS = [self::FORM_UPLOAD, self::DOCUMENT_SOURCE, self::DOCUMENT_ARTIFACT, self::CHAT_ATTACHMENT];
+    public const KINDS = [self::FORM_UPLOAD, self::DOCUMENT_SOURCE, self::DOCUMENT_ARTIFACT, self::CHAT_ATTACHMENT, self::VISIT_FILE];
 
     private const KEY_ENTROPY_BYTES = 16;
 
