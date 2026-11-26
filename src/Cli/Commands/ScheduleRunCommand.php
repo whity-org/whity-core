@@ -290,6 +290,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1440 (AP.17): external-calendar failures older than a week
+        // are deleted once a day, so that log never grows.
+        if ($now->format('H:i') === '03:20') {
+            $this->queue->dispatch(\Whity\Core\Calendar\BusyCheckPruneJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'calendar-busy-check-prune-' . $now->format('Ymd'),
+            ]);
+        }
+
         // WHIT-1417 (AP.14): booking reminders the queue lost, every five
         // minutes; each reminder is claimed when sent, so it goes out once.
         if ((int) $now->format('i') % 5 === 0) {

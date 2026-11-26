@@ -114,6 +114,13 @@ final class PublicBookingApiHandler
                     'price_minor' => $service['price_minor'],
                     'currency' => $service['currency'],
                     'staff_profile_ids' => $offered,
+                    // WHIT-1440 (AP.19): each person's own length and price, so the
+                    // page shows theirs, or a range ("30–45 min") for anyone.
+                    'staff' => array_map(static function (int $profileId) use ($service): array {
+                        $own = ServiceRepository::forPerson($service, $profileId);
+
+                        return ['profile_id' => $profileId, 'duration_minutes' => (int) $own['duration_minutes'], 'price_minor' => $own['price_minor']];
+                    }, $offered),
                     // Design 3.3: the page says "Send request" instead of "Book it".
                     'sends_request' => $service['needs_approval'] || !$settings->instantBooking,
                 ];
@@ -127,7 +134,8 @@ final class PublicBookingApiHandler
                 // WHIT-1173: `multi_service_booking` lets the customer add more services.
                 'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
                 'services' => $services,
-                'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name']], $staff),
+                // WHIT-1440 (AP.16): each person's branch zone; null is the workspace's (`settings.time_zone`).
+                'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name'], 'time_zone' => $s['time_zone']], $staff),
                 // WHIT-1286 (#2203): only a check that is fully set up; never an empty site key.
                 'bot_check' => $this->bot->isRequired() && $this->bot->isReady()
                     ? ['provider' => $this->bot->provider(), 'site_key' => $this->bot->siteKey()]
@@ -304,6 +312,8 @@ final class PublicBookingApiHandler
             return Response::json(['data' => self::forCustomer($booking) + [
                 'manage_token' => $booking['manage_token'] ?? null,
                 'payment' => $booking['payment'] ?? null,
+                // WHIT-1440 (AP.16): the zone of the person's branch, or the workspace's.
+                'time_zone' => $booking['time_zone'] ?? $this->booking->settingsFor($tenantId)->zone->getName(),
             ]], 201);
         });
     }
@@ -322,7 +332,8 @@ final class PublicBookingApiHandler
             return Response::json(['data' => self::forCustomer($booking) + [
                 'workspace' => ['name' => $name],
                 'brand' => $this->brandFor($tenantId, $name),
-                'time_zone' => $settings->zone->getName(),
+                // WHIT-1440 (AP.16): the zone of the person's branch, or the workspace's.
+                'time_zone' => $booking['time_zone'] ?? $settings->zone->getName(),
             ]]);
         });
     }

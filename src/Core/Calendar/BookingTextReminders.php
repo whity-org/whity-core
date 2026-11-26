@@ -113,7 +113,9 @@ final class BookingTextReminders
     {
         $effective = $this->settings->effective($tenantId);
         $arabic = str_starts_with((string) ($effective[SettingsRegistry::LOCALE] ?? 'en'), 'ar');
-        $zone = CalendarSettings::fromSettings($effective)->zone;
+        // WHIT-1440 (AP.16): in the zone of the person's branch.
+        $zoneName = BranchZones::valid($booking['time_zone'] ?? null);
+        $zone = $zoneName !== null ? new \DateTimeZone($zoneName) : CalendarSettings::fromSettings($effective)->zone;
         $start = Interval::fromApi(is_string($booking['starts_at'] ?? null) ? $booking['starts_at'] : null) ?? new DateTimeImmutable();
         $when = EmailBookingMessenger::when($start->setTimezone($zone), $arabic);
         $service = is_array($booking['service']['name'] ?? null) ? $booking['service']['name'] : [];

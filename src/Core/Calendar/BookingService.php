@@ -9,6 +9,7 @@ use DateTimeZone;
 use PDO;
 use Throwable;
 use Whity\Core\Hooks\HookManager;
+use Whity\Core\Log\ScrubbedErrorLog;
 use Whity\Core\Queue\QueueService;
 use Whity\Sdk\Calendar\BookingPaymentStep;
 use Whity\Sdk\Calendar\BookingQuote;
@@ -78,6 +79,7 @@ final class BookingService
     private string $manageUrlBase = '';
 
     private ?RoomRepository $rooms = null;
+    private ?BranchZones $zones = null;
 
     /** WHIT-1427: every attendance mark is audited (AP.3). */
     private ?\Whity\Core\Audit\AuditLoggerInterface $audit = null;
@@ -190,9 +192,12 @@ final class BookingService
 
         $byStart = [];
         foreach ($this->candidates($tenantId, $service, $profileId, $publicOnly) as $candidate) {
-            foreach ($this->slotsFor($tenantId, $candidate, $service, $settings, $earliest, $latest, $now, $exceptBookingId) as $slot) {
+            // WHIT-1440 (AP.19): each person's own length and buffer after.
+            $own = ServiceRepository::forPerson($service, $candidate);
+            foreach ($this->slotsFor($tenantId, $candidate, $own, $settings, $earliest, $latest, $now, $exceptBookingId) as $slot) {
                 $key = $slot->getTimestamp();
-                $byStart[$key] ??= ['start' => $slot, 'profile_ids' => []];
+                // The end is the first free person's, in the order "anyone" tries them.
+                $byStart[$key] ??= ['start' => $slot, 'minutes' => (int) $own['duration_minutes'], 'profile_ids' => []];
                 $byStart[$key]['profile_ids'][] = $candidate;
             }
         }
@@ -200,7 +205,7 @@ final class BookingService
 
         return array_values(array_map(static fn (array $s): array => [
             'starts_at' => Interval::toApi($s['start']),
-            'ends_at' => Interval::toApi($s['start']->modify('+' . $service['duration_minutes'] . ' minutes')),
+            'ends_at' => Interval::toApi($s['start']->modify('+' . $s['minutes'] . ' minutes')),
             'profile_ids' => $s['profile_ids'],
         ], $byStart));
     }
@@ -231,13 +236,17 @@ final class BookingService
             return [];
         }
 
+        // The longest the whole booking can take, whoever does each part.
         $total = 0;
-        foreach ($plan['services'] as $service) {
-            $total += (int) $service['duration_minutes'];
+        foreach ($plan['services'] as $k => $service) {
+            $longest = (int) $service['duration_minutes'];
+            foreach ($plan['candidates'][$k] as $person) {
+                $longest = max($longest, (int) ServiceRepository::forPerson($service, $person)['duration_minutes']);
+            }
+            $total += $longest;
         }
         $wideFrom = $earliest->modify('-1 day');
         $wideTo = $latest->modify('+1 day')->modify('+' . $total . ' minutes');
-        $dayStart = $earliest->setTimezone($settings->zone)->setTime(0, 0);
         $windows = [];
         $busy = [];
         foreach ($plan['candidates'] as $who) {
@@ -245,11 +254,13 @@ final class BookingService
                 if (isset($windows[$person])) {
                     continue;
                 }
+                // WHIT-1440 (AP.16): each person's hours in their branch's zone.
+                $zone = $this->zoneOf($tenantId, $person, $settings);
                 $windows[$person] = Availability::openWindows(
                     $this->calendar->hours($tenantId, $person),
                     $this->calendar->exceptions($tenantId, $person, $wideFrom, $wideTo),
-                    $settings->zone,
-                    $dayStart,
+                    $zone,
+                    $earliest->setTimezone($zone)->setTime(0, 0),
                     $latest->modify('+' . $total . ' minutes'),
                 );
                 $busy[$person] = Interval::merge($this->busyFor($tenantId, $person, $wideFrom, $wideTo, $now, $exceptBookingId));
@@ -258,11 +269,13 @@ final class BookingService
         // WHIT-1439 (AP.18): what each service needs, and each resource's busy time, read once.
         $needs = [];
         foreach ($plan['services'] as $k => $service) {
-            $needs[$k] = $this->needs($tenantId, $service);
+            foreach ($plan['candidates'][$k] as $person) {
+                $needs[$k][$person] = $this->needs($tenantId, ServiceRepository::forPerson($service, $person));
+            }
         }
         $busyOf = $this->busyReader($tenantId, $wideFrom, $wideTo, $now, $exceptBookingId);
         $free = static function (int $person, int $k, DateTimeImmutable $at) use ($plan, $windows, $busy, $needs, $busyOf): bool {
-            $service = $plan['services'][$k];
+            $service = ServiceRepository::forPerson($plan['services'][$k], $person);
             $minutes = (int) $service['duration_minutes'];
             if (!Availability::withinWindows($at, $minutes, $windows[$person] ?? [])) {
                 return false;
@@ -271,15 +284,17 @@ final class BookingService
                 return false;
             }
 
-            return $needs[$k] === [] || self::choose($needs[$k], Availability::blockFor($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes']), $busyOf) !== null;
+            $own = $needs[$k][$person] ?? [];
+
+            return $own === [] || self::choose($own, Availability::blockFor($at, $minutes, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes']), $busyOf) !== null;
         };
 
         // Start times step from the start of each open window of whoever may
         // do the first service, as one service's do (on the hours' grid).
         $step = max(1, $settings->slotStepMinutes) * 60;
-        $firstMinutes = (int) $plan['services'][0]['duration_minutes'] * 60;
         $starts = [];
         foreach ($plan['candidates'][0] as $person) {
+            $firstMinutes = (int) ServiceRepository::forPerson($plan['services'][0], $person)['duration_minutes'] * 60;
             foreach ($windows[$person] as $window) {
                 for ($t = $window->start->getTimestamp(); $t + $firstMinutes <= $window->end->getTimestamp(); $t += $step) {
                     if ($t >= $earliest->getTimestamp() && $t < $latest->getTimestamp()) {
@@ -359,14 +374,18 @@ final class BookingService
             throw new CalendarRejectedException('Nobody offers this service.', 422);
         }
 
-        $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
-        $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
         // A request is not paid for until it is accepted: no payment step.
         $asRequest = $request['public'] && ($service['needs_approval'] || !$settings->instantBooking);
         $step = $asRequest ? null : $this->plugins?->paymentStep();
         $room = $this->roomLock($tenantId, $service);
         $why = null;
+        $base = $service;
         foreach ($candidates as $candidate) {
+            // WHIT-1440 (AP.19): the person's own length, buffer after and
+            // price; the booking keeps what it used (its end, block and price).
+            $service = ServiceRepository::forPerson($base, $candidate);
+            $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
+            $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
             // Asked before the lock: a plugin never runs while a person's
             // calendar is held. A step that fails refuses the booking rather
             // than letting it through unpaid.
@@ -477,13 +496,11 @@ final class BookingService
         }
         $asRequest = $public && ($needsApproval || !$settings->instantBooking);
         $step = $asRequest ? null : $this->plugins?->paymentStep();
-        $total = self::totalPrice($plan['services']);
-
         $why = null;
         $tried = [];
         for ($attempt = 0; $attempt < 3; $attempt++) {
             $people = self::assign($plan, $start, function (int $person, int $k, DateTimeImmutable $at) use ($tenantId, $plan, $settings, $now, $checkHours, $bookAnyway, &$why): bool {
-                $why = $this->whyNotFree($tenantId, $person, $plan['services'][$k], $settings, $at, $now, null, $checkHours, $bookAnyway);
+                $why = $this->whyNotFree($tenantId, $person, ServiceRepository::forPerson($plan['services'][$k], $person), $settings, $at, $now, null, $checkHours, $bookAnyway);
 
                 return $why === null;
             });
@@ -492,6 +509,9 @@ final class BookingService
             }
             $tried[implode(',', $people)] = true;
             $parts = self::parts($plan['services'], $people, $start);
+            // WHIT-1440 (AP.19): each part as its person provides it.
+            $own = array_map(static fn (array $service, int $person): array => ServiceRepository::forPerson($service, $person), $plan['services'], $people);
+            $total = self::totalPrice($own);
             $end = $parts[count($parts) - 1]['ends_at'];
             $quote = new BookingQuote($tenantId, $parts[0]['service_id'], $parts[0]['profile_id'], $start, $end, $total, $plan['currency'], (string) $request['customer_email'], (string) $request['source']);
             $requirement = null;
@@ -505,17 +525,17 @@ final class BookingService
             }
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
             try {
-                $id = $this->underLocks($tenantId, $people, $this->resourceIds($tenantId, $plan['services']), function () use ($tenantId, $plan, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
+                $id = $this->underLocks($tenantId, $people, $this->resourceIds($tenantId, $plan['services']), function () use ($tenantId, $plan, $own, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
                     $overlapOk = false;
                     $chosen = [];
                     foreach ($parts as $k => $part) {
-                        $why = $this->whyNotFree($tenantId, $part['profile_id'], $plan['services'][$k], $settings, $part['starts_at'], $now, null, $checkHours, $bookAnyway);
+                        $why = $this->whyNotFree($tenantId, $part['profile_id'], $own[$k], $settings, $part['starts_at'], $now, null, $checkHours, $bookAnyway);
                         if ($why !== null) {
                             return null;
                         }
-                        $overlapOk = $overlapOk || ($bookAnyway && $this->personClashes($tenantId, $part['profile_id'], $plan['services'][$k], $part['starts_at'], $now, null));
+                        $overlapOk = $overlapOk || ($bookAnyway && $this->personClashes($tenantId, $part['profile_id'], $own[$k], $part['starts_at'], $now, null));
                         // WHIT-1439 (AP.18): each part's own resources.
-                        $chosen[$k] = $this->chooseFor($tenantId, $plan['services'][$k], $part['starts_at'], $now, null) ?? [];
+                        $chosen[$k] = $this->chooseFor($tenantId, $own[$k], $part['starts_at'], $now, null) ?? [];
                         $parts[$k]['room_id'] = $chosen[$k][0] ?? null;
                     }
                     $id = $this->bookings->insert($tenantId, [
@@ -955,10 +975,10 @@ final class BookingService
         }
         $isRequest = $current['status'] === BookingRepository::STATUS_REQUESTED;
         $service = $this->service($tenantId, (int) $current['service_id'], false);
-        // A move keeps the booking's own length, so one made before the
-        // service's length changed keeps the time it was booked for.
-        $kept = (int) round((Interval::fromDb((string) $current['ends_at'])->getTimestamp() - Interval::fromDb((string) $current['starts_at'])->getTimestamp()) / 60);
-        $service = self::withLength($service, $kept > 0 && $kept !== $service['duration_minutes'] ? $kept : null);
+        // A move keeps the booking's own length and buffer after, so one made
+        // before the service changed, or with a person's own length
+        // (WHIT-1440, AP.19), keeps the time it was booked for.
+        $service = self::asBooked($service, $current);
         $settings = $this->settingsFor($tenantId);
         $now = $this->now();
         $from = (int) $current['profile_id'];
@@ -966,6 +986,8 @@ final class BookingService
         if ($to !== $from && !in_array($to, $this->candidates($tenantId, $service, $to, false), true)) {
             throw new CalendarRejectedException('That person does not offer this service.', 422);
         }
+        // WHIT-1440 (AP.16): a group's resource from the branch of whoever has it.
+        $service['for_profile_id'] = $to;
         if ($enforceHours) {
             $this->assertInWindow($start, $settings, $now);
         }
@@ -1023,14 +1045,14 @@ final class BookingService
         foreach ($items as $item) {
             $service = $this->service($tenantId, (int) $item['service_id'], false);
             $from = Interval::fromDb((string) $item['starts_at']);
-            // Each keeps the length it was booked for.
-            $kept = (int) round((Interval::fromDb((string) $item['ends_at'])->getTimestamp() - $from->getTimestamp()) / 60);
-            $service = self::withLength($service, $kept > 0 && $kept !== $service['duration_minutes'] ? $kept : null);
+            // Each keeps the length and buffer after it was booked with.
+            $service = self::asBooked($service, $item);
             $was = (int) $item['profile_id'];
             $person = $profileId ?? $was;
             if ($person !== $was && !in_array($person, $this->candidates($tenantId, $service, $person, false), true)) {
                 throw new CalendarRejectedException('That person does not offer all of these services.', 422);
             }
+            $service['for_profile_id'] = $person;
             $at = (new DateTimeImmutable('@' . ($from->getTimestamp() + $shift)))->setTimezone(new DateTimeZone('UTC'));
             $parts[] = [
                 'service_id' => (int) $item['service_id'],
@@ -1224,6 +1246,7 @@ final class BookingService
 
             return $done;
         }
+        $service = self::asBooked($service, $row);
         $done = $this->settleHeld(fn (): bool => $this->underLock([[$tenantId, (int) $row['profile_id']]], function () use ($tenantId, $bookingId, $row, $service, $settings, $start, $paymentRef): bool {
             if ($this->whyNotFree($tenantId, (int) $row['profile_id'], $service, $settings, $start, $this->now(), $bookingId, false) !== null) {
                 return false;
@@ -1264,8 +1287,7 @@ final class BookingService
                 return false;
             }
             $at = Interval::fromDb((string) $item['starts_at']);
-            $kept = (int) round((Interval::fromDb((string) $item['ends_at'])->getTimestamp() - $at->getTimestamp()) / 60);
-            $checks[] = [(int) $item['profile_id'], self::withLength($service, $kept > 0 ? $kept : null), $at];
+            $checks[] = [(int) $item['profile_id'], self::asBooked($service, $item), $at];
             $people[] = (int) $item['profile_id'];
             if (isset($item['room_id'])) {
                 $rooms[] = (int) $item['room_id'];
@@ -1687,11 +1709,13 @@ final class BookingService
         // "now plus notice", so free times stay on the working-hours grid
         // (09:00, 09:15, ...) instead of starting at an odd minute and second;
         // slots() then drops the ones before `$earliest`.
-        $dayStart = $earliest->setTimezone($settings->zone)->setTime(0, 0);
+        // WHIT-1440 (AP.16): in the zone of the person's branch.
+        $zone = $this->zoneOf($tenantId, $profileId, $settings);
+        $dayStart = $earliest->setTimezone($zone)->setTime(0, 0);
         $windows = Availability::openWindows(
             $this->calendar->hours($tenantId, $profileId),
             $this->calendar->exceptions($tenantId, $profileId, $from, $to),
-            $settings->zone,
+            $zone,
             $dayStart,
             $latest->modify('+' . $service['duration_minutes'] . ' minutes'),
         );
@@ -1760,7 +1784,7 @@ final class BookingService
         $windows = Availability::openWindows(
             $this->calendar->hours($tenantId, $profileId),
             $this->calendar->exceptions($tenantId, $profileId, $block->start->modify('-1 day'), $block->end->modify('+1 day')),
-            $settings->zone,
+            $this->zoneOf($tenantId, $profileId, $settings),
             $start->modify('-1 day'),
             $start->modify('+2 days'),
         );
@@ -1769,18 +1793,29 @@ final class BookingService
     }
 
     /**
-     * The service as this booking uses it: the length it was booked for, when
-     * that differs from the service's today.
+     * The service as this booking (or one part of it) uses it: the length and
+     * buffer after it was booked with, when they differ from the service's
+     * today or were the person's own (WHIT-1440, AP.19). The booking keeps
+     * them in its end and its block.
      *
      * @param array<string, mixed> $service
+     * @param array<string, mixed> $row a booking or booking-part row
      * @return array<string, mixed>
      */
-    private static function withLength(array $service, ?int $minutes): array
+    private static function asBooked(array $service, array $row): array
     {
-        if ($minutes === null) {
-            return $service;
+        $starts = Interval::fromDb((string) $row['starts_at'])->getTimestamp();
+        $ends = Interval::fromDb((string) $row['ends_at'])->getTimestamp();
+        $kept = (int) round(($ends - $starts) / 60);
+        if ($kept > 0) {
+            $service['duration_minutes'] = $kept;
         }
-        $service['duration_minutes'] = $minutes;
+        if (is_string($row['blocks_until'] ?? null) && $row['blocks_until'] !== '') {
+            $after = (int) round((Interval::fromDb($row['blocks_until'])->getTimestamp() - $ends) / 60);
+            if ($after >= 0) {
+                $service['buffer_after_minutes'] = $after;
+            }
+        }
 
         return $service;
     }
@@ -1804,12 +1839,16 @@ final class BookingService
         }
         foreach ($sources as $source) {
             try {
-                foreach ($source->busyTimes($tenantId, $profileId, $from, $to) as $interval) {
+                $times = $source instanceof PluginBusySource
+                    ? $source->read($tenantId, $profileId, $from, $to)
+                    : $source->busyTimes($tenantId, $profileId, $from, $to);
+                foreach ($times as $interval) {
                     $busy[] = $interval;
                 }
             } catch (Throwable $e) {
-                // Fail open (ADR 0017, section 4).
-                error_log('[calendar] an external busy-time source failed: ' . $e->getMessage());
+                // Fail open (ADR 0017, section 4), and say so: the desk and
+                // the person see that this calendar wasn't checked (WHIT-1440, AP.17).
+                $this->busyCheckFailed($tenantId, $profileId, $source instanceof PluginBusySource ? $source->plugin() : BusyCheckFailures::UNNAMED, $now, $e);
             }
         }
 
@@ -1984,6 +2023,23 @@ final class BookingService
         return $this->rooms ??= new RoomRepository($this->db);
     }
 
+    /** Keep a busy source's failure for the desk; never let keeping it fail a booking. */
+    private function busyCheckFailed(int $tenantId, int $profileId, string $source, DateTimeImmutable $now, Throwable $e): void
+    {
+        ScrubbedErrorLog::failure('[calendar] an external busy-time source failed', $e);
+        try {
+            (new BusyCheckFailures($this->db))->record($tenantId, $profileId, $source, $now);
+        } catch (Throwable $kept) {
+            ScrubbedErrorLog::failure('[calendar] could not keep a busy-source failure', $kept);
+        }
+    }
+
+    /** WHIT-1440 (AP.16): the zone of the person's branch, or the workspace's. */
+    private function zoneOf(int $tenantId, int $profileId, CalendarSettings $settings): DateTimeZone
+    {
+        return ($this->zones ??= new BranchZones($this->db))->forPerson($tenantId, $profileId, $settings->zone);
+    }
+
     /**
      * The services of a booking of several, who may do each, and the
      * currency of the total (WHIT-1173). `fixed` is true when staff named a
@@ -2056,30 +2112,31 @@ final class BookingService
      */
     private static function assign(array $plan, DateTimeImmutable $start, callable $free): ?array
     {
-        $starts = [];
-        $at = $start;
-        foreach ($plan['services'] as $service) {
-            $starts[] = $at;
-            $at = $at->modify('+' . (int) $service['duration_minutes'] . ' minutes');
-        }
+        // WHIT-1440 (AP.19): each part lasts as long as its person takes, so
+        // the next part starts when that person's part ends.
+        $length = static fn (int $k, int $person): int => (int) ServiceRepository::forPerson($plan['services'][$k], $person)['duration_minutes'];
+        $count = count($plan['services']);
         if ($plan['same']) {
             foreach ($plan['candidates'][0] as $person) {
                 $all = true;
-                foreach ($starts as $k => $t) {
+                $t = $start;
+                for ($k = 0; $k < $count; $k++) {
                     if (!$free($person, $k, $t)) {
                         $all = false;
                         break;
                     }
+                    $t = $t->modify('+' . $length($k, $person) . ' minutes');
                 }
                 if ($all) {
-                    return array_fill(0, count($starts), $person);
+                    return array_fill(0, $count, $person);
                 }
             }
 
             return null;
         }
         $people = [];
-        foreach ($starts as $k => $t) {
+        $t = $start;
+        for ($k = 0; $k < $count; $k++) {
             $order = $plan['candidates'][$k];
             $previous = $k > 0 ? $people[$k - 1] : null;
             if ($previous !== null && in_array($previous, $order, true)) {
@@ -2096,6 +2153,7 @@ final class BookingService
                 return null;
             }
             $people[] = $chosen;
+            $t = $t->modify('+' . $length($k, $chosen) . ' minutes');
         }
 
         return $people;
@@ -2113,6 +2171,8 @@ final class BookingService
         $parts = [];
         $at = $start;
         foreach ($services as $k => $service) {
+            // WHIT-1440 (AP.19): the part as its person provides it.
+            $service = ServiceRepository::forPerson($service, $people[$k]);
             $end = $at->modify('+' . (int) $service['duration_minutes'] . ' minutes');
             $parts[] = [
                 'service_id' => (int) $service['id'],
@@ -2229,7 +2289,10 @@ final class BookingService
             return is_int($service['room_id'] ?? null) ? [[$service['room_id']]] : [];
         }
 
-        return $this->rooms()->needsFor($tenantId, $service['id'], is_int($service['room_id'] ?? null) ? $service['room_id'] : null);
+        // WHIT-1440 (AP.16): for a person, a group's resources in their branch.
+        $branch = is_int($service['for_profile_id'] ?? null) ? ($this->zones ??= new BranchZones($this->db))->branchOf($tenantId, $service['for_profile_id']) : null;
+
+        return $this->rooms()->needsFor($tenantId, $service['id'], is_int($service['room_id'] ?? null) ? $service['room_id'] : null, $branch);
     }
 
     /**

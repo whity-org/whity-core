@@ -50,7 +50,7 @@ final class HealthProbeRegistryTest extends TestCase
     public function testCoreProbeSetIsExactlyTheFourItHasAlwaysBeen(): void
     {
         self::assertSame(
-            ['database', 'queue', 'scheduler', 'render'],
+            ['database', 'queue', 'scheduler', 'render', 'calendars'],
             (new HealthProbeRegistry())->getAll(),
             'The registry replaced a literal array in HealthProbe::runAll(); its core '
             . 'contents and ORDER must match that array exactly, or the collector starts '
@@ -63,7 +63,7 @@ final class HealthProbeRegistryTest extends TestCase
         $registry = new HealthProbeRegistry();
 
         self::assertSame(
-            ['database', 'queue', 'scheduler', 'render'],
+            ['database', 'queue', 'scheduler', 'render', 'calendars'],
             $registry->getBySource(HealthProbeRegistry::CORE_SOURCE)
         );
         self::assertTrue($registry->exists('database'));
@@ -79,7 +79,7 @@ final class HealthProbeRegistryTest extends TestCase
         $pdo = $this->sqlite();
         $results = (new HealthProbe($pdo, new HealthSampleRepository($pdo)))->runAll();
 
-        self::assertSame(['database', 'queue', 'scheduler', 'render'], array_keys($results));
+        self::assertSame(['database', 'queue', 'scheduler', 'render', 'calendars'], array_keys($results));
         self::assertSame(HealthStatus::Operational, $results['database']);
     }
 
@@ -106,7 +106,7 @@ final class HealthProbeRegistryTest extends TestCase
         $results = (new HealthProbe($pdo, new HealthSampleRepository($pdo), null, $registry))->runAll();
 
         self::assertSame(
-            ['database', 'queue', 'scheduler', 'render', 'acme:ldap'],
+            ['database', 'queue', 'scheduler', 'render', 'calendars', 'acme:ldap'],
             array_keys($results),
             'Core components stay first and in their original order; contributions append.'
         );
@@ -168,7 +168,7 @@ final class HealthProbeRegistryTest extends TestCase
         $keys = array_column((new StatusReport(new HealthSampleRepository($pdo), $registry))->build()['components'], 'name', 'key');
 
         self::assertSame(
-            ['api', 'database', 'queue', 'scheduler', 'render', 'web', 'acme:ldap'],
+            ['api', 'database', 'queue', 'scheduler', 'render', 'calendars', 'web', 'acme:ldap'],
             array_keys($keys),
             'Core cards keep their position — an operator looks for the database card where it '
             . 'has always been — and contributed cards follow.'
@@ -182,7 +182,7 @@ final class HealthProbeRegistryTest extends TestCase
 
         $keys = array_column((new StatusReport(new HealthSampleRepository($pdo)))->build()['components'], 'key');
 
-        self::assertSame(['api', 'database', 'queue', 'scheduler', 'render', 'web'], $keys);
+        self::assertSame(['api', 'database', 'queue', 'scheduler', 'render', 'calendars', 'web'], $keys);
     }
 
     // ==================== a plugin cannot collide or shadow ====================
@@ -218,7 +218,7 @@ final class HealthProbeRegistryTest extends TestCase
 
         self::assertTrue($registry->exists('impostor:database'));
         self::assertSame(
-            ['database', 'queue', 'scheduler', 'render'],
+            ['database', 'queue', 'scheduler', 'render', 'calendars'],
             $registry->getBySource(HealthProbeRegistry::CORE_SOURCE),
             "Core's components must remain exactly the four bare keys core owns."
         );
@@ -429,7 +429,7 @@ final class HealthProbeRegistryTest extends TestCase
             'A bad declaration contributes nothing…'
         );
         self::assertSame(
-            ['database', 'queue', 'scheduler', 'render'],
+            ['database', 'queue', 'scheduler', 'render', 'calendars'],
             $registry->getAll(),
             '…and leaves the core catalogue intact.'
         );

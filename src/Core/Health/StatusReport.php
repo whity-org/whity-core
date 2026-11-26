@@ -25,6 +25,7 @@ final class StatusReport
         'queue' => 'Background jobs',
         'scheduler' => 'Scheduled tasks',
         'render' => 'Document rendering',
+        'calendars' => 'External calendars',
         'web' => 'Web application',
     ];
 

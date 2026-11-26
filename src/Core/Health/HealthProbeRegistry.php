@@ -71,6 +71,8 @@ class HealthProbeRegistry implements HostWiredService
     public const PROBE_QUEUE = 'queue';
     public const PROBE_SCHEDULER = 'scheduler';
     public const PROBE_RENDER = 'render';
+    /** WHIT-1440 (AP.17): external calendars that could not be read, counted. */
+    public const PROBE_CALENDARS = 'calendars';
 
     /**
      * The components core samples, in the order it has always sampled them.
@@ -86,6 +88,7 @@ class HealthProbeRegistry implements HostWiredService
         self::PROBE_QUEUE,
         self::PROBE_SCHEDULER,
         self::PROBE_RENDER,
+        self::PROBE_CALENDARS,
     ];
 
     /**

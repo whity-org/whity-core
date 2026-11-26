@@ -53,7 +53,8 @@ import { Switch } from '@whity/ui/switch';
 import { Textarea } from '@whity/ui/textarea';
 import { useTranslation } from '@whity/features/i18n';
 import { toZonedIso, useDateDisplay, zonedDate, zonedInstant } from '@whity/features/datetime';
-import { calendarApi, type CalendarStaff, type CalendarTimeOff } from '@/lib/calendar/api';
+import { calendarApi, type CalendarBooking, type CalendarStaff, type CalendarTimeOff } from '@/lib/calendar/api';
+import { TimeOffCovered } from '@/components/calendar/time-off-covered';
 import { addDays, dateKey, isoWeekdayOf, parseDateKey, rangeQuery, zonedIsoFor } from '@/lib/calendar/layout';
 import { firstBadDay, rowsOf, weekOf, weekOrder, type HoursWeek } from '@/lib/calendar/hours';
 import { timeOptions } from '@/lib/calendar/times';
@@ -344,6 +345,7 @@ function TimeOffList({ profileId, timeZone, canChange }: { profileId: number; ti
   const { addToast } = useToast();
   const [adding, setAdding] = useState(false);
   const [removing, setRemoving] = useState<CalendarTimeOff | null>(null);
+  const [covered, setCovered] = useState<CalendarBooking[]>([]);
 
   const today = zonedDate(timeZone);
   const range = rangeQuery({ first: today, end: addDays(today, 60) }, timeZone);
@@ -413,12 +415,15 @@ function TimeOffList({ profileId, timeZone, canChange }: { profileId: number; ti
         onOpenChange={setAdding}
         profileId={profileId}
         timeZone={timeZone}
-        onAdded={() => {
+        onAdded={(covered) => {
           setAdding(false);
           addToast(t('timeOff.added', 'Time off added'), 'success');
+          setCovered(covered);
           refetch();
         }}
       />
+      {/* WHIT-1440 (AP.17): the bookings it covers, to move or keep. */}
+      <TimeOffCovered bookings={covered} timeZone={timeZone} onClose={() => setCovered([])} />
 
       <ConfirmAction
         open={removing !== null}
@@ -458,7 +463,7 @@ function AddTimeOffDialog({
   onOpenChange: (open: boolean) => void;
   profileId: number;
   timeZone: string;
-  onAdded: () => void;
+  onAdded: (covered: CalendarBooking[]) => void;
 }) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
@@ -489,9 +494,9 @@ function AddTimeOffDialog({
     setSaving(true);
     setProblem(null);
     try {
-      await calendarApi.addTimeOff({ profile_id: profileId, kind, starts_at: startsAt, ends_at: endsAt, note: note.trim() });
+      const added = await calendarApi.addTimeOff({ profile_id: profileId, kind, starts_at: startsAt, ends_at: endsAt, note: note.trim() });
       setNote('');
-      onAdded();
+      onAdded(added.covered_bookings);
     } catch (err) {
       setProblem(words.errorText(err, t('timeOff.error.add', 'The time off could not be added. Try again.')));
     } finally {

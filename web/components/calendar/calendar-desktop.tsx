@@ -52,8 +52,9 @@ import { CalendarPanel, zoneLabel, type PanelEntry } from './calendar-panel';
 import { BookingDetails } from './booking-details';
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
+import { TimeOffCovered } from './time-off-covered';
 import { EventDialog } from './event-dialog';
-import { DidTheyComeCard, RequestsCard } from './appointments-side';
+import { CalendarChecksCard, DidTheyComeCard, RequestsCard } from './appointments-side';
 import { BookingLinkCard } from './booking-link';
 import { TimeGrid, hoursToDraw, type CalItem } from './time-grid';
 import { QuickBooking, useGridEditing } from './calendar-editing';
@@ -102,6 +103,8 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState<CalItem | null>(null);
   const [sheet, setSheet] = useState<{ booking: CalendarBooking; startWith: 'move' | 'cancel' | null; suggest: boolean } | null>(null);
+  // WHIT-1440 (AP.17): bookings new time off covers, to move or keep.
+  const [covered, setCovered] = useState<CalendarBooking[]>([]);
   const [newBooking, setNewBooking] = useState(false);
   const [eventOpen, setEventOpen] = useState(false);
   const [editing, setEditing] = useState<CalendarEvent | null>(null);
@@ -339,6 +342,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         onNewBooking={() => setNewBooking(true)}
         footer={
           <>
+            <CalendarChecksCard timeZone={timeZone} reloadKey={reloadKey} />
             <DidTheyComeCard unitId={null} reloadKey={reloadKey} timeZone={timeZone} canChange={access.canWrite} onChanged={refetch} />
             {(requests.data ?? []).length > 0 && (
               <RequestsCard
@@ -471,9 +475,10 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
                   me={access.me}
                   onServiceLength={edits.onServiceLength}
                   onClose={() => edits.setDraft(null)}
-                  onSaved={(message) => {
+                  onSaved={(message, coveredNow) => {
                     edits.setDraft(null);
                     addToast(message, 'success');
+                    setCovered(coveredNow ?? []);
                     refetch();
                   }}
                   onMore={(date, profileId) => {
@@ -527,6 +532,14 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         }}
       />
 
+      <TimeOffCovered
+        bookings={covered}
+        timeZone={timeZone}
+        onClose={() => {
+          setCovered([]);
+          refetch();
+        }}
+      />
       <BookingSheet
         booking={sheet?.booking ?? null}
         suggest={sheet?.suggest ?? false}

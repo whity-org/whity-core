@@ -263,3 +263,49 @@ export function TodayCard({ unitId, reloadKey, settings }: { unitId: number | nu
     </Card>
   );
 }
+
+/** How recent a failed check must be to be shown. */
+const CHECKS_SHOWN_HOURS = 6;
+
+/**
+ * Calendars that could not be checked (WHIT-1440, design section 39 §5.4,
+ * AP.17): when a person's Google or Microsoft calendar can't be read, booking
+ * stays open, and the desk (everyone's) and the person (their own) see
+ * "Couldn't check Amro Saleh's calendar in Google Calendar at 09:14". Shown by
+ * name, never by id; gone once it has been read again for a few hours.
+ */
+export function CalendarChecksCard({ timeZone, reloadKey, className }: { timeZone: string; reloadKey: number; className?: string }) {
+  const t = useTranslation('calendar');
+  const dates = useDateDisplay({ timeZone });
+  const { data } = useFetch(() => calendarApi.busyChecks(), [reloadKey]);
+  const [since] = useState(() => Date.now() - CHECKS_SHOWN_HOURS * 3600 * 1000);
+  const recent = (data ?? []).filter((check) => new Date(check.failed_at).getTime() >= since);
+  if (recent.length === 0) return null;
+
+  return (
+    <Card className={className} data-testid="calendar-checks" role="status">
+      <CardHeader>
+        <CardTitle>{t('checks.title', 'Some calendars weren’t checked')}</CardTitle>
+        <CardDescription>
+          {t('checks.description', 'Booking stays open, so free times may include time these people are busy elsewhere.')}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3">
+        {recent.map((check) => (
+          <div key={`${check.profile_id}-${check.source}`} className="flex items-center gap-3" data-testid={`calendar-check-${check.profile_id}`}>
+            <Avatar name={check.name} size={32} />
+            <p className="m-0 min-w-0 text-sm text-foreground">
+              {check.source === 'external'
+                ? t('checks.lineOutside', 'Couldn’t check {name}’s outside calendar at {time}', { name: check.name, time: dates.time(check.failed_at) ?? '—' })
+                : t('checks.line', 'Couldn’t check {name}’s calendar in {source} at {time}', {
+                    name: check.name,
+                    source: check.source,
+                    time: dates.time(check.failed_at) ?? '—',
+                  })}
+            </p>
+          </div>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}

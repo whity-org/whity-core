@@ -181,11 +181,11 @@ final class HealthWatchCommandTest extends TestCase
         self::assertSame(0, $heartbeat['consecutive_failures']);
         self::assertNull($heartbeat['last_error']);
 
-        // 6. Samples really were written — four core components on each of the
+        // 6. Samples really were written — five core components on each of the
         //    two passes after the table appeared.
         $count = $pdo->query('SELECT COUNT(*) FROM health_samples');
         self::assertNotFalse($count);
-        self::assertSame(8, (int) $count->fetchColumn());
+        self::assertSame(10, (int) $count->fetchColumn());
     }
 
     /**

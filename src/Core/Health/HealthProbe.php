@@ -6,6 +6,7 @@ namespace Whity\Core\Health;
 
 use PDO;
 use Throwable;
+use Whity\Core\Calendar\BusyCheckFailures;
 use Whity\Core\Scheduler\SchedulerHeartbeat;
 use Whity\Core\Settings\GlobalSettingsRepository;
 
@@ -99,6 +100,7 @@ final class HealthProbe
                 'queue' => $this->probeQueue(),
                 'scheduler' => $this->probeScheduler(),
                 'render' => $this->probeRender(),
+                'calendars' => $this->probeCalendars(),
                 default => $this->probeContributed($component),
             };
         } catch (Throwable $e) {
@@ -240,6 +242,25 @@ final class HealthProbe
             null,
             $status === HealthStatus::Operational ? null : "last scheduler tick was {$ageSeconds}s ago",
         ];
+    }
+
+    /**
+     * External calendars (WHIT-1440, design section 39 §5.4, AP.17): how many
+     * times in the last hour a person's Google or Microsoft calendar could
+     * not be read. Booking stays open when one fails, and each workspace sees
+     * its own on the calendar, so this only counts: one workspace's expired
+     * sign-in is not an outage. Operational, with the count as the detail.
+     *
+     * @return array{0: HealthStatus, 1: ?int, 2: ?string}
+     */
+    private function probeCalendars(): array
+    {
+        if (!$this->tableExists('calendar_busy_check_failures')) {
+            return [HealthStatus::Unknown, null, 'the calendar_busy_check_failures table does not exist — migrations may not have run'];
+        }
+        $count = (new BusyCheckFailures($this->pdo))->countSince(new \DateTimeImmutable('-1 hour', new \DateTimeZone('UTC')));
+
+        return [HealthStatus::Operational, null, $count === 0 ? null : "{$count} external calendar checks failed in the last hour"];
     }
 
     /**

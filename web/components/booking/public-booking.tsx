@@ -55,6 +55,23 @@ import { moneyText, useBookingWords } from './use-booking-words';
 import { cn } from '@/lib/utils';
 
 const ANYONE = 'anyone';
+
+/**
+ * WHIT-1440 (AP.19): a service's length and price for one person (their own,
+ * or the service's), or the range over everyone who offers it.
+ */
+function serviceSpan(s: PublicService, profileId: number | null): { minutes: [number, number]; price: [number, number] | null } {
+  const people = (s.staff ?? []).filter((p) => profileId === null || p.profile_id === profileId);
+  if (people.length === 0) {
+    return { minutes: [s.duration_minutes, s.duration_minutes], price: s.price_minor === null || s.price_minor === undefined ? null : [s.price_minor, s.price_minor] };
+  }
+  const minutes = people.map((p) => p.duration_minutes);
+  const prices = people.map((p) => p.price_minor).filter((p): p is number => p !== null && p !== undefined);
+  return {
+    minutes: [Math.min(...minutes), Math.max(...minutes)],
+    price: prices.length === 0 ? null : [Math.min(...prices), Math.max(...prices)],
+  };
+}
 /** Several services: a different person for each (WHIT-1173). */
 const EACH = 'each';
 /** At most this many services in one booking (the server's limit). */
@@ -253,9 +270,6 @@ function BookingForm({
   const words = useBookingWords();
   const { currentLanguage } = useCurrentLanguage();
   const { resolved: theme } = useThemeMode();
-  const timeZone = safeTimeZone(page.settings.time_zone);
-  const whenAt = useWhenAt(timeZone);
-
   const [serviceId, setServiceId] = useState<number | null>(page.services.length === 1 ? page.services[0].id : null);
   const [person, setPerson] = useState<string>(ANYONE);
   const [slot, setSlot] = useState<FreeTime | null>(null);
@@ -318,6 +332,14 @@ function BookingForm({
   const providers =
     chosen.length === 0 ? [] : page.staff.filter((p) => chosen.every((s) => s.staff_profile_ids.includes(p.profile_id)));
   const profileId = person === ANYONE || person === EACH ? null : Number(person);
+  // WHIT-1440 (AP.16): times are in the zone of the person's branch; for
+  // anyone, the zone they share, else the workspace's.
+  const zoneOfPerson = (id: number): string => page.staff.find((p) => p.profile_id === id)?.time_zone ?? page.settings.time_zone;
+  const sharedZones = new Set(providers.map((p) => zoneOfPerson(p.profile_id)));
+  const timeZone = safeTimeZone(
+    profileId !== null ? zoneOfPerson(profileId) : sharedZones.size === 1 ? [...sharedZones][0] : page.settings.time_zone
+  );
+  const whenAt = useWhenAt(timeZone);
   const several: ServicePick[] | null = severalOn
     ? chosen.map((s, i) => ({
         service_id: s.id,
@@ -326,9 +348,23 @@ function BookingForm({
     : null;
   const severalKey = several ? several.map((s) => `${s.service_id}:${s.profile_id ?? 0}`).join(',') : '';
   const showPerson = severalOn ? true : providers.length > 1;
-  const totalMinutes = chosen.reduce((sum, s) => sum + s.duration_minutes, 0);
-  const pricedServices = chosen.filter((s) => s.price_minor !== null && s.price_minor !== undefined);
-  const totalPrice = pricedServices.length > 0 ? pricedServices.reduce((sum, s) => sum + (s.price_minor ?? 0), 0) : null;
+  // WHIT-1440 (AP.19): the person's own length and price, or a range for anyone.
+  const whoFor = (i: number): number | null =>
+    person === EACH ? (each[i] && each[i] !== ANYONE ? Number(each[i]) : null) : profileId;
+  const spans = chosen.map((s, i) => serviceSpan(s, whoFor(i)));
+  const totalMinutes = spans.reduce((sum, r) => sum + r.minutes[0], 0);
+  const totalMinutesMost = spans.reduce((sum, r) => sum + r.minutes[1], 0);
+  const priced = spans.filter((r) => r.price !== null);
+  const totalPrice = priced.length > 0 ? priced.reduce((sum, r) => sum + (r.price?.[0] ?? 0), 0) : null;
+  const totalPriceMost = priced.length > 0 ? priced.reduce((sum, r) => sum + (r.price?.[1] ?? 0), 0) : null;
+  const durationText = (from: number, to: number): string =>
+    from === to ? (words.duration(from) ?? '') : t('range.between', '{from}–{to}', { from: words.duration(from) ?? '', to: words.duration(to) ?? '' });
+  const priceText = (from: number | null, to: number | null, currency: string): string | null => {
+    if (from === null || to === null) return null;
+    return from === to
+      ? words.price(from, currency)
+      : t('range.between', '{from}–{to}', { from: words.price(from, currency) ?? '', to: words.price(to, currency) ?? '' });
+  };
   const sendsRequest = chosen.some((s) => s.sends_request);
   const servicesChanged = () => {
     setPerson(ANYONE);
@@ -473,7 +509,8 @@ function BookingForm({
               {page.services.map((s) => {
                 const on = s.id === serviceId;
                 const description = descriptionOf(s);
-                const price = words.price(s.price_minor, s.currency);
+                const span = serviceSpan(s, null);
+                const price = priceText(span.price?.[0] ?? null, span.price?.[1] ?? null, s.currency);
                 return (
                   <label
                     key={s.id}
@@ -491,7 +528,7 @@ function BookingForm({
                         <span className="block text-sm text-muted-foreground">{words.name(description)}</span>
                       )}
                       <span className="mt-0.5 block text-sm text-muted-foreground">
-                        {words.duration(s.duration_minutes)}
+                        {durationText(span.minutes[0], span.minutes[1])}
                       </span>
                       {s.sends_request && (
                         <span className="mt-0.5 block text-sm text-muted-foreground" data-testid="book-service-request">
@@ -529,7 +566,11 @@ function BookingForm({
                         invalid={extra[i] === null && problem !== null}
                         options={page.services.map((s) => ({
                           value: String(s.id),
-                          label: [words.name(s.name), words.duration(s.duration_minutes), words.price(s.price_minor, s.currency)]
+                          label: [
+                            words.name(s.name),
+                            durationText(serviceSpan(s, null).minutes[0], serviceSpan(s, null).minutes[1]),
+                            priceText(serviceSpan(s, null).price?.[0] ?? null, serviceSpan(s, null).price?.[1] ?? null, s.currency),
+                          ]
                             .filter((part): part is string => part !== null && part !== '')
                             .join(' · '),
                         }))}
@@ -568,12 +609,12 @@ function BookingForm({
                   )}
                   {more.length > 0 && (
                     <p className="text-sm text-muted-foreground" aria-live="polite" data-testid="book-total">
-                      {t('more.total', 'In all: {time}', { time: words.duration(totalMinutes) ?? '' })}
+                      {t('more.total', 'In all: {time}', { time: durationText(totalMinutes, totalMinutesMost) })}
                       {totalPrice !== null && (
                         <>
                           {' · '}
                           <span dir="ltr" className="tabular-nums">
-                            {words.price(totalPrice, service.currency)}
+                            {priceText(totalPrice, totalPriceMost, service.currency)}
                           </span>
                         </>
                       )}
@@ -767,13 +808,13 @@ function BookingForm({
                 </span>
                 {severalOn && (
                   <span className="block text-sm text-muted-foreground" data-testid="book-summary-total">
-                    {t('more.total', 'In all: {time}', { time: words.duration(totalMinutes) ?? '' })}
+                    {t('more.total', 'In all: {time}', { time: durationText(totalMinutes, totalMinutesMost) })}
                   </span>
                 )}
-                {words.price(totalPrice, service.currency) !== null && (
+                {priceText(totalPrice, totalPriceMost, service.currency) !== null && (
                   <span className="block text-sm text-muted-foreground">
                     <span dir="ltr" className="tabular-nums">
-                      {words.price(totalPrice, service.currency)}
+                      {priceText(totalPrice, totalPriceMost, service.currency)}
                     </span>
                   </span>
                 )}
@@ -881,7 +922,8 @@ function TextField({
 /** After booking: what was booked, the link to change it, and a payment to make when one is held. */
 function BookedView({ page, result }: { page: PublicBookingPage; result: BookedResult }) {
   const t = useTranslation('booking');
-  const timeZone = safeTimeZone(page.settings.time_zone);
+  // WHIT-1440 (AP.16): in the zone of the person's branch.
+  const timeZone = safeTimeZone(result.booking.time_zone ?? page.settings.time_zone);
   const holdUntil = useDateDisplay({ timeZone }).time(result.payment?.hold_expires_at ?? null);
   const { booking, manageToken, payment } = result;
   const owes = payment !== null;

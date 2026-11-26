@@ -43,6 +43,7 @@ import {
   calendarApi,
   isTaken,
   takenReason,
+  type CalendarBooking,
   type CalendarService,
   type CalendarStaff,
 } from '@/lib/calendar/api';
@@ -130,7 +131,8 @@ export interface QuickBookingProps {
   /** A booking's service sets the slot's length; null gives an event or time off back the length dragged. */
   onServiceLength: (minutes: number | null) => void;
   onClose: () => void;
-  onSaved: (message: string) => void;
+  /** WHIT-1440 (AP.17): time off also gives the bookings it covers. */
+  onSaved: (message: string, covered?: CalendarBooking[]) => void;
   onMore: (date: CalendarDate, profileId: number | null) => void;
   /** Inside the phone's sheet: full width, no card of its own. */
   inSheet?: boolean;
@@ -204,8 +206,8 @@ export function QuickBooking({ draft, services, staff, timeZone, canEvent, me, o
         await calendarApi.createEvent({ profile_id: Number(chosen), title: title.trim(), starts_at: starts, ends_at: ends, busy: true, all_day: false });
         onSaved(t('quick.eventAdded', 'Event added'));
       } else {
-        await calendarApi.addTimeOff({ profile_id: Number(chosen), kind: 'off', starts_at: starts, ends_at: ends, note: '' });
-        onSaved(t('quick.timeOffAdded', 'Time off added'));
+        const added = await calendarApi.addTimeOff({ profile_id: Number(chosen), kind: 'off', starts_at: starts, ends_at: ends, note: '' });
+        onSaved(t('quick.timeOffAdded', 'Time off added'), added.covered_bookings);
       }
     } catch (error) {
       const reason = takenReason(error);

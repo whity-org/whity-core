@@ -190,7 +190,7 @@ final class PublicBookingRealEngineTest extends TestCase
         $data = self::data($page)['data'];
         self::assertSame('Asia/Amman', $data['settings']['time_zone']);
         self::assertSame([$this->cake], array_column($data['services'], 'id'));
-        self::assertSame([['profile_id' => 11, 'display_name' => 'Baker 11']], $data['staff']);
+        self::assertSame([['profile_id' => 11, 'display_name' => 'Baker 11', 'time_zone' => null]], $data['staff']);
 
         $off = $this->handler->page(self::request('GET', '/api/v1/public/booking/other-bakery'), ['workspace' => 'other-bakery']);
         $unknown = $this->handler->page(self::request('GET', '/api/v1/public/booking/nobody'), ['workspace' => 'nobody']);

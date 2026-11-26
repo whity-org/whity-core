@@ -77,14 +77,15 @@ final class CalendarRepository
     /**
      * Staff who have a calendar here, with their names.
      *
-     * @return list<array{profile_id: int, display_name: string, bookable: bool, sort_order: int, feed_enabled: bool, unit_id: ?int}>
+     * @return list<array{profile_id: int, display_name: string, bookable: bool, sort_order: int, feed_enabled: bool, unit_id: ?int, time_zone: ?string}>
      */
     public function listStaff(int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT cs.profile_id, p.display_name, cs.bookable, cs.sort_order, cs.feed_token_hash, cs.unit_id
+            'SELECT cs.profile_id, p.display_name, cs.bookable, cs.sort_order, cs.feed_token_hash, cs.unit_id, ou.time_zone
                FROM calendar_staff cs
                JOIN profiles p ON p.id = cs.profile_id
+               LEFT JOIN organizational_units ou ON ou.id = cs.unit_id AND ou.tenant_id = cs.tenant_id
               WHERE cs.tenant_id = :tenant_id
               ORDER BY cs.sort_order, p.display_name, cs.profile_id'
         );
@@ -97,6 +98,8 @@ final class CalendarRepository
             'sort_order' => (int) $r['sort_order'],
             'feed_enabled' => $r['feed_token_hash'] !== null,
             'unit_id' => $r['unit_id'] !== null ? (int) $r['unit_id'] : null,
+            // WHIT-1440 (AP.16): their branch's zone; null is the workspace's.
+            'time_zone' => BranchZones::valid($r['time_zone'] ?? null),
         ], $stmt->fetchAll(PDO::FETCH_ASSOC)));
     }
 

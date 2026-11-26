@@ -22,6 +22,7 @@ import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
 import { BookingLinkCard } from '@/components/calendar/booking-link';
+import { BranchZonesCard } from '@/components/calendar/branch-zones';
 import { useCalendarAccess } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
@@ -512,6 +513,9 @@ export default function CalendarSettingsPage() {
               </Link>
             </CardContent>
           </Card>
+
+          {/* WHIT-1440 (AP.16): a branch in another zone can have its own. */}
+          <BranchZonesCard canChange={access.canManage} />
 
           {problem && (
             <Alert variant="destructive" data-testid="settings-problem">

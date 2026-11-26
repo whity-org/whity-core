@@ -102,6 +102,7 @@
         "person.anyone": "أيّ شخص متاح",
         "person.each": "شخص مختلف لكل خدمة",
         "price.free": "بدون رسوم",
+        "range.between": "{from}–{to}",
         "service.missing": "اختر خدمة.",
         "service.request": "ترسل طلبًا، ويؤكد صاحب العمل الموعد.",
         "service.unnamed": "خدمة",

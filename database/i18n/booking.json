@@ -101,6 +101,7 @@
         "person.anyone": "Anyone who is free",
         "person.each": "A different person for each service",
         "price.free": "No charge",
+        "range.between": "{from}–{to}",
         "service.missing": "Choose a service.",
         "service.request": "You send a request; the business confirms the time.",
         "service.unnamed": "A service",

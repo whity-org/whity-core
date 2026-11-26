@@ -34,6 +34,22 @@ final class PluginBusySource implements ExternalBusySource
 
     public function busyTimes(int $tenantId, int $profileId, DateTimeImmutable $fromUtc, DateTimeImmutable $toUtc): array
     {
+        try {
+            return $this->read($tenantId, $profileId, $fromUtc, $toUtc);
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    /**
+     * As {@see self::busyTimes()}, but a failure is thrown after it is logged,
+     * so core can tell the desk and the person (WHIT-1440, AP.17) while
+     * still keeping booking open.
+     *
+     * @return list<Interval>
+     */
+    public function read(int $tenantId, int $profileId, DateTimeImmutable $fromUtc, DateTimeImmutable $toUtc): array
+    {
         $started = microtime(true);
         try {
             // Wider than the contract on purpose: a plugin may return anything.
@@ -42,7 +58,7 @@ final class PluginBusySource implements ExternalBusySource
         } catch (\Throwable $e) {
             $this->logger?->warning('[calendar] a plugin could not say when someone is busy', ['plugin' => $this->plugin, 'error' => $e->getMessage()]);
 
-            return [];
+            throw $e;
         } finally {
             $took = microtime(true) - $started;
             if ($took > self::BUDGET_SECONDS) {

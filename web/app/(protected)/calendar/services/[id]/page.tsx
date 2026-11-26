@@ -41,7 +41,7 @@ import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import { Skeleton } from '@whity/ui/skeleton';
 import { Switch } from '@whity/ui/switch';
 import { useTranslation } from '@whity/features/i18n';
-import { calendarApi, type CalendarService, type CalendarServiceRequest } from '@/lib/calendar/api';
+import { calendarApi, type CalendarService, type CalendarServicePerson, type CalendarServiceRequest } from '@/lib/calendar/api';
 import { cleanLocalizedText, sameLocalizedText } from '@whity/ui/localized-text';
 
 interface Draft {
@@ -62,6 +62,23 @@ interface Draft {
   needs: string[];
   active: boolean;
   staff: number[];
+  /**
+   * WHIT-1440 (AP.19): each person's own length, time free after and price,
+   * by profile id; empty is the service's own.
+   */
+  own: Record<number, OwnValues>;
+}
+
+interface OwnValues {
+  duration: string;
+  after: string;
+  price: string;
+}
+
+const NO_OWN: OwnValues = { duration: '', after: '', price: '' };
+
+function ownKey(own: Record<number, OwnValues>, staff: number[]): string {
+  return staff.map((p) => `${p}:${own[p]?.duration ?? ''}/${own[p]?.after ?? ''}/${own[p]?.price ?? ''}`).join(',');
 }
 
 /** A need as the select's value. */
@@ -88,6 +105,16 @@ function draftOf(service: CalendarService): Draft {
     needs: (service.resources ?? (service.room_id ? [{ resource_id: service.room_id, group_key: null }] : [])).map(needValue),
     active: service.active,
     staff: [...service.staff_profile_ids].sort((a, b) => a - b),
+    own: Object.fromEntries(
+      (service.staff ?? []).map((person) => [
+        person.profile_id,
+        {
+          duration: person.duration_minutes === null || person.duration_minutes === undefined ? '' : String(person.duration_minutes),
+          after: person.buffer_after_minutes === null || person.buffer_after_minutes === undefined ? '' : String(person.buffer_after_minutes),
+          price: person.price_minor === null || person.price_minor === undefined ? '' : safeDecimal(person.price_minor, service.currency),
+        },
+      ])
+    ),
   };
 }
 
@@ -135,7 +162,8 @@ export default function CalendarServicePage() {
     if (current.bookableOnline !== saved.bookableOnline || current.active !== saved.active || current.needsApproval !== saved.needsApproval)
       changes.push(t('services.field.offered', 'Where it is offered'));
     if (current.needs.join('|') !== saved.needs.join('|')) changes.push(t('services.field.needs', 'Rooms and equipment it needs'));
-    if (current.staff.join(',') !== saved.staff.join(',')) changes.push(t('services.field.staff', 'Who provides it'));
+    if (current.staff.join(',') !== saved.staff.join(',') || ownKey(current.own, current.staff) !== ownKey(saved.own, saved.staff))
+      changes.push(t('services.field.staff', 'Who provides it'));
   }
 
   const update = (patch: Partial<Draft>) => {
@@ -181,6 +209,28 @@ export default function CalendarServicePage() {
       }
     }
 
+    // WHIT-1440 (AP.19): each person's own values; empty is the service's.
+    const staff: CalendarServicePerson[] = [];
+    for (const profileId of current.staff) {
+      const own = current.own[profileId] ?? NO_OWN;
+      const ownDuration = own.duration.trim() === '' ? null : whole(own.duration, 5, 1440);
+      const ownAfter = own.after.trim() === '' ? null : whole(own.after, 0, 240);
+      if ((own.duration.trim() !== '' && ownDuration === null) || (own.after.trim() !== '' && ownAfter === null)) {
+        setProblem(t('services.error.own', 'A person’s own length must be 5 to 1440 minutes, and their time free after 0 to 240.'));
+        return;
+      }
+      let ownPrice: number | null = null;
+      if (own.price.trim() !== '') {
+        try {
+          ownPrice = parseMoney(own.price, currency);
+        } catch {
+          setProblem(t('services.error.price', 'Enter the price as a number, such as 12.50.'));
+          return;
+        }
+      }
+      staff.push({ profile_id: profileId, duration_minutes: ownDuration, buffer_after_minutes: ownAfter, price_minor: ownPrice });
+    }
+
     const body: CalendarServiceRequest = {
       name: names,
       description: cleanLocalizedText(current.description),
@@ -193,7 +243,7 @@ export default function CalendarServicePage() {
       needs_approval: current.needsApproval,
       resources: current.needs.map(needOf),
       active: current.active,
-      staff_profile_ids: current.staff,
+      staff,
     };
     setSaving(true);
     setProblem(null);
@@ -480,19 +530,29 @@ export default function CalendarServicePage() {
               <CardHeader>
                 <CardTitle>{t('services.field.staff', 'Who provides it')}</CardTitle>
                 <CardDescription>
-                  {t('services.card.staffHint', 'Only these people are offered for it. Add people to the calendar under Hours and time off.')}
+                  {t(
+                    'services.card.staffOwnHint',
+                    'Only these people are offered for it. Each can have their own length, time free after and price; leave them empty to use the service’s. Add people to the calendar under Hours and time off.'
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 {data.staff.length === 0 ? (
                   <p className="text-sm text-muted-foreground">{t('services.staff.noTeam', 'Nobody has a calendar yet.')}</p>
                 ) : (
-                  <ChangedField changed={current.staff.join(',') !== saved.staff.join(',')}>
+                  <ChangedField
+                    changed={current.staff.join(',') !== saved.staff.join(',') || ownKey(current.own, current.staff) !== ownKey(saved.own, saved.staff)}
+                  >
                     <ul className="divide-y divide-divider">
                       {data.staff.map((person) => {
                         const checked = current.staff.includes(person.profile_id);
+                        const own = current.own[person.profile_id] ?? NO_OWN;
+                        const setOwn = (patch: Partial<OwnValues>) =>
+                          update({ own: { ...current.own, [person.profile_id]: { ...own, ...patch } } });
+                        const money = /^[A-Z]{3}$/.test(current.currency) ? current.currency : workspaceCurrency;
                         return (
-                          <li key={person.profile_id} className="flex min-h-12 items-center gap-3">
+                          <li key={person.profile_id} className="py-1">
+                            <div className="flex min-h-12 items-center gap-3">
                             <Checkbox
                               id={`service-staff-${person.profile_id}`}
                               checked={checked}
@@ -508,6 +568,43 @@ export default function CalendarServicePage() {
                             <label htmlFor={`service-staff-${person.profile_id}`} className="text-sm text-foreground">
                               {person.display_name}
                             </label>
+                            </div>
+                            {checked && (
+                              <div className="grid gap-3 pb-3 ps-9 sm:grid-cols-3" data-testid={`service-own-${person.profile_id}`}>
+                                <Input
+                                  id={`service-own-duration-${person.profile_id}`}
+                                  type="number"
+                                  min={5}
+                                  max={1440}
+                                  label={t('services.own.duration', 'Their length, in minutes')}
+                                  placeholder={current.duration}
+                                  value={own.duration}
+                                  onChange={(e) => setOwn({ duration: e.target.value })}
+                                />
+                                <Input
+                                  id={`service-own-after-${person.profile_id}`}
+                                  type="number"
+                                  min={0}
+                                  max={240}
+                                  label={t('services.own.after', 'Their time free after')}
+                                  placeholder={current.after}
+                                  value={own.after}
+                                  onChange={(e) => setOwn({ after: e.target.value })}
+                                />
+                                <div className="space-y-1">
+                                  <label htmlFor={`service-own-price-${person.profile_id}`} className="text-sm font-medium text-foreground">
+                                    {t('services.own.price', 'Their price')}
+                                  </label>
+                                  <MoneyInput
+                                    id={`service-own-price-${person.profile_id}`}
+                                    currency={money}
+                                    value={own.price}
+                                    onValueChange={(price) => setOwn({ price })}
+                                    placeholder={current.price !== '' ? current.price : toDecimalString(0, money)}
+                                  />
+                                </div>
+                              </div>
+                            )}
                           </li>
                         );
                       })}
