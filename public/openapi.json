@@ -150330,11 +150330,15 @@
                 "properties": {
                     "part": {
                         "type": "string",
-                        "description": "settings, theme, calendar, services, roles, forms, documents or examples"
+                        "description": "settings, theme, calendar, services, roles, forms, documents, pipelines or examples"
                     },
                     "key": {
                         "type": "string",
                         "description": "The template's key for the item"
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "The item's name in the reader's language, as the template writes it, when it has one (WHIT-1429); settings, the theme and the calendar have none"
                     },
                     "action": {
                         "type": "string",

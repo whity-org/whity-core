@@ -31,3 +31,8 @@ export async function templatePickerPath(): Promise<string | null> {
 export function templateSetupPath(key: string): string {
   return `/admin/setup/template-${encodeURIComponent(key)}`;
 }
+
+/** "See what's new" for a template this workspace uses (WHIT-1429, WT.2). */
+export function templateUpdatePath(key: string): string {
+  return `${TEMPLATE_PICKER_PATH}/${encodeURIComponent(key)}/update`;
+}

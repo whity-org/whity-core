@@ -433,7 +433,7 @@ final class WorkspaceTemplatesApiHandler
                 'template' => $template['key'],
                 'made' => $result['made'],
                 'skipped' => $result['skipped'],
-                'items' => $result['items'],
+                'items' => $this->labelled($result['items'], $template),
             ]]);
         });
     }
@@ -469,7 +469,7 @@ final class WorkspaceTemplatesApiHandler
                 'appliedVersion' => $run['version'] ?? null,
                 'made' => $result['made'],
                 'skipped' => $result['skipped'],
-                'items' => $result['items'],
+                'items' => $this->labelled($result['items'], $template),
             ]]);
         });
     }
@@ -614,6 +614,55 @@ final class WorkspaceTemplatesApiHandler
         $days = $offer['trialDays'] ?? null;
 
         return is_int($days) && $days > 0 ? min($days, \Whity\Sdk\Manifest\WorkspaceTemplateValidator::MAX_TRIAL_DAYS) : $pluginDays;
+    }
+
+    /**
+     * Each item with its name in the reader's language, as the template
+     * writes it (WHIT-1429): a service, role, form or pipeline's name, a
+     * document's title, an example customer's name, or an example booking's
+     * service and customer. Settings, the theme and the calendar have no name
+     * of their own here; the screen words them.
+     *
+     * @param list<array<string, mixed>> $items
+     * @param array<string, mixed> $template
+     * @return list<array<string, mixed>>
+     */
+    private function labelled(array $items, array $template): array
+    {
+        $language = $this->language();
+        /** @var array<string, array<string, string|null>> $names */
+        $names = [];
+        foreach (['services' => 'name', 'roles' => 'name', 'forms' => 'name', 'pipelines' => 'name', 'documents' => 'title'] as $part => $field) {
+            foreach (is_array($template[$part] ?? null) ? $template[$part] : [] as $entry) {
+                if (is_array($entry) && is_string($entry['key'] ?? null)) {
+                    $names[$part][$entry['key']] = self::text($entry[$field] ?? null, $language);
+                }
+            }
+        }
+        $examples = is_array($template['examples'] ?? null) ? $template['examples'] : [];
+        $contacts = [];
+        foreach (is_array($examples['contacts'] ?? null) ? $examples['contacts'] : [] as $contact) {
+            if (is_array($contact) && is_string($contact['key'] ?? null) && is_string($contact['name'] ?? null)) {
+                $contacts[$contact['key']] = $contact['name'];
+            }
+        }
+        $names['examples'] = $contacts;
+        foreach (is_array($examples['bookings'] ?? null) ? $examples['bookings'] : [] as $booking) {
+            if (!is_array($booking) || !is_string($booking['key'] ?? null) || isset($names['examples'][$booking['key']])) {
+                continue;
+            }
+            $service = ($names['services'] ?? [])[(string) ($booking['service'] ?? '')] ?? null;
+            $who = $contacts[(string) ($booking['contact'] ?? '')] ?? null;
+            $names['examples'][$booking['key']] = $service !== null && $who !== null ? "{$service}, {$who}" : $service;
+        }
+
+        $out = [];
+        foreach ($items as $item) {
+            $label = $names[(string) ($item['part'] ?? '')][(string) ($item['key'] ?? '')] ?? null;
+            $out[] = $label !== null ? $item + ['label' => $label] : $item;
+        }
+
+        return $out;
     }
 
     private function language(): string
