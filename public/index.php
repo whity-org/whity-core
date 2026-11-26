@@ -5720,6 +5720,8 @@ $router->register('GET',    '/api/calendar/today',                          [$ca
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/attendance',   [$calendarHandler, 'markAttendance'],  null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('GET',    '/api/calendar/attendance/unmarked',            [$calendarHandler, 'unmarkedAttendance'], null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/attendance',                     [$calendarHandler, 'attendanceRates'], null, null, CorePermissions::CALENDAR_READ);
+// WHIT-1437 (AP.7, AP.8): Reports › Appointments, JSON or CSV.
+$router->register('GET',    '/api/calendar/attendance/report',              [$calendarHandler, 'attendanceReport'], null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/customers/attendance',           [$calendarHandler, 'customerAttendance'], null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/customers/attendance/reset',     [$calendarHandler, 'resetCustomerAttendance'], null, null, CorePermissions::CALENDAR_MANAGE);
 $router->register('GET',    '/api/calendar/items',                          [$calendarHandler, 'items'],           null, null, CorePermissions::CALENDAR_READ);

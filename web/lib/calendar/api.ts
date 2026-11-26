@@ -41,10 +41,44 @@ export type CalendarToday = Schemas['CalendarToday'];
 export type CalendarAttendance = 'attended' | 'no_show' | null;
 export type CalendarCustomerAttendance = Schemas['CalendarCustomerAttendance'];
 export type CalendarAttendanceRates = Schemas['CalendarAttendanceRates'];
+export type CalendarAttendanceReport = Schemas['CalendarAttendanceReport'];
+export type CalendarAttendanceReportRow = Schemas['CalendarAttendanceReportRow'];
+export type CalendarReportBy = 'staff' | 'service' | 'customer' | 'source' | 'weekday_hour' | 'reminder' | 'returning';
+export type CalendarReportPeriod = 'this_week' | 'this_month' | 'last_month' | 'last_3_months' | 'last_6_months' | 'last_12_months';
+export interface CalendarReportQuery {
+  by: CalendarReportBy;
+  period?: CalendarReportPeriod | null;
+  from?: string | null;
+  to?: string | null;
+  profileId?: number | null;
+  serviceId?: number | null;
+}
+
+function reportQuery(q: CalendarReportQuery): Record<string, string | number | null | undefined> {
+  return {
+    by: q.by,
+    period: q.from && q.to ? null : q.period ?? 'this_month',
+    from: q.from,
+    to: q.to,
+    profile_id: q.profileId,
+    service_id: q.serviceId,
+  };
+}
+
+/** WHIT-1437: where the report downloads as a spreadsheet, in the reader's language. */
+export function attendanceReportCsvUrl(q: CalendarReportQuery, language: string): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries({ ...reportQuery(q), format: 'csv', lang: language })) {
+    if (value !== null && value !== undefined && value !== '') params.set(key, String(value));
+  }
+  return `/api/v1/calendar/attendance/report?${params.toString()}`;
+}
 
 export const CALENDAR_READ = 'calendar:read';
 export const CALENDAR_WRITE = 'calendar:write';
 export const CALENDAR_MANAGE = 'calendar:manage';
+/** WHIT-1437 (AP.9): everyone's rates; without it, a person sees their own. */
+export const CALENDAR_REPORTS = 'calendar:reports';
 
 /** A refused calendar request, with the HTTP status the screen branches on. */
 export class CalendarRequestError extends Error {
@@ -296,6 +330,12 @@ export const calendarApi = {
     read<CalendarBooking[]>(
       await api.GET('/api/v1/calendar/attendance/unmarked', { params: { query: query({ date, unit_id: unitId }) } }),
       'Did they come? could not be loaded'
+    ),
+  /** WHIT-1437 (AP.7): the rates broken down one way, with the period before. */
+  attendanceReport: async (q: CalendarReportQuery) =>
+    read<CalendarAttendanceReport>(
+      await api.GET('/api/v1/calendar/attendance/report', { params: { query: query(reportQuery(q)) } }),
+      'The report could not be loaded'
     ),
   /** WHIT-1427 (AP.8): one customer's line and flag. */
   customerAttendance: async ({ contactId, email }: { contactId?: number | null; email?: string | null }) =>

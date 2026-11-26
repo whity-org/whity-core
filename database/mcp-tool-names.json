@@ -511,6 +511,10 @@
     "en": "Get no-show and late-cancel rates",
     "ar": "عرض نسبة عدم الحضور والإلغاء المتأخر"
   },
+  "get_api_calendar_attendance_report": {
+    "en": "Get the appointment report: no-show rates by staff, service or customer",
+    "ar": "عرض تقرير المواعيد: نسب عدم الحضور حسب الموظف أو الخدمة أو الزبون"
+  },
   "get_api_calendar_customers_attendance": {
     "en": "Get a customer's attendance and flag",
     "ar": "عرض حضور زبون وتنبيهه"

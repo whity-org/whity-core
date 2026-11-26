@@ -2508,6 +2508,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/attendance/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Appointment report: no-show and late-cancel rates broken down one way, with the period before (WHIT-1437). Needs calendar:reports; without it, only your own bookings */
+        get: operations["get_api_v1_calendar_attendance_report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/attendance/unmarked": {
         parameters: {
             query?: never;
@@ -17278,6 +17295,51 @@ export interface components {
             /** @description (no_show + late_cancels) / due. */
             missed_rate: number | null;
             /** @description unmarked / (due + unmarked). Above 0.1, show "Not all bookings are marked". */
+            unmarked_share: number | null;
+        };
+        CalendarAttendanceReport: {
+            from: string;
+            to: string;
+            /** @description The period before runs from here to `from`. */
+            previous_from: string;
+            by: string;
+            totals: components["schemas"]["CalendarAttendanceReportTotals"];
+            previous: components["schemas"]["CalendarAttendanceReportTotals"];
+            rows: components["schemas"]["CalendarAttendanceReportRow"][];
+            /** @description More than 50,000 bookings: the rest are left out. */
+            truncated: boolean;
+            /** @description Only the caller's own bookings (no calendar:reports). */
+            own: boolean;
+            time_zone: string;
+        };
+        CalendarAttendanceReportRow: {
+            /** @description The staff member's or service's id, the customer's key, the source, `1-09` (ISO weekday and hour, in the workspace's zone), `confirmed`/`reminded`/`not_reminded`, or `new`/`returning`. */
+            key: string;
+            /** @description A name to show: a string, or for a service its name by language code. */
+            label: string | {
+                [key: string]: string;
+            };
+            came: number;
+            no_show: number;
+            late_cancels: number;
+            early_cancels: number;
+            unmarked: number;
+            due: number;
+            no_show_rate: number | null;
+            late_cancel_rate: number | null;
+            missed_rate: number | null;
+            unmarked_share: number | null;
+        };
+        CalendarAttendanceReportTotals: {
+            came: number;
+            no_show: number;
+            late_cancels: number;
+            early_cancels: number;
+            unmarked: number;
+            due: number;
+            no_show_rate: number | null;
+            late_cancel_rate: number | null;
+            missed_rate: number | null;
             unmarked_share: number | null;
         };
         CalendarAttendanceRequest: {
@@ -41062,6 +41124,101 @@ export interface operations {
                 };
             };
             /** @description A period is needed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_attendance_report: {
+        parameters: {
+            query?: {
+                /** @description `this_week`, `this_month` (default), `last_month`, `last_3_months`, `last_6_months` or `last_12_months`, in the workspace's time zone. Or give `from` and `to`. */
+                period?: string;
+                /** @description Start, ISO 8601 with an offset, instead of `period`. */
+                from?: string;
+                /** @description End (not included), up to 13 months after from. */
+                to?: string;
+                /** @description `staff` (default), `service`, `customer`, `source`, `weekday_hour`, `reminder` or `returning`. */
+                by?: string;
+                /** @description One staff member. */
+                profile_id?: number;
+                /** @description One service. */
+                service_id?: number;
+                /** @description `staff`, `public`, `agent` or `walkin`. */
+                source?: string;
+                /** @description `csv` to download the rows as a spreadsheet. */
+                format?: string;
+                /** @description The CSV's language: `en` (default) or `ar`. */
+                lang?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarAttendanceReport"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Someone else's rates without calendar:reports */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description An unknown period or breakdown */
             422: {
                 headers: {
                     [name: string]: unknown;
