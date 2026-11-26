@@ -58,6 +58,7 @@ import {
   calendarApi,
   isTaken,
   type CalendarBooking,
+  type CalendarRoom,
   type CalendarService,
   type CalendarSlot,
   type CalendarStaff,
@@ -87,7 +88,7 @@ export function statusVariant(status: CalendarBooking['status']): 'success' | 'w
 }
 
 /** What just happened to a booking, so the screen can say it. */
-export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn' | 'cameMarked' | 'noShowMarked';
+export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn' | 'cameMarked' | 'noShowMarked' | 'resourcesChanged';
 
 export interface BookingSheetProps {
   booking: CalendarBooking | null;
@@ -178,7 +179,14 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
             </SheetHeader>
 
             {mode === 'view' ? (
-              <BookingFacts booking={booking} service={service} person={person} timeZone={timeZone} />
+              <BookingFacts
+                booking={booking}
+                service={service}
+                person={person}
+                timeZone={timeZone}
+                canChange={canChange && open}
+                onResourcesChanged={(changed) => onChanged(changed, 'resourcesChanged')}
+              />
             ) : (
               <MovePanel
                 booking={booking}
@@ -309,22 +317,67 @@ function useReminderLog(booking: CalendarBooking): ReminderLog {
   return loaded !== null && loaded.id === booking.id && loaded.sent === sent ? loaded.log : [];
 }
 
+/**
+ * What a booking holds (WHIT-1439, AP.18): the one booking with its
+ * resources and the workspace's rooms and equipment, read once for the
+ * booking shown, since the calendar's list carries neither.
+ */
+function useHeld(booking: CalendarBooking): { full: CalendarBooking | null; rooms: CalendarRoom[] } {
+  const [loaded, setLoaded] = useState<{ id: number; full: CalendarBooking; rooms: CalendarRoom[] } | null>(null);
+  const roomId = booking.room_id ?? null;
+  useEffect(() => {
+    if (roomId === null) return;
+    let cancelled = false;
+    Promise.all([calendarApi.booking(booking.id), calendarApi.rooms()])
+      .then(([full, rooms]) => {
+        if (!cancelled) setLoaded({ id: booking.id, full, rooms });
+      })
+      .catch(() => {
+        // The facts still show the room by name.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [booking.id, roomId]);
+  return loaded !== null && loaded.id === booking.id ? { full: loaded.full, rooms: loaded.rooms } : { full: null, rooms: [] };
+}
+
 function BookingFacts({
   booking,
   service,
   person,
   timeZone,
+  canChange = false,
+  onResourcesChanged,
 }: {
   booking: CalendarBooking;
   service: CalendarService | null;
   person: CalendarStaff | null;
   timeZone: string;
+  canChange?: boolean;
+  onResourcesChanged?: (booking: CalendarBooking) => void;
 }) {
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const dates = useDateDisplay({ timeZone });
   // WHIT-1417: the reminders sent come only with the one booking, not the calendar's list.
   const reminders = useReminderLog(booking);
+  const heldInfo = useHeld(booking);
+  const [changingResource, setChangingResource] = useState(false);
+  const [resourceProblem, setResourceProblem] = useState<string | null>(null);
+  const changeResource = async (index: number, resourceId: number) => {
+    const current = (heldInfo.full?.resources ?? []).filter((r) => r.part === 0).map((r) => r.resource_id);
+    const next = current.map((id, i) => (i === index ? resourceId : id));
+    setChangingResource(true);
+    setResourceProblem(null);
+    try {
+      onResourcesChanged?.(await calendarApi.changeResources(booking.id, next));
+    } catch (error) {
+      setResourceProblem(words.errorText(error, t('booking.resources.error', 'That one is taken then. Choose another.')));
+    } finally {
+      setChangingResource(false);
+    }
+  };
 
   const rows: { label: string; value: React.ReactNode; testId?: string }[] = [];
   if (!dates.hidden) {
@@ -356,7 +409,45 @@ function BookingFacts({
     });
     rows.push({ label: t('booking.fact.service', 'Service'), value: words.serviceName(service) });
   }
-  if (booking.room_name) {
+  const held = (heldInfo.full?.resources ?? []).filter((r) => r.part === 0);
+  if (held.length > 0 && heldInfo.rooms.length > 0 && !isSeveral(booking)) {
+    // WHIT-1439 (AP.18): each thing it holds; for a group, the desk can pick another.
+    rows.push({
+      label: t('booking.fact.resources', 'Room and equipment'),
+      value: (
+        <ul className="space-y-2" data-testid="booking-resources">
+          {held.map((r, index) => {
+            const room = heldInfo.rooms.find((x) => x.id === r.resource_id);
+            const need = service?.resources?.[index];
+            const group = need?.group_key ?? null;
+            const choices = group ? heldInfo.rooms.filter((x) => x.group_key === group && (x.active || x.id === r.resource_id)) : [];
+            return (
+              <li key={`${r.resource_id}-${index}`}>
+                {canChange && choices.length > 1 ? (
+                  <>
+                    <label htmlFor={`booking-resource-${index}`} className="sr-only">
+                      {t('booking.resources.change', 'Change {name}', { name: room ? words.label(room.name) : '' })}
+                    </label>
+                    <FieldSelect
+                      id={`booking-resource-${index}`}
+                      value={String(r.resource_id)}
+                      disabled={changingResource}
+                      onChange={(value) => void changeResource(index, Number(value))}
+                      options={choices.map((x) => ({ value: String(x.id), label: words.label(x.name) }))}
+                    />
+                  </>
+                ) : (
+                  <span>{room ? words.label(room.name) : t('room.unnamed', 'Unnamed room')}</span>
+                )}
+              </li>
+            );
+          })}
+          {resourceProblem && <li className="text-destructive">{resourceProblem}</li>}
+        </ul>
+      ),
+      testId: 'booking-resources-fact',
+    });
+  } else if (booking.room_name) {
     rows.push({ label: t('booking.fact.room', 'Room'), value: words.label(booking.room_name), testId: 'booking-room' });
   }
   if (booking.checked_in_at) {

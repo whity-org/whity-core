@@ -304,6 +304,9 @@ final class CalendarHoldsRealEngineTest extends TestCase
     public function testDownRemovesEverythingItAdded(): void
     {
         $db = $this->database();
+        // Rolled back in order: 366 (WHIT-1439) builds on these holds.
+        require_once dirname(__DIR__, 3) . '/database/migrations/366_create_calendar_booking_resources.php';
+        \Database\Migrations\CreateCalendarBookingResources::down($db);
         CreateCalendarHolds::down($db);
         self::assertFalse((bool) $this->scalar("SELECT to_regclass('calendar_holds') IS NOT NULL"));
         self::assertSame(0, (int) $this->scalar("SELECT COUNT(*) FROM information_schema.columns WHERE table_name = 'calendar_bookings' AND column_name IN ('overlap_ok', 'overlap_before_guard')"));

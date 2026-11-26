@@ -11375,12 +11375,16 @@ final class CoreApiSchemas
                 'unit_id' => self::int(true) + ['description' => 'The branch (organisational unit) it is in.'],
                 'active' => self::bool(),
                 'sort_order' => self::int(),
-            ], ['id', 'name', 'unit_id', 'active', 'sort_order']),
+                'kind' => self::str() + ['enum' => ['room', 'chair', 'equipment', 'other'], 'description' => 'What it is (WHIT-1439).'],
+                'group_key' => self::str() + ['description' => 'The group it belongs to, such as "Chairs"; empty for none. A service can need any one from a group.'],
+            ], ['id', 'name', 'unit_id', 'active', 'sort_order', 'kind', 'group_key']),
             'CalendarRoomRequest' => self::object([
                 'name' => ['oneOf' => [self::str(), SchemaBuilder::ref('LocalizedLabel')], 'description' => 'Text, or a `{ar, en}` map.'],
                 'unit_id' => self::int(true) + ['description' => 'The branch it is in; null for none.'],
                 'active' => self::bool() + ['description' => 'Inactive rooms are not shown as columns.'],
                 'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
+                'kind' => self::str() + ['enum' => ['room', 'chair', 'equipment', 'other'], 'description' => 'What it is. Default: room.'],
+                'group_key' => self::str() + ['maxLength' => 80, 'description' => 'The group it belongs to, such as "Chairs"; empty for none.'],
             ], []),
             'CalendarToday' => self::object([
                 'date' => self::str() + ['description' => 'The local day, `YYYY-MM-DD`.'],
@@ -11434,7 +11438,8 @@ final class CoreApiSchemas
                 'active' => self::bool(),
                 'sort_order' => self::int(),
                 'staff_profile_ids' => ['type' => 'array', 'items' => self::int()],
-                'room_id' => self::int(true) + ['description' => 'The room it needs; booked with the person.'],
+                'room_id' => self::int(true) + ['description' => 'The first specific room it needs; booked with the person. `resources` lists every need.'],
+                'resources' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarServiceNeed'), 'description' => 'What it needs, in order: specific rooms and equipment, or any one from a group (WHIT-1439).'],
                 'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
                 'item_id' => self::int(true) + ['description' => 'The inventory service item that holds its name and price (WHIT-1334).'],
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
@@ -11450,7 +11455,8 @@ final class CoreApiSchemas
                 'active' => self::bool() + ['description' => 'Inactive services cannot be booked.'],
                 'sort_order' => self::int() + ['minimum' => 0, 'description' => 'Position in lists; lower comes first.'],
                 'staff_profile_ids' => ['type' => 'array', 'maxItems' => 200, 'items' => self::int(), 'description' => 'The staff who provide it; the list replaces what is there.'],
-                'room_id' => self::int(true) + ['description' => 'The room it needs; null for none.'],
+                'room_id' => self::int(true) + ['description' => 'Older clients: the one room it needs; null for none. Left out when `resources` is sent.'],
+                'resources' => ['type' => 'array', 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarServiceNeed'), 'description' => 'What it needs, in order: each a `resource_id`, or a `group_key` for any free one from that group (WHIT-1439).'],
                 'needs_approval' => self::bool() + ['description' => 'Customers send a request instead of booking.'],
             ], []),
             'CalendarSlot' => self::object([
@@ -11521,6 +11527,7 @@ final class CoreApiSchemas
                 'attendance_auto' => self::bool(),
                 'cancel_kind' => self::str(true) + ['enum' => ['early', 'late', 'business', null], 'description' => 'A cancelled booking (AP.5): early or late by the customer or for them, business when the workspace cancelled.'],
                 'customer_flag' => SchemaBuilder::ref('CalendarCustomerFlag'),
+                'resources' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingResource'), 'description' => 'Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first.'],
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
@@ -11571,6 +11578,17 @@ final class CoreApiSchemas
                 'reason' => self::str() + ['maxLength' => 500, 'description' => 'Why, in a few words; shown to the customer.'],
                 'cancelled_for' => self::str() + ['enum' => ['customer', 'business'], 'description' => 'Staff only (WHIT-1427, AP.5): `customer` (the customer asked) counts as an early or late cancel by the window; `business` (we cancelled) never counts. Left out, no kind is recorded.'],
             ], []),
+            'CalendarBookingResourcesRequest' => self::object([
+                'resource_ids' => ['type' => 'array', 'items' => self::int(), 'description' => 'One resource for each thing the service needs, in the order of its `resources`.'],
+            ], ['resource_ids']),
+            'CalendarServiceNeed' => self::object([
+                'resource_id' => self::int(true) + ['description' => 'A specific room or piece of equipment.'],
+                'group_key' => self::str(true) + ['description' => 'Or any free one from this group, such as "Chairs".'],
+            ], ['resource_id', 'group_key']),
+            'CalendarBookingResource' => self::object([
+                'part' => self::int() + ['description' => 'The service\'s position in a booking of several; 0 for one.'],
+                'resource_id' => self::int(),
+            ], ['part', 'resource_id']),
             'CalendarAttendanceRequest' => self::object([
                 'attendance' => self::str(true) + ['enum' => ['attended', 'no_show', null], 'description' => '`attended` (came), `no_show` (didn\'t come), or null to clear the mark.'],
             ], ['attendance']),
@@ -20842,6 +20860,17 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking, or it has not started'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/resources', 'calendar:write', [
+                'summary' => 'Change the room or equipment a booking holds: one for each thing its service needs (WHIT-1439)',
+                'tags' => ['calendar'],
+                'request' => 'CalendarBookingResourcesRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('That room or equipment is taken then'),
+                    422 => self::errorResponse('Not one for each need, not one the service can use, or a booking of several services'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/attendance/unmarked', 'calendar:read', [

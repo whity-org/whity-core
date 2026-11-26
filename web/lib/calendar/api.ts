@@ -319,6 +319,12 @@ export const calendarApi = {
         : await api.DELETE('/api/v1/calendar/bookings/{id}/check-in', { params: { path: { id } } }),
       'The check-in could not be saved'
     ),
+  /** WHIT-1439 (AP.18): the desk changes the room or equipment a booking holds, one for each need. */
+  changeResources: async (id: number, resourceIds: number[]) =>
+    send<CalendarBooking>(
+      await api.POST('/api/v1/calendar/bookings/{id}/resources', { params: { path: { id } }, body: { resource_ids: resourceIds } }),
+      'The room or equipment could not be changed'
+    ),
   /** WHIT-1427 (AP.3): came, didn't come, or clear the mark. */
   markAttendance: async (id: number, attendance: CalendarAttendance) =>
     send<CalendarBooking>(

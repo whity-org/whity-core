@@ -17977,6 +17977,140 @@
                 ]
             }
         },
+        "/api/v1/calendar/bookings/{id}/resources": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_resources",
+                "summary": "Change the room or equipment a booking holds: one for each thing its service needs (WHIT-1439)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarBookingResourcesRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "That room or equipment is taken then",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not one for each need, not one the service can use, or a booking of several services",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/bookings/{id}/suggest": {
             "post": {
                 "operationId": "post_api_v1_calendar_bookings_id_suggest",
@@ -113438,6 +113572,13 @@
                     "customer_flag": {
                         "$ref": "#/components/schemas/CalendarCustomerFlag"
                     },
+                    "resources": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBookingResource"
+                        },
+                        "description": "Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first."
+                    },
                     "room_name": {
                         "type": "object",
                         "nullable": true,
@@ -113687,6 +113828,37 @@
                     "channel",
                     "outcome",
                     "sent_at"
+                ]
+            },
+            "CalendarBookingResource": {
+                "type": "object",
+                "properties": {
+                    "part": {
+                        "type": "integer",
+                        "description": "The service's position in a booking of several; 0 for one."
+                    },
+                    "resource_id": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "part",
+                    "resource_id"
+                ]
+            },
+            "CalendarBookingResourcesRequest": {
+                "type": "object",
+                "properties": {
+                    "resource_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "One resource for each thing the service needs, in the order of its `resources`."
+                    }
+                },
+                "required": [
+                    "resource_ids"
                 ]
             },
             "CalendarBookingServiceChoice": {
@@ -114411,6 +114583,20 @@
                     },
                     "sort_order": {
                         "type": "integer"
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "room",
+                            "chair",
+                            "equipment",
+                            "other"
+                        ],
+                        "description": "What it is (WHIT-1439)."
+                    },
+                    "group_key": {
+                        "type": "string",
+                        "description": "The group it belongs to, such as \"Chairs\"; empty for none. A service can need any one from a group."
                     }
                 },
                 "required": [
@@ -114418,7 +114604,9 @@
                     "name",
                     "unit_id",
                     "active",
-                    "sort_order"
+                    "sort_order",
+                    "kind",
+                    "group_key"
                 ]
             },
             "CalendarRoomRequest": {
@@ -114448,6 +114636,21 @@
                         "type": "integer",
                         "minimum": 0,
                         "description": "Position in lists; lower comes first."
+                    },
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "room",
+                            "chair",
+                            "equipment",
+                            "other"
+                        ],
+                        "description": "What it is. Default: room."
+                    },
+                    "group_key": {
+                        "type": "string",
+                        "maxLength": 80,
+                        "description": "The group it belongs to, such as \"Chairs\"; empty for none."
                     }
                 }
             },
@@ -114498,7 +114701,14 @@
                     "room_id": {
                         "type": "integer",
                         "nullable": true,
-                        "description": "The room it needs; booked with the person."
+                        "description": "The first specific room it needs; booked with the person. `resources` lists every need."
+                    },
+                    "resources": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarServiceNeed"
+                        },
+                        "description": "What it needs, in order: specific rooms and equipment, or any one from a group (WHIT-1439)."
                     },
                     "needs_approval": {
                         "type": "boolean",
@@ -114522,6 +114732,25 @@
                     "active",
                     "sort_order",
                     "staff_profile_ids"
+                ]
+            },
+            "CalendarServiceNeed": {
+                "type": "object",
+                "properties": {
+                    "resource_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "A specific room or piece of equipment."
+                    },
+                    "group_key": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Or any free one from this group, such as \"Chairs\"."
+                    }
+                },
+                "required": [
+                    "resource_id",
+                    "group_key"
                 ]
             },
             "CalendarServiceRequest": {
@@ -114602,7 +114831,15 @@
                     "room_id": {
                         "type": "integer",
                         "nullable": true,
-                        "description": "The room it needs; null for none."
+                        "description": "Older clients: the one room it needs; null for none. Left out when `resources` is sent."
+                    },
+                    "resources": {
+                        "type": "array",
+                        "maxItems": 8,
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarServiceNeed"
+                        },
+                        "description": "What it needs, in order: each a `resource_id`, or a `group_key` for any free one from that group (WHIT-1439)."
                     },
                     "needs_approval": {
                         "type": "boolean",

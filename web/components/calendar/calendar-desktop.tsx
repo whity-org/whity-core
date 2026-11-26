@@ -554,7 +554,9 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
                         ? t('booking.cameToast', '{name} came', { name: changed.customer.name ?? '' })
                         : what === 'noShowMarked'
                           ? t('booking.noShowToast', '{name} didn’t come', { name: changed.customer.name ?? '' })
-                          : t('booking.moved', 'Booking moved'),
+                          : what === 'resourcesChanged'
+                            ? t('booking.resourcesChanged', 'Room or equipment changed')
+                            : t('booking.moved', 'Booking moved'),
             'success'
           );
           refetch();

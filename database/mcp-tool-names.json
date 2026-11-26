@@ -503,6 +503,10 @@
     "en": "Mark whether the customer came",
     "ar": "تسجيل إن كان الزبون قد حضر"
   },
+  "post_api_calendar_bookings_id_resources": {
+    "en": "Change the room or equipment a booking holds",
+    "ar": "تغيير الغرفة أو المعدّات في موعد"
+  },
   "get_api_calendar_attendance_unmarked": {
     "en": "List bookings nobody has marked as came or didn't come",
     "ar": "عرض المواعيد التي لم يُسجَّل حضورها"

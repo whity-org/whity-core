@@ -39,7 +39,7 @@ export function CalendarNav({
   const tabs: { id: CalendarSection; label: string; href: string; show: boolean }[] = [
     { id: 'calendar', label: t('nav.phone.bookings', 'Bookings'), href: '/calendar', show: true },
     { id: 'services', label: t('nav.services', 'Services'), href: '/calendar/services', show: access.canRead },
-    { id: 'rooms', label: t('nav.rooms', 'Rooms and branches'), href: '/calendar/rooms', show: access.canRead },
+    { id: 'rooms', label: t('nav.roomsEquipment', 'Rooms and equipment'), href: '/calendar/rooms', show: access.canRead },
     { id: 'hours', label: t('nav.hours', 'Hours and time off'), href: '/calendar/hours', show: access.canRead },
     // WHIT-1437 (AP.8, AP.9): everyone sees their own rate; calendar:reports sees everyone's.
     { id: 'reports', label: t('nav.reports', 'Reports'), href: '/calendar/reports', show: access.canRead },
@@ -51,7 +51,7 @@ export function CalendarNav({
   const phonePages: { id: CalendarSection; label: string; hint: string; icon: IconName }[] = [
     { id: 'calendar', label: t('nav.phone.bookings', 'Bookings'), hint: t('nav.phone.bookingsHint', 'Day, week and month'), icon: 'calendar' },
     { id: 'services', label: t('nav.services', 'Services'), hint: t('nav.phone.servicesHint', 'What customers can book'), icon: 'tool' },
-    { id: 'rooms', label: t('nav.rooms', 'Rooms and branches'), hint: t('nav.phone.roomsHint', 'Where bookings happen'), icon: 'branch' },
+    { id: 'rooms', label: t('nav.roomsEquipment', 'Rooms and equipment'), hint: t('nav.phone.roomsEquipmentHint', 'Rooms, chairs, equipment and branches'), icon: 'branch' },
     { id: 'hours', label: t('nav.hours', 'Hours and time off'), hint: t('nav.phone.hoursHint', 'Who works when'), icon: 'clock' },
     { id: 'reports', label: t('nav.reports', 'Reports'), hint: t('nav.phone.reportsHint', 'Who came and who didn’t'), icon: 'chart' },
     { id: 'settings', label: t('nav.phone.settings', 'Calendar settings'), hint: t('nav.phone.settingsHint', 'Booking rules and reminders'), icon: 'settings' },
