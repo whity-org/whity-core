@@ -944,6 +944,75 @@ class PluginLoader implements \Whity\Core\Plugin\Workspace\PluginWorkspaceGate
     }
 
     /**
+     * The workspace templates a workspace may choose (WHIT-1433): those of
+     * the plugins on in it, as {@see self::getWorkspaceTemplates()}, and those
+     * of installed plugins that are off in it but that the workspace may turn
+     * on (left for each workspace to choose, and free or paid for there).
+     * Owner, 26 Nov 2026: "a plugin(template) should be turned on only for
+     * workspaces that need it"; choosing its template turns it on. Each
+     * template carries `pluginOn`. A key is kept from the first plugin that
+     * offers it, on or not.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getOfferableWorkspaceTemplates(): array
+    {
+        $tenantId = TenantContext::getTenantId();
+        $out = [];
+        $seen = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $templates = $this->workspaceTemplates[$pluginKey] ?? [];
+            if ($templates === [] || isset($this->administrativelyDisabled[$pluginKey])) {
+                continue;
+            }
+            $lifecycle = $this->lifecycles[$pluginKey] ?? null;
+            if ($lifecycle === null || !$lifecycle->isActive()) {
+                continue;
+            }
+            $name = $info['plugin']->getName();
+            $on = !$this->isOffForWorkspace($pluginKey);
+            if (!$on) {
+                $activation = $this->workspaceActivation;
+                if ($activation === null || $tenantId === null
+                    || $activation->accessOf($name) !== \Whity\Core\Plugin\Workspace\CodePluginActivation::CHOOSE
+                    || $activation->isKilled($name) || !$activation->mayTurnOn($name, $tenantId)) {
+                    continue;
+                }
+            }
+            foreach ($templates as $template) {
+                $key = (string) $template['key'];
+                if (isset($seen[$key])) {
+                    continue;
+                }
+                $seen[$key] = true;
+                $out[] = $template + ['plugin' => $name, 'pluginOn' => $on];
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * The template keys each loaded plugin offers, by plugin name (WHIT-1433),
+     * so {@see \Whity\Core\Plugin\Workspace\CodePluginActivation} can turn a
+     * template plugin on where its template was applied.
+     *
+     * @return array<string, list<string>>
+     */
+    public function getWorkspaceTemplateKeysByPlugin(): array
+    {
+        $out = [];
+        foreach ($this->registeredPlugins as $pluginKey => $info) {
+            $keys = array_map(static fn (array $t): string => (string) $t['key'], $this->workspaceTemplates[$pluginKey] ?? []);
+            if ($keys !== []) {
+                $out[$info['plugin']->getName()] = $keys;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * Each plugin's checked themes (SDK 1.125, WHIT-1225), by plugin key.
      *
      * @var array<string, list<array<string, mixed>>>

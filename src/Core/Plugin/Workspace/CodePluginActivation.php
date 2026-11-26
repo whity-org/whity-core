@@ -76,6 +76,9 @@ final class CodePluginActivation
     /** @var (\Closure(): array<string, array{entitlement: string, product: string, trialDays: int}>)|null */
     private ?\Closure $paidAccess = null;
 
+    /** @var (\Closure(): array<string, list<string>>)|null plugin name => the workspace template keys it offers */
+    private ?\Closure $templateKeys = null;
+
     /** @var (\Closure(int, string): bool)|null */
     private ?\Closure $entitled = null;
 
@@ -123,6 +126,21 @@ final class CodePluginActivation
     public function usePaidAccess(\Closure $paidAccess): void
     {
         $this->paidAccess = $paidAccess;
+    }
+
+    /**
+     * Which workspace templates each plugin offers (WHIT-1433). A template
+     * plugin a workspace never switched either way is turned on there the
+     * first time it is asked about, if the workspace has a run of one of its
+     * templates: a template plugin is on only where it is used (owner,
+     * 26 Nov 2026), and a workspace that used a template keeps it, its theme
+     * included, when the template moves into its own plugin.
+     *
+     * @param \Closure(): array<string, list<string>> $templateKeys
+     */
+    public function useTemplateKeys(\Closure $templateKeys): void
+    {
+        $this->templateKeys = $templateKeys;
     }
 
     /** @param \Closure(int, string): bool $entitled (workspace, entitlement key) => granted */
@@ -223,6 +241,10 @@ final class CodePluginActivation
     private function compute(string $pluginName, int $tenantId): array
     {
         $row = $this->rowsFor($tenantId)[$pluginName] ?? null;
+        if ($row === null && $this->accessOf($pluginName) === self::CHOOSE && $this->usesTemplateOf($pluginName, $tenantId)) {
+            $this->setEnabled($tenantId, $pluginName, true);
+            $row = $this->rowsFor($tenantId)[$pluginName] ?? null;
+        }
         $switchedOn = match ($this->accessOf($pluginName)) {
             self::ALL => true,
             self::OPERATOR => false,
@@ -546,6 +568,32 @@ final class CodePluginActivation
     private function paidAccessAll(): array
     {
         return $this->paidAccess !== null ? ($this->paidAccess)() : [];
+    }
+
+    /**
+     * Has this workspace applied one of the templates this plugin offers?
+     * Only asked for a plugin the workspace never switched either way.
+     */
+    private function usesTemplateOf(string $pluginName, int $tenantId): bool
+    {
+        if ($this->templateKeys === null) {
+            return false;
+        }
+        $keys = ($this->templateKeys)()[$pluginName] ?? [];
+        if ($keys === []) {
+            return false;
+        }
+        $marks = implode(', ', array_fill(0, count($keys), '?'));
+        try {
+            $stmt = $this->db->prepare(
+                "SELECT 1 FROM workspace_template_runs WHERE tenant_id = ? AND template_key IN ({$marks}) LIMIT 1"
+            );
+            $stmt->execute([$tenantId, ...$keys]);
+
+            return $stmt->fetchColumn() !== false;
+        } catch (\PDOException) {
+            return false;
+        }
     }
 
     /** @return array<string, array{enabled: bool, trial_started_at: ?string, trial_ends_at: ?string, access_lapsed_at: ?string}> */

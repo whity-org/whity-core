@@ -2983,6 +2983,8 @@ $entitlementService = new \Whity\Core\Entitlement\EntitlementService(
 // during its trial or grace, or when the operator made it free for everyone.
 // One installed from the store also needs this installation's store licence.
 $codePluginActivation->usePaidAccess(static fn (): array => $pluginLoader->getPaidAccess());
+// WHIT-1433: a template plugin turns on where its template was applied (owner, 26 Nov 2026).
+$codePluginActivation->useTemplateKeys(static fn (): array => $pluginLoader->getWorkspaceTemplateKeysByPlugin());
 $codePluginActivation->useEntitlements(static function (int $tenantId, string $key) use ($entitlementService): bool {
     try {
         return $entitlementService->isGranted($tenantId, $key);
@@ -3055,6 +3057,8 @@ $workspaceTemplatesHandler = new \Whity\Api\WorkspaceTemplatesApiHandler(
             return is_string($name) ? $name : null;
         },
     ),
+    // WHIT-1433: choosing a template whose plugin is off here turns it on.
+    static fn (int $profileId, int $tenantId): bool => $roleChecker->hasPermissionForProfile($profileId, \Whity\Core\RBAC\CorePermissions::PLUGINS_ENABLE, $tenantId),
 );
 $workspaceCodePluginsHandler->useTemplateOnboardings(static fn (int $tenantId): array => $workspaceTemplatesHandler->onboardings($tenantId));
 $workspaceTemplatesHandler->useDisplayNames(static fn (): array => $pluginLoader->getDisplayNames());

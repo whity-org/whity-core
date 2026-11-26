@@ -12,6 +12,11 @@ use Whity\Sdk\Templates\TemplateComposer;
  * plugins on in this workspace, then core's own "Blank". A plugin cannot
  * replace Blank.
  *
+ * Since WHIT-1433 they also include the templates of installed plugins that
+ * are off in this workspace but may be turned on there, marked `pluginOn:
+ * false`: a template plugin is on only where it is used (owner, 26 Nov
+ * 2026), and choosing its template turns it on.
+ *
  * Since SDK 1.170 (WHIT-1413) they are composed first
  * ({@see TemplateComposer}): a template that `extends` another is merged
  * with it, and the extensions of the plugins on here are added. Each composed
@@ -38,12 +43,22 @@ final class TemplateCatalogue
     /** @return list<array<string, mixed>> */
     public function all(): array
     {
-        $fromPlugins = $this->plugins !== null ? ($this->plugins)() : ($this->loader?->getWorkspaceTemplates() ?? []);
+        // WHIT-1433: also the templates of plugins off here that the workspace
+        // may turn on; choosing one turns its plugin on (`pluginOn`).
+        $fromPlugins = $this->plugins !== null ? ($this->plugins)() : ($this->loader?->getOfferableWorkspaceTemplates() ?? []);
         $extensions = $this->extensions !== null ? ($this->extensions)() : ($this->loader?->getWorkspaceTemplateExtensions() ?? []);
         $templates = array_values(array_filter($fromPlugins, static fn (array $t): bool => ($t['key'] ?? null) !== self::BLANK));
+        $on = [];
+        foreach ($templates as $i => $template) {
+            $on[(string) $template['key']] = ($template['pluginOn'] ?? true) !== false;
+            unset($templates[$i]['pluginOn']);
+        }
         $composed = TemplateComposer::compose($templates, $extensions);
         $this->notes = $composed['notes'];
-        $out = $composed['templates'];
+        $out = [];
+        foreach ($composed['templates'] as $template) {
+            $out[] = $template + ['pluginOn' => $on[(string) $template['key']] ?? true];
+        }
         $out[] = self::blank();
 
         return $out;

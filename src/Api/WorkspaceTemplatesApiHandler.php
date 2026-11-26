@@ -41,6 +41,7 @@ final class WorkspaceTemplatesApiHandler
     public const AUDIT_APPLIED = 'workspace_template.applied';
     public const AUDIT_EXAMPLES_REMOVED = 'workspace_template.examples_removed';
     public const AUDIT_ITEM_ADOPTED = 'workspace_template.item_adopted';
+    public const AUDIT_PLUGIN_TURNED_ON = 'workspace_template.plugin_turned_on';
 
     /** A workspace this new, with no template yet, is sent to the picker after sign-in. */
     public const PICKER_DAYS = 14;
@@ -57,6 +58,7 @@ final class WorkspaceTemplatesApiHandler
         private readonly ?AuditLogger $audit = null,
         private readonly ?\Closure $language = null,
         private readonly ?\Closure $setup = null,
+        private readonly ?\Closure $mayTurnOnPlugins = null,
     ) {
     }
 
@@ -380,6 +382,7 @@ final class WorkspaceTemplatesApiHandler
                 $cards[] = [
                     'key' => $template['key'],
                     'plugin' => $template['plugin'] ?? null,
+                    'pluginOn' => ($template['pluginOn'] ?? true) !== false,
                     'version' => $template['version'],
                     'name' => self::text($template['name'], $language),
                     'summary' => self::text($template['summary'], $language),
@@ -414,6 +417,16 @@ final class WorkspaceTemplatesApiHandler
             $template = $this->catalogue->find((string) ($params['key'] ?? ''));
             if ($template === null) {
                 return Response::error('There is no such template.', 404);
+            }
+            // WHIT-1433: a template plugin is on only where it is used (owner,
+            // 26 Nov 2026), so choosing a template of one that is off here turns
+            // it on first, for someone who may turn plugins on.
+            if (($template['pluginOn'] ?? true) === false) {
+                $refused = $this->turnPluginOn($tenantId, $profileId, (string) ($template['plugin'] ?? ''));
+                if ($refused !== null) {
+                    return $refused;
+                }
+                $template = $this->catalogue->find((string) $template['key']) ?? $template;
             }
             $body = JsonBody::parsed($request);
             // Examples come with a first apply; an update adds them only when asked (SDK 1.170).
@@ -614,6 +627,32 @@ final class WorkspaceTemplatesApiHandler
         $days = $offer['trialDays'] ?? null;
 
         return is_int($days) && $days > 0 ? min($days, \Whity\Sdk\Manifest\WorkspaceTemplateValidator::MAX_TRIAL_DAYS) : $pluginDays;
+    }
+
+    /**
+     * Turn a template's plugin on in this workspace, as the person, recorded
+     * as theirs. Null when done; the refusal otherwise.
+     */
+    private function turnPluginOn(int $tenantId, int $profileId, string $plugin): ?Response
+    {
+        if ($this->activation === null || $plugin === '') {
+            return Response::error('This template can’t be chosen here.', 409);
+        }
+        if ($this->mayTurnOnPlugins === null || !($this->mayTurnOnPlugins)($profileId, $tenantId)) {
+            return Response::error('Choosing this template turns on its plugin. Ask someone who can turn plugins on.', 403);
+        }
+        if (!$this->activation->mayTurnOn($plugin, $tenantId)) {
+            return Response::error('This template’s plugin can’t be turned on here.', 409);
+        }
+        $this->activation->setEnabled($tenantId, $plugin, true, $profileId);
+        $this->audit?->record(self::AUDIT_PLUGIN_TURNED_ON, [
+            'tenant_id' => $tenantId,
+            'actor_user_id' => $profileId,
+            'target_type' => 'code_plugin',
+            'metadata' => ['plugin' => $plugin],
+        ]);
+
+        return null;
     }
 
     private function language(): string

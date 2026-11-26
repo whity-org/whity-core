@@ -1,6 +1,6 @@
 # 40. Workspace templates SDK, and one plugin per template
 
-Status: **decided 25 Nov 2026** (owner's answers in §9; register rows WT.1-WT.4). Built in steps, §7.
+Status: **decided 25 Nov 2026** (owner's answers in §9; register rows WT.1-WT.4). Q5 changed on 26 Nov 2026 (§5, §9). Built in steps, §7.
 
 Owner, 25 Nov 2026: "we need from you to also help us create a better SDK for the templates feature" and "remove all baked in templates to their plugins please". The SDK stays on 1.x and only adds (owner, 24 Nov).
 
@@ -152,7 +152,12 @@ Built in WHIT-1419 (SDK 1.172) with two differences from the above: a pipeline i
 
 - **The key is the link.** `workspace_template_runs` keys runs by template key, and the catalogue finds a template by key whatever plugin offers it, so a run made from `workspace-templates` keeps its guided setup, offer, examples and update from `ClinicTemplate`. `plugin_name` on the run is updated the next time the run is read or applied.
 - **No gap and no double.** For each template, one release does both: the new plugin is published with the key, and `workspace-templates` drops it in the same store release. If both are installed for a moment, the loader keeps the first to offer a key, and the two manifests are identical, so nothing differs.
-- **On everywhere the package was.** Each new plugin is installed with "Every workspace" access, as the package is. For a disk install, the move PR adds a one-time step to core: when a plugin first offers a template key that a workspace has a run for, it is turned on in that workspace if `WorkspaceTemplates` was on there. (A migration cannot do it, because the plugin is not installed when migrations run.)
+- **On only where it is used** (owner, 26 Nov 2026: "a plugin(template) should be turned on only for workspaces that need it"; this replaces the earlier answer to Q5, "every workspace"). Built in WHIT-1433:
+  - A template plugin is installed for the platform with "Each workspace chooses" access, so it is off in a workspace until that workspace uses it.
+  - The picker, after a workspace is created and in adopt mode, lists the templates of installed template plugins that are off in the workspace as well as those that are on (`pluginOn` on each card). It leaves out a plugin the operator keeps to themselves, one that was withdrawn, and a paid one the workspace may not turn on.
+  - Choosing one turns its plugin on in that workspace, as the person and recorded as theirs, then applies it. That needs `plugins:enable`; without it the person is asked to find someone who has it.
+  - A workspace that already applied a template (it has a `workspace_template_runs` row for the key) gets the template's plugin turned on the first time the plugin's state is asked there, if the workspace never switched it either way. That keeps its guided setup, examples, updates and theme. Every other workspace leaves it off. (A migration cannot do it, because the plugin is not installed when migrations run.)
+  - Turning a template plugin off later never deletes what it made (WT.3); its template simply stops being offered there.
 - **Themes:** the theme ids do not change, so `branding_theme` keeps pointing at the same theme, now shipped by the template's plugin. A workspace using a template theme keeps it even if the template plugin is later turned off there, as today's rule for plugin themes already says (TH.13).
 - **Ledger and versions:** migration 358 gives every existing run its `template:{key}` part at the run's `version`, so the first update offer compares like with like.
 
@@ -163,7 +168,7 @@ Built in WHIT-1419 (SDK 1.172) with two differences from the above: a pipeline i
 | WT.1 | **See what a template adds before applying it.** Choosing a card opens "What this adds" from the dry run: each part with Add, Already there, or Can't add and why, in plain words. Apply is the one filled button. |
 | WT.2 | **Template updates are offered, never automatic.** When a template a workspace uses gets a new version, a setup point on the dashboard and a line on Settings › Workspace say so; "See what's new" opens the same preview: what will be added, and each item that changed in the template with **Use the template's version** for that item alone. Apply update adds only the new pieces. |
 | WT.3 | **An update never deletes or brings back, and overwrites only what the person picks.** What was removed from the template stays in the workspace; what the person deleted is not made again; their edits are kept unless they choose Use the template's version on that item, which changes only what the template sets on it and deletes nothing. |
-| WT.4 | **One plugin per template.** Each template is its own free plugin carrying its theme; Start blank stays in core. Settings › Plugins lists them as "Clinic template" and so on. |
+| WT.4 | **One plugin per template.** Each template is its own free plugin carrying its theme; Start blank stays in core. Settings › Plugins lists them as "Clinic template" and so on. It is on only in the workspaces that use it (26 Nov 2026, §5). |
 
 No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand ask covers the preview panel and the update point.
 
@@ -173,7 +178,7 @@ No new card: WT.1 and WT.2 reuse the picker and guided setup screens. A brand as
 2. **SDK: manifest v2** (SDK minor B, one migration for the item fingerprint): `extends`, `remove`, `hidesParent`, `changes`, extensions interface, composer, `plugin.json` keys, schema, builder. Update offers on the list API; per-item "Use the template's version" (`POST /api/workspace/templates/{key}/items/{part}/{itemKey}/adopt`). The dashboard setup point (WT.2) ships in the web PR with the screen it opens, so nothing visible lands half-built.
 3. **SDK: pipelines** (SDK minor C; review routes in Flows, Q1): manifest key, `WorkspaceSetup::ROUTES` additions, engine part.
 4. **Web:** preview panel in the picker, update point, "See what's new" with Use the template's version per item (after the brand ask).
-5. **Core: the move's one-time switch-on** (§5) and Settings › Plugins label.
+5. **Core: template plugins on only where used** (§5, WHIT-1433): off templates in the picker, choosing turns the plugin on, and workspaces with a run get it turned on.
 6. **whity-plugins, one PR per batch:** Clinic and Salon first (the two with real users), then Coffee house, Study house, Meeting rooms, then Bakery and Car dealership. Each new plugin uses `WorkspaceTemplateTestCase`; each batch bumps `workspace-templates` to drop the moved keys. A `dental` example extending `clinic` ships in the SDK's test fixtures only, not the store (Q4).
 7. **Check on a local stack:** an old workspace on `workspace-templates` 0.3.0 moves to the new plugins without losing its run, theme or examples; an update to a new version adds only what is new.
 
@@ -201,6 +206,6 @@ Relayed by the orchestrator on 25 Nov 2026. Q1: "Review routes now (Recommended)
 | 2 | Each template its own plugin in Settings › Plugins ("Clinic template") |
 | 3 | **Offer "Use the template's version" per changed item**; never automatic, never deleting |
 | 4 | Dental is an SDK test example only |
-| 5 | Template plugins on in every workspace |
+| 5 | ~~Template plugins on in every workspace~~ (25 Nov). **Replaced 26 Nov 2026:** "a plugin(template) should be turned on only for workspaces that need it". On only where the workspace uses it; choosing its template turns it on (§5) |
 | 6 | Retire `workspace-templates` once empty, with a README note |
 | 7 | WT.1-WT.4 accepted, WT.2 and WT.3 adjusted for Q3 |

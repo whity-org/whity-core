@@ -124,6 +124,15 @@ A template plugin needs no PHP. List the files in `plugin.json` and extend `Whit
 
 `whity-cli plugin validate <dir>` checks each file offline.
 
+## Which workspaces a template plugin is on in
+
+A template plugin is installed for the platform and on only in the workspaces that use it (owner, 26 Nov 2026; design section 40 §5, WHIT-1433). Install it with "Each workspace chooses" access.
+
+- The picker lists the templates of template plugins that are off in the workspace too (`pluginOn: false` on the card), unless the operator keeps the plugin to themselves, it was withdrawn, or it is paid and the workspace may not turn it on.
+- Choosing such a template turns its plugin on in the workspace first, as the person (`plugins:enable`), then applies it.
+- A workspace that already applied one of a plugin's templates gets the plugin turned on the first time it is asked about there, unless the workspace switched it either way before. Every other workspace leaves it off.
+- Turning a template plugin off never deletes what its template made.
+
 ## Building on a template (SDK 1.170)
 
 A template can build on another with `extends`. For example, a Dental template on Clinic:
