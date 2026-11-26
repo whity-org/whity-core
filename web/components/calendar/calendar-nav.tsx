@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from '@whity/features/i18n';
 import { useCalendarAccess } from './use-calendar-basics';
 
-export type CalendarSection = 'calendar' | 'desk' | 'services' | 'rooms' | 'hours' | 'reports' | 'settings';
+export type CalendarSection = 'calendar' | 'desk' | 'waitlist' | 'services' | 'rooms' | 'hours' | 'reports' | 'settings';
 
 export function CalendarNav({
   active,
@@ -40,6 +40,8 @@ export function CalendarNav({
     { id: 'calendar', label: t('nav.phone.bookings', 'Bookings'), href: '/calendar', show: true },
     // WHIT-1441 (AP.27): the front desk's day.
     { id: 'desk', label: t('nav.desk', 'Front desk'), href: '/calendar/desk', show: access.canFrontDesk },
+    // WHIT-1442 (AP.23): people waiting for a time.
+    { id: 'waitlist', label: t('nav.waitlist', 'Waitlist'), href: '/calendar/waitlist', show: access.canRead },
     { id: 'services', label: t('nav.services', 'Services'), href: '/calendar/services', show: access.canRead },
     { id: 'rooms', label: t('nav.roomsEquipment', 'Rooms and equipment'), href: '/calendar/rooms', show: access.canRead },
     { id: 'hours', label: t('nav.hours', 'Hours and time off'), href: '/calendar/hours', show: access.canRead },
@@ -53,6 +55,7 @@ export function CalendarNav({
   const phonePages: { id: CalendarSection; label: string; hint: string; icon: IconName }[] = [
     { id: 'calendar', label: t('nav.phone.bookings', 'Bookings'), hint: t('nav.phone.bookingsHint', 'Day, week and month'), icon: 'calendar' },
     { id: 'desk', label: t('nav.desk', 'Front desk'), hint: t('nav.phone.deskHint', 'Today’s arrivals and who is waiting'), icon: 'users' },
+    { id: 'waitlist', label: t('nav.waitlist', 'Waitlist'), hint: t('nav.phone.waitlistHint', 'People waiting for a time to free up'), icon: 'list-todo' },
     { id: 'services', label: t('nav.services', 'Services'), hint: t('nav.phone.servicesHint', 'What customers can book'), icon: 'tool' },
     { id: 'rooms', label: t('nav.roomsEquipment', 'Rooms and equipment'), hint: t('nav.phone.roomsEquipmentHint', 'Rooms, chairs, equipment and branches'), icon: 'branch' },
     { id: 'hours', label: t('nav.hours', 'Hours and time off'), hint: t('nav.phone.hoursHint', 'Who works when'), icon: 'clock' },

@@ -367,6 +367,11 @@ class EnforceTenantIsolation
         '#^/api/v1/public/booking/[a-z0-9-]+$#',
         '#^/api/v1/public/booking/[a-z0-9-]+/slots$#',
         '#^/api/v1/public/booking/[a-z0-9-]+/bookings$#',
+        // WHIT-1442 (AP.23): joining the waitlist names the workspace by slug,
+        // as booking does; an offered time's page names its row by a 256-bit token.
+        '#^/api/v1/public/booking/[a-z0-9-]+/waitlist$#',
+        '#^/api/v1/public/waitlist-offers/[^/]+$#',
+        '#^/api/v1/public/waitlist-offers/[^/]+/accept$#',
         // WHIT-1179: the visitor's own name and email. The handler validates
         // the session cookie itself, as /api/v1/me does, and reads only the
         // caller's own profile; signed out, it answers null.

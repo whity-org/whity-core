@@ -33,6 +33,7 @@ import { safeTimeZone, toZonedIso, useDateDisplay, zonedDate } from '@whity/feat
 import { useThemeMode } from '@/lib/theme-mode-context';
 import { PublicShell } from '@/components/auth/public-shell';
 import { TurnstileWidget } from '@/components/auth/turnstile-widget';
+import { WaitlistJoin } from './waitlist-join';
 import { addDays } from '@/lib/calendar/layout';
 import {
   MIN_FILL_MS,
@@ -710,6 +711,19 @@ function BookingForm({
                 }}
                 reloadKey={reloadKey}
               />
+              {/* WHIT-1442 (AP.23): no time that suits them? The waitlist. */}
+              {!severalOn && (
+                <WaitlistJoin
+                  key={`${serviceId}:${person}`}
+                  workspace={workspace}
+                  page={page}
+                  serviceId={service.id}
+                  profileId={profileId}
+                  timeZone={timeZone}
+                  loadedAt={loadedAt}
+                  defaults={{ name, email, phone }}
+                />
+              )}
             </section>
           )}
 

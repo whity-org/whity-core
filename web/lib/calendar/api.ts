@@ -44,6 +44,8 @@ export type CalendarLatePlanStep = Schemas['CalendarLatePlanStep'];
 export type CalendarLateResult = Schemas['CalendarLateResult'];
 export type CalendarWalkin = Schemas['CalendarWalkin'];
 export type DeskStatus = 'expected' | 'arrived' | 'with_staff' | 'done';
+export type CalendarWaitlistEntry = Schemas['CalendarWaitlistEntry'];
+export type CalendarWaitlistRequest = Schemas['CalendarWaitlistRequest'];
 export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
 export type CalendarToday = Schemas['CalendarToday'];
 /** WHIT-1427: did they come. */
@@ -398,6 +400,21 @@ export const calendarApi = {
     send<CalendarLateResult[]>(
       await api.POST('/api/v1/calendar/staff/{profileId}/late', { params: { path: { profileId } }, body: { minutes, booking_ids: bookingIds } }),
       'The bookings could not be moved'
+    ),
+  /** WHIT-1442 (AP.23): the waitlist. */
+  waitlist: async () => {
+    const result = await api.GET('/api/v1/calendar/waitlist');
+    if (result.response.status === 403) throw new ForbiddenError();
+    return sendBody<Schemas['CalendarWaitlistList']>(result, 'The waitlist could not be loaded');
+  },
+  addToWaitlist: async (body: CalendarWaitlistRequest) =>
+    send<CalendarWaitlistEntry>(await api.POST('/api/v1/calendar/waitlist', { body }), 'They could not be added'),
+  removeFromWaitlist: async (id: number) =>
+    send<CalendarWaitlistEntry>(await api.POST('/api/v1/calendar/waitlist/{id}/remove', { params: { path: { id } } }), 'They could not be taken off'),
+  offerFromWaitlist: async (id: number, profileId: number, startsAt: string) =>
+    send<Schemas['CalendarWaitlistOffer']>(
+      await api.POST('/api/v1/calendar/waitlist/{id}/offer', { params: { path: { id } }, body: { profile_id: profileId, starts_at: startsAt } }),
+      'The time could not be offered'
     ),
   walkins: async () => read<CalendarWalkin[]>(await api.GET('/api/v1/calendar/walkins'), 'The walk-ins could not be loaded'),
   addWalkin: async (body: Schemas['CalendarWalkinRequest']) =>

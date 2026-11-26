@@ -23566,6 +23566,433 @@
                 ]
             }
         },
+        "/api/v1/calendar/waitlist": {
+            "get": {
+                "operationId": "get_api_v1_calendar_waitlist",
+                "summary": "The waitlist, oldest first, and how many are on it (WHIT-1442)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "required": false,
+                        "description": "Comma-separated: waiting, offered, booked, removed. Default: waiting,offered.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The waitlist",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CalendarWaitlistList"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_waitlist",
+                "summary": "Add someone to the waitlist (WHIT-1442)",
+                "tags": [
+                    "calendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarWaitlistRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWaitlistEntry"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such service",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Missing name, email or phone, or days in the wrong order",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/waitlist/{id}/offer": {
+            "post": {
+                "operationId": "post_api_v1_calendar_waitlist_id_offer",
+                "summary": "Offer a free time to someone on the waitlist; they are sent a link to take it (WHIT-1442); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarWaitlistOfferRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "The offer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWaitlistOffer"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "That time is taken, or was already offered to them",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Too soon, or they are no longer on the waitlist",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/waitlist/{id}/remove": {
+            "post": {
+                "operationId": "post_api_v1_calendar_waitlist_id_remove",
+                "summary": "Take someone off the waitlist; their open offers close (WHIT-1442)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The entry",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarWaitlistEntry"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/walkins": {
             "get": {
                 "operationId": "get_api_v1_calendar_walkins",
@@ -83902,6 +84329,135 @@
                 }
             }
         },
+        "/api/v1/public/booking/{workspace}/waitlist": {
+            "post": {
+                "operationId": "post_api_v1_public_booking_workspace_waitlist",
+                "summary": "Join the waitlist on the public page (public, WHIT-1442)",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "The same protection as booking: per-IP limits, a hidden field, a minimum time on the page and the bot check. When a time that matches frees up, the customer is emailed a link to take it.",
+                "parameters": [
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The workspace slug."
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/PublicWaitlistRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "201": {
+                        "description": "Joined",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicWaitlistJoined"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This booking page or service is not available",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Missing details, days in the wrong order, or refused as spam",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "503": {
+                        "description": "The bot check could not be reached",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/bookings/{token}": {
             "get": {
                 "operationId": "get_api_v1_public_bookings_token",
@@ -86572,6 +87128,192 @@
                     },
                     "503": {
                         "description": "The bot check provider could not be reached; try again later",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/waitlist-offers/{token}": {
+            "get": {
+                "operationId": "get_api_v1_public_waitlist_offers_token",
+                "summary": "An offered time, by the link in the offer (public, WHIT-1442)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The 64-character token from the customer's email."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The offer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicWaitlistOffer"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This link is invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/public/waitlist-offers/{token}/accept": {
+            "post": {
+                "operationId": "post_api_v1_public_waitlist_offers_token_accept",
+                "summary": "Take the offered time (public, WHIT-1442): the first booking the database accepts wins",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "token",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The 64-character token from the customer's email."
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Booked; `manage_token` opens the booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/PublicBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "This link is invalid",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "`taken_first`: someone took this time first; `expired`; or `closed`. They stay on the waitlist.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -115458,6 +116200,10 @@
                             "$ref": "#/components/schemas/CalendarBooking"
                         },
                         "description": "With `since`, cancelled and expired ones too, so they can be dropped."
+                    },
+                    "waitlist_count": {
+                        "type": "integer",
+                        "description": "How many are on the waitlist (WHIT-1442)."
                     }
                 },
                 "required": [
@@ -115465,7 +116211,8 @@
                     "time_zone",
                     "now",
                     "full",
-                    "bookings"
+                    "bookings",
+                    "waitlist_count"
                 ]
             },
             "CalendarDeskStatusRequest": {
@@ -116822,6 +117569,243 @@
                         "description": "The person opened the app's sidebar on the calendar, so it stays open there."
                     }
                 }
+            },
+            "CalendarWaitlistEntry": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "contact_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "customer": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            },
+                            "email": {
+                                "type": "string"
+                            },
+                            "phone": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "email",
+                            "phone"
+                        ]
+                    },
+                    "service_id": {
+                        "type": "integer"
+                    },
+                    "service_name": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "Language code => text."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The person they want; null for anyone."
+                    },
+                    "staff_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "date_from": {
+                        "type": "string",
+                        "description": "Y-m-d."
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Y-m-d."
+                    },
+                    "times": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "morning",
+                                "afternoon",
+                                "evening"
+                            ]
+                        },
+                        "description": "Empty for any time of day."
+                    },
+                    "note": {
+                        "type": "string"
+                    },
+                    "language": {
+                        "type": "string",
+                        "description": "`en`, `ar`, or empty for the workspace's."
+                    },
+                    "source": {
+                        "type": "string",
+                        "enum": [
+                            "staff",
+                            "public"
+                        ]
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "waiting",
+                            "offered",
+                            "booked",
+                            "removed"
+                        ]
+                    },
+                    "booking_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "id",
+                    "customer",
+                    "service_id",
+                    "date_from",
+                    "date_to",
+                    "times",
+                    "status"
+                ]
+            },
+            "CalendarWaitlistList": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarWaitlistEntry"
+                        }
+                    },
+                    "count": {
+                        "type": "integer",
+                        "description": "Still waiting or with an offer open."
+                    }
+                },
+                "required": [
+                    "data",
+                    "count"
+                ]
+            },
+            "CalendarWaitlistOffer": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "waitlist_id": {
+                        "type": "integer"
+                    },
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "starts_at": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string",
+                        "description": "The start minus the minimum notice."
+                    }
+                },
+                "required": [
+                    "id",
+                    "waitlist_id",
+                    "profile_id",
+                    "starts_at",
+                    "expires_at"
+                ]
+            },
+            "CalendarWaitlistOfferRequest": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "Who the time is with."
+                    },
+                    "starts_at": {
+                        "type": "string",
+                        "description": "The time to offer, with an offset or Z; it must be free."
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "starts_at"
+                ]
+            },
+            "CalendarWaitlistRequest": {
+                "type": "object",
+                "properties": {
+                    "service_id": {
+                        "type": "integer",
+                        "description": "The service they want."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The person they want; null or left out for anyone."
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "Their name."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Where the offer goes; email or phone is required."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "For WhatsApp or SMS when connected."
+                    },
+                    "date_from": {
+                        "type": "string",
+                        "description": "First day, Y-m-d; default today."
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Last day, Y-m-d, within a year; default the first."
+                    },
+                    "times": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "morning",
+                                "afternoon",
+                                "evening"
+                            ]
+                        },
+                        "description": "Times of day; left out or empty for any."
+                    },
+                    "note": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "Anything the desk should know."
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ],
+                        "description": "The language of their messages; default the workspace's."
+                    }
+                },
+                "required": [
+                    "service_id",
+                    "name"
+                ]
             },
             "CalendarWalkin": {
                 "type": "object",
@@ -143157,6 +144141,196 @@
                 "required": [
                     "email",
                     "display_name"
+                ]
+            },
+            "PublicWaitlistJoined": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "date_from": {
+                        "type": "string"
+                    },
+                    "date_to": {
+                        "type": "string"
+                    },
+                    "times": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    }
+                },
+                "required": [
+                    "id",
+                    "date_from",
+                    "date_to",
+                    "times"
+                ]
+            },
+            "PublicWaitlistOffer": {
+                "type": "object",
+                "properties": {
+                    "state": {
+                        "type": "string",
+                        "enum": [
+                            "open",
+                            "booked",
+                            "taken",
+                            "expired",
+                            "closed"
+                        ],
+                        "description": "`taken`: someone took it first."
+                    },
+                    "starts_at": {
+                        "type": "string"
+                    },
+                    "ends_at": {
+                        "type": "string"
+                    },
+                    "expires_at": {
+                        "type": "string"
+                    },
+                    "service": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "$ref": "#/components/schemas/LocalizedLabel"
+                            },
+                            "duration_minutes": {
+                                "type": "integer"
+                            }
+                        },
+                        "required": [
+                            "name",
+                            "duration_minutes"
+                        ]
+                    },
+                    "staff_name": {
+                        "type": "string"
+                    },
+                    "customer_name": {
+                        "type": "string"
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The zone of the person's branch."
+                    },
+                    "booking_id": {
+                        "type": "integer",
+                        "nullable": true
+                    },
+                    "workspace": {
+                        "type": "object",
+                        "properties": {
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "name"
+                        ]
+                    },
+                    "brand": {
+                        "nullable": true,
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/PublicWorkspaceBrand"
+                            }
+                        ]
+                    },
+                    "workspace_time_zone": {
+                        "type": "string"
+                    }
+                },
+                "required": [
+                    "state",
+                    "starts_at",
+                    "ends_at",
+                    "expires_at",
+                    "service",
+                    "staff_name",
+                    "workspace"
+                ]
+            },
+            "PublicWaitlistRequest": {
+                "type": "object",
+                "properties": {
+                    "service_id": {
+                        "type": "integer",
+                        "description": "The service they want."
+                    },
+                    "profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The person; null for anyone."
+                    },
+                    "name": {
+                        "type": "string",
+                        "maxLength": 200,
+                        "description": "Their name."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "Where the offer goes."
+                    },
+                    "phone": {
+                        "type": "string",
+                        "description": "Optional."
+                    },
+                    "date_from": {
+                        "type": "string",
+                        "description": "First day, Y-m-d."
+                    },
+                    "date_to": {
+                        "type": "string",
+                        "description": "Last day, Y-m-d."
+                    },
+                    "times": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                            "enum": [
+                                "morning",
+                                "afternoon",
+                                "evening"
+                            ]
+                        },
+                        "description": "Times of day; empty for any."
+                    },
+                    "note": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "description": "Optional."
+                    },
+                    "language": {
+                        "type": "string",
+                        "enum": [
+                            "en",
+                            "ar"
+                        ],
+                        "description": "The page's language."
+                    },
+                    "elapsed_ms": {
+                        "type": "integer",
+                        "description": "Time on the page, as for booking."
+                    },
+                    "website": {
+                        "type": "string",
+                        "description": "Hidden; must be empty."
+                    },
+                    "bot_token": {
+                        "type": "string",
+                        "description": "The bot check's answer, when set up."
+                    }
+                },
+                "required": [
+                    "service_id",
+                    "name",
+                    "email",
+                    "elapsed_ms"
                 ]
             },
             "PublicWorkspaceBrand": {

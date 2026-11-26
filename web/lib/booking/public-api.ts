@@ -19,6 +19,10 @@ export type PublicService = PublicBookingPage['services'][number];
 export type PublicStaff = PublicBookingPage['staff'][number];
 export type PublicBooking = Schemas['PublicBooking'];
 export type PublicBookingRequest = Schemas['PublicBookingRequest'];
+/** WHIT-1442 (AP.23): the waitlist. */
+export type PublicWaitlistRequest = Schemas['PublicWaitlistRequest'];
+export type PublicWaitlistOffer = Schemas['PublicWaitlistOffer'];
+export type WaitlistTime = 'morning' | 'afternoon' | 'evening';
 
 /** WHIT-1179: the signed-in visitor's own name and email, to fill the form. */
 export interface BookingVisitor {
@@ -296,6 +300,21 @@ export const publicBookingApi = {
   /** WHIT-1417: the customer says they are coming. Pressing it again changes nothing. */
   async coming(token: string): Promise<PublicBooking> {
     return (await send<{ data: PublicBooking }>(`${LINK(token)}/coming`, { method: 'POST', body: '{}' })).data;
+  },
+
+  /** WHIT-1442 (AP.23): "No time that suits you? Join the waitlist". */
+  async joinWaitlist(workspace: string, body: PublicWaitlistRequest): Promise<{ id: number; date_from: string; date_to: string; times: string[] }> {
+    return (await send<{ data: { id: number; date_from: string; date_to: string; times: string[] } }>(`${PAGE(workspace)}/waitlist`, { method: 'POST', body: JSON.stringify(body) })).data;
+  },
+
+  /** WHIT-1442: an offered time, by the link in the offer. */
+  async offer(token: string): Promise<PublicWaitlistOffer> {
+    return (await send<{ data: PublicWaitlistOffer }>(`/api/v1/public/waitlist-offers/${encodeURIComponent(token)}`)).data;
+  },
+
+  /** WHIT-1442: take it. A 409 with `code` taken_first, expired or closed when it can't be had. */
+  async acceptOffer(token: string): Promise<PublicBooking & { manage_token?: string | null }> {
+    return (await send<{ data: PublicBooking & { manage_token?: string | null } }>(`/api/v1/public/waitlist-offers/${encodeURIComponent(token)}/accept`, { method: 'POST', body: '{}' })).data;
   },
 
   /** Take the time the business suggested for a request (design 3.3). The link changes: the new token comes back. */
