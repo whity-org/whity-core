@@ -135,6 +135,7 @@ final class CoreApiSchemas
             self::brandingRoutes(),
             self::uiPreferenceRoutes(),
             self::themeRoutes(),
+            self::desktopAppUpdateRoutes(),
             self::identityRoutes(),
             self::meEmailsRoutes(),
             self::tenantEmailDomainRoutes(),
@@ -13336,7 +13337,7 @@ final class CoreApiSchemas
                 'counts' => SchemaBuilder::ref('DataTypeBulkCounts'),
                 'results' => ['type' => 'array', 'items' => SchemaBuilder::ref('DataTypeBulkResult')],
             ], ['key', 'action', 'counts', 'results'])),
-        ] + self::workspacePluginComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components() + AccountingApiSchemas::components() + CustomerAreaApiSchemas::components();
+        ] + self::workspacePluginComponents() + self::desktopAppUpdateComponents() + ContactsApiSchemas::components() + InventoryApiSchemas::components() + ImportApiSchemas::components() + SalesApiSchemas::components() + AccountingApiSchemas::components() + CustomerAreaApiSchemas::components();
     }
 
     /**
@@ -21246,6 +21247,55 @@ final class CoreApiSchemas
      *
      * @return array<string, array<string, mixed>>
      */
+    /**
+     * The desktop app's own update check (WC-app-self-update; whity-desktop
+     * ADR 0001, decisions 2b and 6): an enrolled device asks with its token
+     * whether a newer build of the app exists for its platform and channel.
+     * The server decides, in Tauri's dynamic-update shape: 204 when the device
+     * is current or the request is not understood, else the manifest. A
+     * device's route, not an agent's, so it stays off the MCP surface.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function desktopAppUpdateRoutes(): array
+    {
+        return [
+            self::permissionRoute('GET', '/api/desktop-app-updates/latest', 'desktop-app-updates:read', [
+                'summary' => 'Whether a newer build of the desktop app exists for this device',
+                'description' => 'The server decides. 204 when the device is current, when its target is unknown, or when '
+                    . 'the request is malformed (an unparseable request never resolves to "update"). `channel` is `stable` '
+                    . '(the default) or `beta`; a beta device is also offered stable releases.',
+                'tags' => ['desktop'],
+                'mcp' => ['expose' => false],
+                'parameters' => [
+                    ['name' => 'target', 'in' => 'query', 'required' => true, 'description' => 'The platform key tauri-plugin-updater reports, such as `windows-x86_64`.', 'schema' => ['type' => 'string']],
+                    ['name' => 'current_version', 'in' => 'query', 'required' => true, 'description' => 'The version the device runs, bare semver.', 'schema' => ['type' => 'string']],
+                    ['name' => 'channel', 'in' => 'query', 'required' => false, 'description' => 'The release channel the device follows.', 'schema' => ['type' => 'string', 'enum' => ['stable', 'beta'], 'default' => 'stable']],
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('A newer release, in the shape tauri-plugin-updater expects', 'DesktopAppUpdateManifest'),
+                    204 => ['description' => 'The device is current, or the request was not understood'],
+                ] + self::authErrors(),
+            ]),
+        ];
+    }
+
+    /**
+     * @return array<string, array<string, mixed>>
+     */
+    private static function desktopAppUpdateComponents(): array
+    {
+        return [
+            'DesktopAppUpdateManifest' => self::object([
+                'version' => self::str() + ['description' => 'The newer version, bare semver'],
+                'notes' => self::str() + ['description' => 'Release notes, possibly empty'],
+                'pub_date' => self::str() + ['description' => 'When it was published'],
+                'url' => self::str() + ['description' => 'Where the signed installer is'],
+                'signature' => self::str() + ['description' => 'The minisign signature over the installer, checked against the key built into the app'],
+            ], ['version', 'notes', 'pub_date', 'url', 'signature']),
+        ];
+    }
+
     private static function workspacePluginComponents(): array
     {
         $label = self::object([

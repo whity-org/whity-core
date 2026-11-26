@@ -12,12 +12,16 @@ plugins. Related: [Desktop plugin releases](Desktop-Plugin-Releases.md),
 **Serving** (already shipped): `Whity\Api\DesktopAppUpdateApiHandler`,
 migrations `099`/`100`, and the route in `public/index.php`:
 
-- `GET /api/desktop-app-updates/latest?target=...&current_version=...` — the
+- `GET /api/desktop-app-updates/latest?target=...&current_version=...&channel=...` — the
   server decides whether a newer release exists (Tauri's "dynamic update
   check" protocol), returning `204 No Content` when the caller is
   current/ahead/unrecognised, or the exact
   `{version, notes, pub_date, url, signature}` shape `tauri-plugin-updater`
-  expects when a newer release is available.
+  expects when a newer release is available. `channel` is `stable` (the
+  default) or `beta`: a release is registered on one channel
+  (`--channel` below), a stable device is offered stable releases only, and
+  a beta device is offered both (whity-desktop ADR 0001, decision 6;
+  WHIT-1431).
 
 Gated by `desktop-app-updates:read` over the standard RBAC route pipeline,
 using the same device bearer token issued by `POST /api/v1/devices/token` —
@@ -70,7 +74,8 @@ that deployment's own step (CI cannot reach into a customer's database):
 php bin/desktop-app-release \
   --version=0.2.0 --target=windows-x86_64 \
   --url=https://github.com/OWNER/REPO/releases/download/tauri-desktop-v0.2.0/whity-desktop_0.2.0_x64.msi \
-  --signature-file=./whity-desktop_0.2.0_x64.msi.sig
+  --signature-file=./whity-desktop_0.2.0_x64.msi.sig \
+  [--channel=beta]
 ```
 
 `(version, target)` is unique; re-running for the same pair without `--force`

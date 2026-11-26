@@ -43,12 +43,27 @@ final class DesktopAppUpdateApiHandler
     /** Same semver shape `LatestReleaseCheck` already requires of a release tag. */
     private const VERSION_PATTERN = '/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/';
 
+    /**
+     * The release channels a device may follow (whity-desktop ADR 0001,
+     * decision 6): each names the channels whose releases it is offered. A
+     * beta device takes a stable release when that is the newest.
+     *
+     * @var array<string, list<string>>
+     */
+    public const CHANNELS = [
+        'stable' => ['stable'],
+        'beta' => ['beta', 'stable'],
+    ];
+
     public function __construct(private readonly PDO $pdo)
     {
     }
 
     /**
-     * GET /api/desktop-app-updates/latest?target=...&current_version=...
+     * GET /api/desktop-app-updates/latest?target=...&current_version=...&channel=...
+     *
+     * `channel` is `stable` (the default) or `beta`; anything else is 204,
+     * like every other malformed request.
      *
      * @param Request $request The incoming request.
      * @param array<string, string> $params Route parameters (unused).
@@ -70,22 +85,27 @@ final class DesktopAppUpdateApiHandler
 
         $targetRaw = $query['target'] ?? '';
         $currentVersionRaw = $query['current_version'] ?? '';
+        $channelRaw = $query['channel'] ?? 'stable';
         $target = is_string($targetRaw) ? trim($targetRaw) : '';
         $currentVersion = is_string($currentVersionRaw) ? trim($currentVersionRaw) : '';
+        $channel = is_string($channelRaw) ? trim($channelRaw) : '';
 
-        if (preg_match(self::TARGET_PATTERN, $target) !== 1 || preg_match(self::VERSION_PATTERN, $currentVersion) !== 1) {
+        if (preg_match(self::TARGET_PATTERN, $target) !== 1 || preg_match(self::VERSION_PATTERN, $currentVersion) !== 1
+            || !isset(self::CHANNELS[$channel])) {
             return new Response(204);
         }
+        $offered = self::CHANNELS[$channel];
+        $placeholders = implode(', ', array_fill(0, count($offered), '?'));
 
         try {
             $stmt = $this->pdo->prepare(
                 'SELECT version, url, signature, notes, pub_date
                  FROM desktop_app_releases
-                 WHERE target = :target
+                 WHERE target = ? AND channel IN (' . $placeholders . ')
                  ORDER BY released_at DESC
                  LIMIT 1'
             );
-            $stmt->execute([':target' => $target]);
+            $stmt->execute([$target, ...$offered]);
             /** @var array<string, mixed>|false $row */
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
