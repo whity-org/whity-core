@@ -20,6 +20,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { safeTimeZone } from '@whity/features/datetime';
 import {
+  CALENDAR_FRONT_DESK,
   CALENDAR_MANAGE,
   CALENDAR_READ,
   CALENDAR_REPORTS,
@@ -65,6 +66,8 @@ export interface CalendarAccess {
   canManage: boolean;
   /** WHIT-1437 (AP.9): everyone's rates; without it, only one's own. */
   canReports: boolean;
+  /** WHIT-1441 (AP.27): the front desk. */
+  canFrontDesk: boolean;
   /** The signed-in person's profile id. */
   me: number | null;
   /** Whether the person may change `profileId`'s calendar (their own on write, anyone's on manage). */
@@ -79,6 +82,7 @@ export function useCalendarAccess(): CalendarAccess {
   const canWrite = has(CALENDAR_WRITE);
   const canManage = has(CALENDAR_MANAGE);
   const canReports = has(CALENDAR_REPORTS);
+  const canFrontDesk = has(CALENDAR_FRONT_DESK);
   return useMemo(
     () => ({
       loading,
@@ -86,10 +90,11 @@ export function useCalendarAccess(): CalendarAccess {
       canWrite,
       canManage,
       canReports,
+      canFrontDesk,
       me,
       canChange: (profileId: number) => canManage || (canWrite && profileId === me),
     }),
-    [loading, canRead, canWrite, canManage, canReports, me]
+    [loading, canRead, canWrite, canManage, canReports, canFrontDesk, me]
   );
 }
 

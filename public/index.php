@@ -5660,6 +5660,12 @@ $router->register('PATCH',  '/api/calendar/rooms/{id:\d+}',                 [$ca
 $router->register('GET',    '/api/calendar/branches',                       [$calendarHandler, 'listBranches'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('PATCH',  '/api/calendar/branches/{id:\d+}',              [$calendarHandler, 'updateBranch'],    null, null, CorePermissions::CALENDAR_MANAGE);
 $router->register('GET',    '/api/calendar/busy-checks',                    [$calendarHandler, 'busyChecks'],      null, null, CorePermissions::CALENDAR_READ);
+// WHIT-1441 (AP.27-AP.29): the front desk: its day, the visit's steps, and running late.
+$router->register('GET',    '/api/calendar/desk',                           [$calendarHandler, 'desk'],            null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/desk-status',  [$calendarHandler, 'deskStatus'],      null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/late',         [$calendarHandler, 'bookingLate'],     null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('GET',    '/api/calendar/staff/{profileId:\d+}/late',     [$calendarHandler, 'staffLatePlan'],   null, null, CorePermissions::CALENDAR_FRONT_DESK);
+$router->register('POST',   '/api/calendar/staff/{profileId:\d+}/late',     [$calendarHandler, 'staffLateApply'],  null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/accept',       [$calendarHandler, 'acceptBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/suggest',      [$calendarHandler, 'suggestBooking'],  null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);

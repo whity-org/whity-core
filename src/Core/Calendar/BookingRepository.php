@@ -42,6 +42,7 @@ final class BookingRepository
         b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id,
         b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence, b.confirmed_by_customer_at,
         b.contact_id, b.attendance, b.attendance_at, b.attendance_by_profile_id, b.attendance_auto, b.cancel_kind,
+        b.started_at, b.finished_at, b.late_minutes, b.late_marked_at, b.updated_at,
         (SELECT ou.time_zone FROM calendar_staff cs
            JOIN organizational_units ou ON ou.id = cs.unit_id AND ou.tenant_id = cs.tenant_id
           WHERE cs.tenant_id = b.tenant_id AND cs.profile_id = b.profile_id) AS branch_time_zone';
@@ -384,6 +385,65 @@ final class BookingRepository
     }
 
     /**
+     * Where a booking is at the front desk (WHIT-1441, AP.27): `expected`,
+     * `arrived` (checked in), `with_staff` (started), `done` (finished) or
+     * `no_show`. Anything not confirmed is its status.
+     *
+     * @param array<string, mixed> $b a booking as {@see self::toApi()} gives it
+     */
+    public static function deskStatus(array $b): string
+    {
+        if (($b['status'] ?? null) !== self::STATUS_CONFIRMED) {
+            return (string) ($b['status'] ?? '');
+        }
+
+        return match (true) {
+            ($b['attendance'] ?? null) === self::NO_SHOW => 'no_show',
+            ($b['finished_at'] ?? null) !== null => 'done',
+            ($b['started_at'] ?? null) !== null => 'with_staff',
+            ($b['checked_in_at'] ?? null) !== null => 'arrived',
+            default => 'expected',
+        };
+    }
+
+    /**
+     * Set when the visit started and finished (WHIT-1441), null to clear.
+     * Only a confirmed booking; returns false when it is not one.
+     */
+    public function setVisit(int $tenantId, int $id, ?DateTimeImmutable $started, ?DateTimeImmutable $finished): bool
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE calendar_bookings SET started_at = :started, finished_at = :finished, updated_at = :now
+              WHERE tenant_id = :tenant_id AND id = :id AND status = 'confirmed'"
+        );
+        $stmt->bindValue(':started', $started !== null ? Interval::toDb($started) : null, $started === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':finished', $finished !== null ? Interval::toDb($finished) : null, $finished === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':now', Interval::toDb(new DateTimeImmutable()));
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /** The customer is running late by `$minutes` (WHIT-1441, AP.29); null clears it. Moves nothing. */
+    public function setLate(int $tenantId, int $id, ?int $minutes, DateTimeImmutable $at): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_bookings SET late_minutes = :minutes, late_marked_at = :at, updated_at = :now
+              WHERE tenant_id = :tenant_id AND id = :id'
+        );
+        $stmt->bindValue(':minutes', $minutes, $minutes === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+        $stmt->bindValue(':at', $minutes !== null ? Interval::toDb($at) : null, $minutes === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':now', Interval::toDb(new DateTimeImmutable()));
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->rowCount() > 0;
+    }
+
+    /**
      * Mark the customer as arrived, or undo it. Only a confirmed booking can
      * be checked in. Returns false when it is not one.
      */
@@ -701,7 +761,14 @@ final class BookingRepository
             'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
             // WHIT-1440 (AP.16): the zone of the person's branch; null is the workspace's.
             'time_zone' => BranchZones::valid($r['branch_time_zone'] ?? null),
+            // WHIT-1441 (AP.27, AP.29): the visit at the desk, and a customer running late.
+            'started_at' => $at($r['started_at'] ?? null),
+            'finished_at' => $at($r['finished_at'] ?? null),
+            'late_minutes' => isset($r['late_minutes']) ? (int) $r['late_minutes'] : null,
+            'late_marked_at' => $at($r['late_marked_at'] ?? null),
+            'updated_at' => $at($r['updated_at'] ?? null),
         ];
+        $out['desk_status'] = self::deskStatus($out);
         // WHIT-1173: the services of a booking of several, in order; empty
         // for a booking of one service (its service_id and profile_id say it).
         $items = is_array($r['items'] ?? null) ? array_values($r['items']) : [];

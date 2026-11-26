@@ -17843,6 +17843,254 @@
                 ]
             }
         },
+        "/api/v1/calendar/bookings/{id}/desk-status": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_desk_status",
+                "summary": "Check in, start or finish a visit, or go back a step (WHIT-1441); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarDeskStatusRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a confirmed booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/late": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_late",
+                "summary": "Mark the customer as running late, or clear it; nothing moves (WHIT-1441)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarLateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a booking that is still on, or minutes out of range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/bookings/{id}/move": {
             "post": {
                 "operationId": "post_api_v1_calendar_bookings_id_move",
@@ -19990,6 +20238,119 @@
                     },
                     "422": {
                         "description": "A missing or reversed range, or more than a year",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/desk": {
+            "get": {
+                "operationId": "get_api_v1_calendar_desk",
+                "summary": "The front desk's day in one read: bookings with their desk status and customer flag (WHIT-1441)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "required": false,
+                        "description": "The local day, Y-m-d; default today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this branch.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "since",
+                        "in": "query",
+                        "required": false,
+                        "description": "The last answer's `now`: only the bookings changed since then.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The day",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarDeskDay"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -22528,6 +22889,247 @@
                     },
                     "422": {
                         "description": "A row out of order or unreadable",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/staff/{profileId}/late": {
+            "get": {
+                "operationId": "get_api_v1_calendar_staff_profileid_late",
+                "summary": "A staff member is behind: the rest of their day pushed by `minutes`, and what can't move; nothing moves (WHIT-1441)",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "profileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "minutes",
+                        "in": "query",
+                        "required": false,
+                        "description": "How far behind they are, 1 to 240.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The plan",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarLatePlanStep"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not on the calendar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "minutes out of range",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            },
+            "post": {
+                "operationId": "post_api_v1_calendar_staff_profileid_late",
+                "summary": "Move and tell them: push the named bookings and tell each customer the new time (WHIT-1441); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "profileId",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarStaffLateRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "What moved",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarLateResult"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not on the calendar",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "minutes or booking_ids missing",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -114111,6 +114713,33 @@
                         "nullable": true,
                         "description": "The zone of the person's branch (WHIT-1440); null is the workspace's."
                     },
+                    "started_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "With staff since (WHIT-1441)."
+                    },
+                    "finished_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Done at (WHIT-1441)."
+                    },
+                    "late_minutes": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The customer said they are running late by this many minutes (WHIT-1441)."
+                    },
+                    "late_marked_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "updated_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "desk_status": {
+                        "type": "string",
+                        "description": "`expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441)."
+                    },
                     "customer_flag": {
                         "$ref": "#/components/schemas/CalendarCustomerFlag"
                     },
@@ -114128,6 +114757,17 @@
                             "type": "string"
                         },
                         "description": "In lists: the room's name, language code => text."
+                    },
+                    "service_name": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "string"
+                        },
+                        "description": "In lists: the service's name, language code => text."
+                    },
+                    "staff_name": {
+                        "type": "string",
+                        "description": "In lists: who the booking is with."
                     },
                     "items": {
                         "type": "array",
@@ -114793,6 +115433,59 @@
                     "count"
                 ]
             },
+            "CalendarDeskDay": {
+                "type": "object",
+                "properties": {
+                    "date": {
+                        "type": "string",
+                        "description": "The local day, Y-m-d."
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "description": "The workspace zone the day is read in."
+                    },
+                    "now": {
+                        "type": "string",
+                        "description": "Send it back as `since` on the next check."
+                    },
+                    "full": {
+                        "type": "boolean",
+                        "description": "True for the whole day; false when only the bookings changed since `since` are listed."
+                    },
+                    "bookings": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBooking"
+                        },
+                        "description": "With `since`, cancelled and expired ones too, so they can be dropped."
+                    }
+                },
+                "required": [
+                    "date",
+                    "time_zone",
+                    "now",
+                    "full",
+                    "bookings"
+                ]
+            },
+            "CalendarDeskStatusRequest": {
+                "type": "object",
+                "properties": {
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "expected",
+                            "arrived",
+                            "with_staff",
+                            "done"
+                        ],
+                        "description": "Where the visit is: a later step fills in the ones it skipped, an earlier one clears the later ones. Didn't come is the attendance route."
+                    }
+                },
+                "required": [
+                    "status"
+                ]
+            },
             "CalendarEvent": {
                 "type": "object",
                 "properties": {
@@ -115188,6 +115881,76 @@
                     "booking",
                     "event",
                     "can"
+                ]
+            },
+            "CalendarLatePlanStep": {
+                "type": "object",
+                "properties": {
+                    "booking": {
+                        "$ref": "#/components/schemas/CalendarBooking"
+                    },
+                    "to": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The new start when pushed; null when it can't move."
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "person_busy",
+                            "closed",
+                            "room_taken",
+                            null
+                        ],
+                        "description": "Why it can't move: it would run into something, outside their hours, or a room or piece of equipment is taken."
+                    }
+                },
+                "required": [
+                    "booking",
+                    "to",
+                    "reason"
+                ]
+            },
+            "CalendarLateRequest": {
+                "type": "object",
+                "properties": {
+                    "minutes": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 1,
+                        "maximum": 240,
+                        "description": "How late the customer will be; null clears it. Nothing moves."
+                    }
+                },
+                "required": [
+                    "minutes"
+                ]
+            },
+            "CalendarLateResult": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "moved": {
+                        "type": "boolean"
+                    },
+                    "to": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "reason": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Why it was left where it was."
+                    }
+                },
+                "required": [
+                    "id",
+                    "moved",
+                    "to",
+                    "reason"
                 ]
             },
             "CalendarRoom": {
@@ -115828,6 +116591,29 @@
                     "bookable",
                     "sort_order",
                     "feed_enabled"
+                ]
+            },
+            "CalendarStaffLateRequest": {
+                "type": "object",
+                "properties": {
+                    "minutes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 240,
+                        "description": "How far behind they are."
+                    },
+                    "booking_ids": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "items": {
+                            "type": "integer"
+                        },
+                        "description": "The bookings to push, from the plan; each customer is told the new time."
+                    }
+                },
+                "required": [
+                    "minutes",
+                    "booking_ids"
                 ]
             },
             "CalendarStaffRequest": {

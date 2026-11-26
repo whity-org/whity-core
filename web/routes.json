@@ -1027,6 +1027,16 @@
       "since": "0.2.28"
     },
     {
+      "path": "/calendar/desk",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
       "path": "/calendar/hours",
       "kind": "page",
       "area": "protected",

@@ -722,6 +722,225 @@ final class BookingService
         return $this->bookingOrFail($tenantId, $bookingId);
     }
 
+    /** WHIT-1441 (AP.27): the desk's statuses, in the order a visit goes. */
+    public const DESK_STEPS = ['expected', 'arrived', 'with_staff', 'done'];
+
+    /**
+     * Set where a visit is at the front desk (WHIT-1441, design section 39
+     * §10.1, AP.27): Expected, Arrived (checked in), With staff (started) or
+     * Done (finished). A later step fills in the earlier ones it skipped
+     * (Start on someone not checked in checks them in), and an earlier one
+     * clears the later ones, so each button can be undone by the one before.
+     * Didn't come is {@see self::markAttendance()}. Only a confirmed booking.
+     *
+     * @return array<string, mixed>
+     */
+    public function setDeskStatus(int $tenantId, int $bookingId, string $status, ?int $actor): array
+    {
+        $to = array_search($status, self::DESK_STEPS, true);
+        if ($to === false) {
+            throw new CalendarRejectedException('status is expected, arrived, with_staff or done.', 422);
+        }
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if ($row['status'] !== BookingRepository::STATUS_CONFIRMED) {
+            throw new CalendarRejectedException('Only a confirmed booking can be checked in, started or finished.', 422);
+        }
+        $now = $this->now();
+        $arrivedNow = $row['checked_in_at'] !== null;
+        if ($to >= 1 && !$arrivedNow) {
+            $this->checkIn($tenantId, $bookingId, true, $actor);
+        } elseif ($to === 0 && $arrivedNow) {
+            $this->checkIn($tenantId, $bookingId, false, $actor);
+        }
+        $started = is_string($row['started_at'] ?? null) && $row['started_at'] !== '' ? Interval::fromDb($row['started_at']) : null;
+        $finished = is_string($row['finished_at'] ?? null) && $row['finished_at'] !== '' ? Interval::fromDb($row['finished_at']) : null;
+        $started = $to >= 2 ? ($started ?? $now) : null;
+        $finished = $to >= 3 ? ($finished ?? $now) : null;
+        $this->bookings->setVisit($tenantId, $bookingId, $started, $finished);
+        try {
+            $this->audit?->record('calendar.desk.status', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $actor !== null && $actor > 0 ? $actor : null,
+                'target_type' => 'booking',
+                'target_id' => $bookingId,
+                'metadata' => ['status' => $status],
+            ]);
+        } catch (Throwable $e) {
+            ScrubbedErrorLog::failure('[calendar] could not audit a desk status', $e);
+        }
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * The customer is running late (WHIT-1441, §10.2, AP.29): shown on the
+     * booking, and nothing moves. Null clears it. A late arrival past the
+     * grace time can still be checked in.
+     *
+     * @return array<string, mixed>
+     */
+    public function markLate(int $tenantId, int $bookingId, ?int $minutes): array
+    {
+        if ($minutes !== null && ($minutes < 1 || $minutes > 240)) {
+            throw new CalendarRejectedException('minutes is from 1 to 240, or null.', 422);
+        }
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if (!in_array($row['status'], BookingRepository::LIVE, true)) {
+            throw new CalendarRejectedException('Only a booking that is still on can be marked late.', 422);
+        }
+        $this->bookings->setLate($tenantId, $bookingId, $minutes, $this->now());
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * The front desk's day in one read (WHIT-1441, §10.1, AP.27, AP.28): the
+     * local day's bookings with their desk status and customer flag, and the
+     * walk-ins waiting. With `$since`, only the bookings changed since then,
+     * cancelled ones included so the desk can drop them.
+     *
+     * @return array{date: string, time_zone: string, now: string, full: bool, bookings: list<array<string, mixed>>}
+     */
+    public function deskDay(int $tenantId, ?string $date, ?int $unitId, ?DateTimeImmutable $since): array
+    {
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $day = $date !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
+            ? new DateTimeImmutable($date . ' 00:00:00', $settings->zone)
+            : $now->setTimezone($settings->zone)->setTime(0, 0);
+        $from = $day->setTimezone(new DateTimeZone('UTC'));
+        $to = $day->modify('+1 day')->setTimezone(new DateTimeZone('UTC'));
+        $statuses = $since === null
+            ? BookingRepository::LIVE
+            : [...BookingRepository::LIVE, BookingRepository::STATUS_CANCELLED, BookingRepository::STATUS_EXPIRED];
+        $rows = array_map([BookingRepository::class, 'toApi'], $this->bookings->list($tenantId, [], $from, $to, $statuses, $unitId));
+        if ($since !== null) {
+            $rows = array_values(array_filter($rows, static fn (array $b): bool => is_string($b['updated_at'] ?? null) && Interval::fromApi($b['updated_at']) >= $since));
+        }
+
+        return [
+            'date' => $day->format('Y-m-d'),
+            'time_zone' => $settings->zone->getName(),
+            'now' => Interval::toApi($now),
+            'full' => $since === null,
+            'bookings' => $this->withCustomerFlags($tenantId, $rows),
+        ];
+    }
+
+    /**
+     * A staff member is behind (WHIT-1441, §10.2, AP.29): the rest of their
+     * bookings today (not started and not over yet), each with the time it would move to when pushed by
+     * `$minutes`, or why it can't (it would run into something, outside
+     * their hours, or a room or piece of equipment is taken then). Nothing
+     * moves here. Read from the last booking back, so one that can't move
+     * stops the ones before it from being pushed into it.
+     *
+     * @return list<array{booking: array<string, mixed>, to: ?string, reason: ?string}>
+     */
+    public function lateStaffPlan(int $tenantId, int $profileId, int $minutes): array
+    {
+        if ($minutes < 1 || $minutes > 240) {
+            throw new CalendarRejectedException('minutes is from 1 to 240.', 422);
+        }
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $zone = $this->zoneOf($tenantId, $profileId, $settings);
+        $endOfDay = $now->setTimezone($zone)->setTime(0, 0)->modify('+1 day')->setTimezone(new DateTimeZone('UTC'));
+        $rows = array_values(array_filter(
+            array_map([BookingRepository::class, 'toApi'], $this->bookings->list($tenantId, [$profileId], $now, $endOfDay, [BookingRepository::STATUS_CONFIRMED, BookingRepository::STATUS_REQUESTED])),
+            // Not started yet, whether or not its time has come: a booking
+            // waiting because they are behind is the one to push.
+            static fn (array $b): bool => $b['started_at'] === null && $b['attendance'] !== BookingRepository::NO_SHOW && $b['items'] === [],
+        ));
+        usort($rows, static fn (array $a, array $b): int => strcmp((string) $a['starts_at'], (string) $b['starts_at']));
+        if ($rows === []) {
+            return [];
+        }
+        // Their busy time without the bookings that would move.
+        $moving = [];
+        foreach ($rows as $b) {
+            $moving[$b['blocks_from'] . '|' . $b['blocks_until']] = true;
+        }
+        $busy = array_values(array_filter(
+            $this->busyFor($tenantId, $profileId, $now->modify('-1 day'), $endOfDay->modify('+1 day'), $now, null),
+            static fn (Interval $i): bool => !isset($moving[Interval::toApi($i->start) . '|' . Interval::toApi($i->end)]),
+        ));
+        $windows = Availability::openWindows(
+            $this->calendar->hours($tenantId, $profileId),
+            $this->calendar->exceptions($tenantId, $profileId, $now->modify('-1 day'), $endOfDay->modify('+1 day')),
+            $zone,
+            $now->modify('-1 day'),
+            $endOfDay->modify('+1 day'),
+        );
+
+        $plan = [];
+        foreach (array_reverse($rows) as $b) {
+            $service = self::asBooked($this->service($tenantId, (int) $b['service_id'], false), ['starts_at' => $b['starts_at'], 'ends_at' => $b['ends_at'], 'blocks_until' => $b['blocks_until']]);
+            $service['for_profile_id'] = $profileId;
+            $length = (int) $service['duration_minutes'];
+            $start = Interval::fromApi($b['starts_at']) ?? $now;
+            $to = $start->modify('+' . $minutes . ' minutes');
+            $reason = null;
+            if (Availability::clashes($to, $length, (int) $service['buffer_before_minutes'], (int) $service['buffer_after_minutes'], $busy)) {
+                $reason = CalendarRejectedException::PERSON_BUSY;
+            } elseif (!Availability::withinWindows($to, $length, $windows)) {
+                $reason = CalendarRejectedException::CLOSED;
+            } elseif ($this->chooseFor($tenantId, $service, $to, $now, (int) $b['id'], $this->bookings->resourcesOf($tenantId, (int) $b['id'])[0] ?? []) === null) {
+                $reason = CalendarRejectedException::ROOM_TAKEN;
+            }
+            if ($reason !== null) {
+                // It stays where it is, so the ones before it can't run into it.
+                $busy[] = new Interval(Interval::fromApi($b['blocks_from']) ?? $start, Interval::fromApi($b['blocks_until']) ?? $start);
+            }
+            $plan[] = ['booking' => $b, 'to' => $reason === null ? Interval::toApi($to) : null, 'reason' => $reason];
+        }
+
+        return array_reverse($plan);
+    }
+
+    /**
+     * Move and tell them (WHIT-1441, AP.29): push each booking named in
+     * `$bookingIds` that the plan can move by `$minutes`, from the last back,
+     * each under the locks and with the customer told the new time. One that
+     * can no longer move is left and said so; nothing else is touched.
+     *
+     * @param list<int> $bookingIds
+     * @return list<array{id: int, moved: bool, to: ?string, reason: ?string}>
+     */
+    public function applyLateStaff(int $tenantId, int $profileId, int $minutes, array $bookingIds, ?int $actor): array
+    {
+        $out = [];
+        foreach (array_reverse($this->lateStaffPlan($tenantId, $profileId, $minutes)) as $step) {
+            $id = (int) $step['booking']['id'];
+            if (!in_array($id, $bookingIds, true)) {
+                continue;
+            }
+            if ($step['to'] === null) {
+                $out[] = ['id' => $id, 'moved' => false, 'to' => null, 'reason' => $step['reason']];
+                continue;
+            }
+            try {
+                $this->move($tenantId, $id, Interval::fromApi($step['to']) ?? $this->now(), null, false, true);
+                $out[] = ['id' => $id, 'moved' => true, 'to' => $step['to'], 'reason' => null];
+            } catch (CalendarRejectedException $e) {
+                $out[] = ['id' => $id, 'moved' => false, 'to' => null, 'reason' => is_string($e->extra['reason'] ?? null) ? $e->extra['reason'] : CalendarRejectedException::PERSON_BUSY];
+            }
+        }
+        try {
+            $this->audit?->record('calendar.desk.staff_late', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $actor !== null && $actor > 0 ? $actor : null,
+                'target_type' => 'profile',
+                'target_id' => $profileId,
+                'metadata' => ['minutes' => $minutes, 'moved' => array_column(array_filter($out, static fn (array $r): bool => $r['moved']), 'id')],
+            ]);
+        } catch (Throwable $e) {
+            ScrubbedErrorLog::failure('[calendar] could not audit a running-late move', $e);
+        }
+
+        return array_reverse($out);
+    }
+
     /**
      * Came, didn't come, or clear the mark (WHIT-1427, AP.3, AP.4). Only a
      * confirmed booking whose time has started; a mark can always be changed.
