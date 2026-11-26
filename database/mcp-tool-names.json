@@ -475,6 +475,14 @@
     "en": "List calendars that could not be checked",
     "ar": "عرض التقاويم التي تعذّر فحصها"
   },
+  "get_api_calendar_desk": {
+    "en": "Read the front desk's day",
+    "ar": "عرض يوم مكتب الاستقبال"
+  },
+  "get_api_calendar_staff_profileid_late": {
+    "en": "See a late staff member's day pushed back",
+    "ar": "عرض يوم موظف متأخر بعد تأجيله"
+  },
   "get_api_calendar_rooms": {
     "en": "List rooms",
     "ar": "عرض الغرف"
@@ -510,6 +518,18 @@
   "post_api_calendar_bookings_id_attendance": {
     "en": "Mark whether the customer came",
     "ar": "تسجيل إن كان الزبون قد حضر"
+  },
+  "post_api_calendar_bookings_id_desk_status": {
+    "en": "Check in, start or finish a visit",
+    "ar": "تسجيل الحضور أو بدء الزيارة أو إنهاؤها"
+  },
+  "post_api_calendar_bookings_id_late": {
+    "en": "Mark a customer as running late",
+    "ar": "تسجيل أن العميل سيتأخر"
+  },
+  "post_api_calendar_staff_profileid_late": {
+    "en": "Move a late staff member's bookings and tell the customers",
+    "ar": "نقل حجوزات موظف متأخر وإبلاغ العملاء"
   },
   "post_api_calendar_bookings_id_resources": {
     "en": "Change the room or equipment a booking holds",

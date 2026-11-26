@@ -671,6 +671,93 @@ final class CalendarApiHandler
     }
 
     /**
+     * The front desk's day in one read (WHIT-1441, AP.27, AP.28). `since`
+     * (from the last answer's `now`) returns only the bookings changed since.
+     */
+    public function desk(Request $request): Response
+    {
+        return $this->run($request, 'desk', function (int $tenantId) use ($request): Response {
+            $q = $this->query($request);
+            $since = is_string($q['since'] ?? null) && $q['since'] !== '' ? Interval::fromApi($q['since']) : null;
+            if (is_string($q['since'] ?? null) && $q['since'] !== '' && $since === null) {
+                return Response::error('since must be a time with an offset or Z', 422);
+            }
+            $date = is_string($q['date'] ?? null) ? $q['date'] : null;
+
+            return Response::json(['data' => $this->booking->deskDay($tenantId, $date, $this->optionalInt($request, 'unit_id'), $since)]);
+        });
+    }
+
+    /**
+     * Check in, Start, Finish, or back a step (WHIT-1441, AP.27).
+     *
+     * @param array<string, string> $params
+     */
+    public function deskStatus(Request $request, array $params): Response
+    {
+        return $this->run($request, 'desk', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $status = JsonBody::parsed($request)['status'] ?? null;
+            if (!is_string($status)) {
+                throw new CalendarRejectedException('status is expected, arrived, with_staff or done.', 422);
+            }
+
+            return Response::json(['data' => $this->booking->setDeskStatus($tenantId, (int) $params['id'], $status, $actor)]);
+        });
+    }
+
+    /**
+     * The customer is running late by `minutes`, or null to clear (WHIT-1441, AP.29).
+     *
+     * @param array<string, string> $params
+     */
+    public function bookingLate(Request $request, array $params): Response
+    {
+        return $this->run($request, 'desk', function (int $tenantId) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            if (!array_key_exists('minutes', $body) || ($body['minutes'] !== null && !is_int($body['minutes']))) {
+                throw new CalendarRejectedException('minutes is a whole number from 1 to 240, or null.', 422);
+            }
+
+            return Response::json(['data' => $this->booking->markLate($tenantId, (int) $params['id'], $body['minutes'])]);
+        });
+    }
+
+    /**
+     * A staff member is behind: the rest of their day pushed by `minutes`,
+     * read only (WHIT-1441, AP.29).
+     *
+     * @param array<string, string> $params
+     */
+    public function staffLatePlan(Request $request, array $params): Response
+    {
+        return $this->run($request, 'desk', function (int $tenantId) use ($request, $params): Response {
+            $minutes = $this->optionalInt($request, 'minutes') ?? throw new CalendarRejectedException('minutes is required', 422);
+
+            return Response::json(['data' => $this->booking->lateStaffPlan($tenantId, $this->staffOr404($tenantId, (int) $params['profileId']), $minutes)]);
+        });
+    }
+
+    /**
+     * Move and tell them (WHIT-1441, AP.29): the bookings named are pushed and
+     * each customer is told. An agent's call is a proposal: no undo window.
+     *
+     * @param array<string, string> $params
+     */
+    public function staffLateApply(Request $request, array $params): Response
+    {
+        return $this->run($request, 'desk', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            $minutes = $body['minutes'] ?? null;
+            $ids = $body['booking_ids'] ?? null;
+            if (!is_int($minutes) || !is_array($ids) || !array_is_list($ids) || array_filter($ids, 'is_int') !== $ids) {
+                throw new CalendarRejectedException('minutes is a whole number and booking_ids a list of booking ids', 422);
+            }
+
+            return Response::json(['data' => $this->booking->applyLateStaff($tenantId, $this->staffOr404($tenantId, (int) $params['profileId']), $minutes, $ids, $actor)]);
+        });
+    }
+
+    /**
      * The desk changes the room or equipment a booking holds (WHIT-1439, AP.18).
      *
      * @param array<string, string> $params

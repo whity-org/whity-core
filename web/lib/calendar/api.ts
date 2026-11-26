@@ -39,6 +39,11 @@ export type CalendarBranch = Schemas['CalendarBranch'];
 export type CalendarBusyCheck = Schemas['CalendarBusyCheck'];
 export type CalendarServicePerson = Schemas['CalendarServicePerson'];
 export type CalendarTimeOffCreated = Schemas['CalendarTimeOffCreated'];
+export type CalendarDeskDay = Schemas['CalendarDeskDay'];
+export type CalendarLatePlanStep = Schemas['CalendarLatePlanStep'];
+export type CalendarLateResult = Schemas['CalendarLateResult'];
+export type CalendarWalkin = Schemas['CalendarWalkin'];
+export type DeskStatus = 'expected' | 'arrived' | 'with_staff' | 'done';
 export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
 export type CalendarToday = Schemas['CalendarToday'];
 /** WHIT-1427: did they come. */
@@ -83,6 +88,8 @@ export const CALENDAR_WRITE = 'calendar:write';
 export const CALENDAR_MANAGE = 'calendar:manage';
 /** WHIT-1437 (AP.9): everyone's rates; without it, a person sees their own. */
 export const CALENDAR_REPORTS = 'calendar:reports';
+/** WHIT-1441 (AP.27): the front desk. */
+export const CALENDAR_FRONT_DESK = 'calendar:front_desk';
 
 /** A refused calendar request, with the HTTP status the screen branches on. */
 export class CalendarRequestError extends Error {
@@ -365,6 +372,36 @@ export const calendarApi = {
       await api.GET('/api/v1/calendar/today', { params: { query: query({ date, unit_id: unitId }) } }),
       'Today could not be loaded'
     ),
+
+  /** WHIT-1441 (AP.27, AP.28): the desk's day; `since` returns only what changed. */
+  desk: async ({ date, unitId, since }: { date?: string | null; unitId?: number | null; since?: string | null }) =>
+    read<CalendarDeskDay>(
+      await api.GET('/api/v1/calendar/desk', { params: { query: query({ date, unit_id: unitId, since }) } }),
+      'The front desk could not be loaded'
+    ),
+  deskStatus: async (id: number, status: DeskStatus) =>
+    send<CalendarBooking>(
+      await api.POST('/api/v1/calendar/bookings/{id}/desk-status', { params: { path: { id } }, body: { status } }),
+      'That could not be saved'
+    ),
+  markLate: async (id: number, minutes: number | null) =>
+    send<CalendarBooking>(
+      await api.POST('/api/v1/calendar/bookings/{id}/late', { params: { path: { id } }, body: { minutes } }),
+      'That could not be saved'
+    ),
+  staffLatePlan: async (profileId: number, minutes: number) =>
+    read<CalendarLatePlanStep[]>(
+      await api.GET('/api/v1/calendar/staff/{profileId}/late', { params: { path: { profileId }, query: { minutes } } }),
+      'The new times could not be worked out'
+    ),
+  staffLateApply: async (profileId: number, minutes: number, bookingIds: number[]) =>
+    send<CalendarLateResult[]>(
+      await api.POST('/api/v1/calendar/staff/{profileId}/late', { params: { path: { profileId } }, body: { minutes, booking_ids: bookingIds } }),
+      'The bookings could not be moved'
+    ),
+  walkins: async () => read<CalendarWalkin[]>(await api.GET('/api/v1/calendar/walkins'), 'The walk-ins could not be loaded'),
+  addWalkin: async (body: Schemas['CalendarWalkinRequest']) =>
+    send<CalendarWalkin>(await api.POST('/api/v1/calendar/walkins', { body }), 'The walk-in could not be added'),
 
   /** WHIT-1440 (AP.16): branches with their own time zones. */
   branches: async () => {

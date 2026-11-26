@@ -2669,6 +2669,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/desk-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Check in, start or finish a visit, or go back a step (WHIT-1441); an agent's call is a proposal */
+        post: operations["post_api_v1_calendar_bookings_id_desk_status"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/late": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark the customer as running late, or clear it; nothing moves (WHIT-1441) */
+        post: operations["post_api_v1_calendar_bookings_id_late"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/move": {
         parameters: {
             query?: never;
@@ -2992,6 +3026,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/desk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The front desk's day in one read: bookings with their desk status and customer flag (WHIT-1441) */
+        get: operations["get_api_v1_calendar_desk"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/events": {
         parameters: {
             query?: never;
@@ -3274,6 +3325,24 @@ export interface paths {
          */
         put: operations["put_api_v1_calendar_staff_profileid_hours"];
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/staff/{profileId}/late": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A staff member is behind: the rest of their day pushed by `minutes`, and what can't move; nothing moves (WHIT-1441) */
+        get: operations["get_api_v1_calendar_staff_profileid_late"];
+        put?: never;
+        /** Move and tell them: push the named bookings and tell each customer the new time (WHIT-1441); an agent's call is a proposal */
+        post: operations["post_api_v1_calendar_staff_profileid_late"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17475,6 +17544,16 @@ export interface components {
             cancel_kind?: "early" | "late" | "business" | null;
             /** @description The zone of the person's branch (WHIT-1440); null is the workspace's. */
             time_zone?: string | null;
+            /** @description With staff since (WHIT-1441). */
+            started_at?: string | null;
+            /** @description Done at (WHIT-1441). */
+            finished_at?: string | null;
+            /** @description The customer said they are running late by this many minutes (WHIT-1441). */
+            late_minutes?: number | null;
+            late_marked_at?: string | null;
+            updated_at?: string | null;
+            /** @description `expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441). */
+            desk_status?: string;
             customer_flag?: components["schemas"]["CalendarCustomerFlag"];
             /** @description Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first. */
             resources?: components["schemas"]["CalendarBookingResource"][];
@@ -17482,6 +17561,12 @@ export interface components {
             room_name?: {
                 [key: string]: string;
             } | null;
+            /** @description In lists: the service's name, language code => text. */
+            service_name?: {
+                [key: string]: string;
+            };
+            /** @description In lists: who the booking is with. */
+            staff_name?: string;
             /** @description A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service's, the times span them all and `price_minor` is the total. */
             items?: components["schemas"]["CalendarBookingItem"][];
         };
@@ -17700,6 +17785,25 @@ export interface components {
             service_id: number;
             count: number;
         };
+        CalendarDeskDay: {
+            /** @description The local day, Y-m-d. */
+            date: string;
+            /** @description The workspace zone the day is read in. */
+            time_zone: string;
+            /** @description Send it back as `since` on the next check. */
+            now: string;
+            /** @description True for the whole day; false when only the bookings changed since `since` are listed. */
+            full: boolean;
+            /** @description With `since`, cancelled and expired ones too, so they can be dropped. */
+            bookings: components["schemas"]["CalendarBooking"][];
+        };
+        CalendarDeskStatusRequest: {
+            /**
+             * @description Where the visit is: a later step fills in the ones it skipped, an earlier one clears the later ones. Didn't come is the attendance route.
+             * @enum {string}
+             */
+            status: "expected" | "arrived" | "with_staff" | "done";
+        };
         CalendarEvent: {
             id: number;
             profile_id: number;
@@ -17810,6 +17914,27 @@ export interface components {
                 resize: boolean;
                 cancel: boolean;
             };
+        };
+        CalendarLatePlanStep: {
+            booking: components["schemas"]["CalendarBooking"];
+            /** @description The new start when pushed; null when it can't move. */
+            to: string | null;
+            /**
+             * @description Why it can't move: it would run into something, outside their hours, or a room or piece of equipment is taken.
+             * @enum {string|null}
+             */
+            reason: "person_busy" | "closed" | "room_taken" | null;
+        };
+        CalendarLateRequest: {
+            /** @description How late the customer will be; null clears it. Nothing moves. */
+            minutes: number | null;
+        };
+        CalendarLateResult: {
+            id: number;
+            moved: boolean;
+            to: string | null;
+            /** @description Why it was left where it was. */
+            reason: string | null;
         };
         CalendarRoom: {
             id: number;
@@ -18017,6 +18142,12 @@ export interface components {
             unit_id?: number | null;
             /** @description Their branch's time zone (WHIT-1440); null is the workspace's. */
             time_zone?: string | null;
+        };
+        CalendarStaffLateRequest: {
+            /** @description How far behind they are. */
+            minutes: number;
+            /** @description The bookings to push, from the plan; each customer is told the new time. */
+            booking_ids: number[];
         };
         CalendarStaffRequest: {
             /** @description The branch they work in; null for none. */
@@ -42224,6 +42355,188 @@ export interface operations {
             };
         };
     };
+    post_api_v1_calendar_bookings_id_desk_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarDeskStatusRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a confirmed booking */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_late: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarLateRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a booking that is still on, or minutes out of range */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_calendar_bookings_id_move: {
         parameters: {
             query?: never;
@@ -43813,6 +44126,80 @@ export interface operations {
             };
             /** @description A missing or reversed range, or more than a year */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_desk: {
+        parameters: {
+            query?: {
+                /** @description The local day, Y-m-d; default today. */
+                date?: string;
+                /** @description Only this branch. */
+                unit_id?: number;
+                /** @description The last answer's `now`: only the bookings changed since then. */
+                since?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The day */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarDeskDay"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -45680,6 +46067,178 @@ export interface operations {
                 };
             };
             /** @description A row out of order or unreadable */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_staff_profileid_late: {
+        parameters: {
+            query?: {
+                /** @description How far behind they are, 1 to 240. */
+                minutes?: number;
+            };
+            header?: never;
+            path: {
+                profileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The plan */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarLatePlanStep"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not on the calendar */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description minutes out of range */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_staff_profileid_late: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                profileId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarStaffLateRequest"];
+            };
+        };
+        responses: {
+            /** @description What moved */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarLateResult"][];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not on the calendar */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description minutes or booking_ids missing */
             422: {
                 headers: {
                     [name: string]: unknown;

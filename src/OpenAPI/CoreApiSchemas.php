@@ -11564,9 +11564,17 @@ final class CoreApiSchemas
                 'attendance_auto' => self::bool(),
                 'cancel_kind' => self::str(true) + ['enum' => ['early', 'late', 'business', null], 'description' => 'A cancelled booking (AP.5): early or late by the customer or for them, business when the workspace cancelled.'],
                 'time_zone' => self::str(true) + ['description' => 'The zone of the person\'s branch (WHIT-1440); null is the workspace\'s.'],
+                'started_at' => self::str(true) + ['description' => 'With staff since (WHIT-1441).'],
+                'finished_at' => self::str(true) + ['description' => 'Done at (WHIT-1441).'],
+                'late_minutes' => self::int(true) + ['description' => 'The customer said they are running late by this many minutes (WHIT-1441).'],
+                'late_marked_at' => self::str(true),
+                'updated_at' => self::str(true),
+                'desk_status' => self::str() + ['description' => '`expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441).'],
                 'customer_flag' => SchemaBuilder::ref('CalendarCustomerFlag'),
                 'resources' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingResource'), 'description' => 'Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first.'],
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
+                'service_name' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'In lists: the service\'s name, language code => text.'],
+                'staff_name' => self::str() + ['description' => 'In lists: who the booking is with.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
             'CalendarBookingReminder' => self::object([
@@ -11627,6 +11635,34 @@ final class CoreApiSchemas
                 'part' => self::int() + ['description' => 'The service\'s position in a booking of several; 0 for one.'],
                 'resource_id' => self::int(),
             ], ['part', 'resource_id']),
+            'CalendarDeskDay' => self::object([
+                'date' => self::str() + ['description' => 'The local day, Y-m-d.'],
+                'time_zone' => self::str() + ['description' => 'The workspace zone the day is read in.'],
+                'now' => self::str() + ['description' => 'Send it back as `since` on the next check.'],
+                'full' => self::bool() + ['description' => 'True for the whole day; false when only the bookings changed since `since` are listed.'],
+                'bookings' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBooking'), 'description' => 'With `since`, cancelled and expired ones too, so they can be dropped.'],
+            ], ['date', 'time_zone', 'now', 'full', 'bookings']),
+            'CalendarDeskStatusRequest' => self::object([
+                'status' => self::str() + ['enum' => ['expected', 'arrived', 'with_staff', 'done'], 'description' => 'Where the visit is: a later step fills in the ones it skipped, an earlier one clears the later ones. Didn\'t come is the attendance route.'],
+            ], ['status']),
+            'CalendarLateRequest' => self::object([
+                'minutes' => self::int(true) + ['minimum' => 1, 'maximum' => 240, 'description' => 'How late the customer will be; null clears it. Nothing moves.'],
+            ], ['minutes']),
+            'CalendarLatePlanStep' => self::object([
+                'booking' => SchemaBuilder::ref('CalendarBooking'),
+                'to' => self::str(true) + ['description' => 'The new start when pushed; null when it can\'t move.'],
+                'reason' => self::str(true) + ['enum' => ['person_busy', 'closed', 'room_taken', null], 'description' => 'Why it can\'t move: it would run into something, outside their hours, or a room or piece of equipment is taken.'],
+            ], ['booking', 'to', 'reason']),
+            'CalendarStaffLateRequest' => self::object([
+                'minutes' => self::int() + ['minimum' => 1, 'maximum' => 240, 'description' => 'How far behind they are.'],
+                'booking_ids' => ['type' => 'array', 'maxItems' => 200, 'items' => self::int(), 'description' => 'The bookings to push, from the plan; each customer is told the new time.'],
+            ], ['minutes', 'booking_ids']),
+            'CalendarLateResult' => self::object([
+                'id' => self::int(),
+                'moved' => self::bool(),
+                'to' => self::str(true),
+                'reason' => self::str(true) + ['description' => 'Why it was left where it was.'],
+            ], ['id', 'moved', 'to', 'reason']),
             'CalendarAttendanceRequest' => self::object([
                 'attendance' => self::str(true) + ['enum' => ['attended', 'no_show', null], 'description' => '`attended` (came), `no_show` (didn\'t come), or null to clear the mark.'],
             ], ['attendance']),
@@ -20902,6 +20938,56 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking, or it has not started'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/desk', 'calendar:front_desk', [
+                'summary' => 'The front desk\'s day in one read: bookings with their desk status and customer flag (WHIT-1441)',
+                'tags' => ['calendar'],
+                'parameters' => [
+                    self::queryParam('date', 'string', 'The local day, Y-m-d; default today.'),
+                    self::queryParam('unit_id', 'integer', 'Only this branch.'),
+                    self::queryParam('since', 'string', 'The last answer\'s `now`: only the bookings changed since then.'),
+                ],
+                'responses' => [200 => self::jsonResponse('The day', self::dataEnvelope(SchemaBuilder::ref('CalendarDeskDay')))] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/desk-status', 'calendar:front_desk', [
+                'summary' => 'Check in, start or finish a visit, or go back a step (WHIT-1441); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarDeskStatusRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a confirmed booking'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/late', 'calendar:front_desk', [
+                'summary' => 'Mark the customer as running late, or clear it; nothing moves (WHIT-1441)',
+                'tags' => ['calendar'],
+                'request' => 'CalendarLateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a booking that is still on, or minutes out of range'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/staff/{profileId:\d+}/late', 'calendar:front_desk', [
+                'summary' => 'A staff member is behind: the rest of their day pushed by `minutes`, and what can\'t move; nothing moves (WHIT-1441)',
+                'tags' => ['calendar'],
+                'parameters' => [self::queryParam('minutes', 'integer', 'How far behind they are, 1 to 240.')],
+                'responses' => [
+                    200 => self::jsonResponse('The plan', self::listEnvelope('CalendarLatePlanStep')),
+                    404 => self::errorResponse('Not on the calendar'),
+                    422 => self::errorResponse('minutes out of range'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/staff/{profileId:\d+}/late', 'calendar:front_desk', [
+                'summary' => 'Move and tell them: push the named bookings and tell each customer the new time (WHIT-1441); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarStaffLateRequest',
+                'responses' => [
+                    200 => self::jsonResponse('What moved', self::listEnvelope('CalendarLateResult')),
+                    404 => self::errorResponse('Not on the calendar'),
+                    422 => self::errorResponse('minutes or booking_ids missing'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/resources', 'calendar:write', [
