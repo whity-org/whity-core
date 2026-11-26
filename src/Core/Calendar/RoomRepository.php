@@ -11,7 +11,7 @@ use Whity\Core\i18n\LocalizedText;
 
 /**
  * Rooms and equipment (design 3.3; WHIT-1439, design section 39 §6, AP.18):
- * `calendar_resources`, the table that was `calendar_rooms`. A resource's
+ * `calendar_resources`, the table that was `calendar_rooms` (migration 365). A resource's
  * name is a `{ar?, en?}` label; `kind` is room, chair, equipment or other;
  * `group_key` gathers several of a thing ("Chairs"); `unit_id` is its branch.
  *

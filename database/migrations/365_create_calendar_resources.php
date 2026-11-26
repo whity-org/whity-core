@@ -13,8 +13,9 @@ use Whity\Database\Database;
  *
  * 1. `calendar_rooms` is renamed `calendar_resources` and keeps every column
  *    and id, so bookings, events and services that name a room keep naming
- *    it. A view called `calendar_rooms` reads it for one release, for
- *    anything outside core that still reads the old name. New columns:
+ *    it: their foreign keys follow the rename. Nothing in core, its plugins
+ *    or templates reads the old name, and no workspace depends on it yet
+ *    (owner, 16 Nov 2026), so there is no view under the old name. New columns:
  *    `kind` (`room`, `chair`, `equipment` or `other`; every room so far is a
  *    room) and `group_key` ("Chairs", "Treatment rooms"): several of a thing
  *    are several rows in one group. The branch stays `unit_id`.
@@ -48,11 +49,6 @@ final class CreateCalendarResources
                 $db->exec("ALTER TABLE calendar_resources ADD COLUMN {$column} {$type}");
             }
         }
-        // The old name, for one release (AP.18).
-        if (!self::isView($db, 'calendar_rooms', $pgsql)) {
-            // migration-lint: allow not-idempotent (guarded by isView)
-            $db->exec('CREATE VIEW calendar_rooms AS SELECT id, tenant_id, name, unit_id, active, sort_order, created_at, updated_at FROM calendar_resources');
-        }
 
         $id = $pgsql ? 'SERIAL PRIMARY KEY' : 'INTEGER PRIMARY KEY AUTOINCREMENT';
         $db->exec("
@@ -82,9 +78,6 @@ final class CreateCalendarResources
     {
         $pgsql = (string) $db->getPdo()->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql';
         $db->exec('DROP TABLE IF EXISTS calendar_service_resources');
-        if (self::isView($db, 'calendar_rooms', $pgsql)) {
-            $db->exec('DROP VIEW calendar_rooms');
-        }
         if (self::isTable($db, 'calendar_resources', $pgsql)) {
             foreach (['group_key', 'kind'] as $column) {
                 if ($pgsql) {
@@ -102,15 +95,6 @@ final class CreateCalendarResources
         $sql = $pgsql
             ? "SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = :name AND table_type = 'BASE TABLE'"
             : "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = :name";
-
-        return $db->query($sql, [':name' => $name])->fetchColumn() !== false;
-    }
-
-    private static function isView(Database $db, string $name, bool $pgsql): bool
-    {
-        $sql = $pgsql
-            ? 'SELECT 1 FROM information_schema.views WHERE table_schema = current_schema() AND table_name = :name'
-            : "SELECT 1 FROM sqlite_master WHERE type = 'view' AND name = :name";
 
         return $db->query($sql, [':name' => $name])->fetchColumn() !== false;
     }

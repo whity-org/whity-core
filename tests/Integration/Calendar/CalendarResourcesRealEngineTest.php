@@ -217,24 +217,99 @@ final class CalendarResourcesRealEngineTest extends TestCase
         }
     }
 
-    public function testTheMigrationRenamesKeepsIdsAndReverses(): void
+    /**
+     * A workspace with rooms, services, bookings of one and of several
+     * services, and an event in a room, as it is before migration 365 (the
+     * shape of the AAU IRB demo), carries over intact: same ids, same
+     * bookings, the rooms still guarded; both migrations run twice and
+     * roll back.
+     */
+    public function testAWorkspacesRoomsServicesAndBookingsCarryOverIntact(): void
     {
-        $old = $this->services->insert(1, [
-            'name' => ['en' => 'X-ray only'], 'description' => [], 'duration_minutes' => 30, 'buffer_before_minutes' => 0, 'buffer_after_minutes' => 0,
-            'price_minor' => null, 'currency' => 'JOD', 'bookable_online' => true, 'active' => true, 'sort_order' => 0, 'room_id' => $this->xray,
-        ]);
         require_once dirname(__DIR__, 3) . '/database/migrations/365_create_calendar_resources.php';
+        require_once dirname(__DIR__, 3) . '/database/migrations/366_create_calendar_booking_resources.php';
         $db = Database::withFactory(fn (): PDO => $this->pdo);
-        self::assertSame('X-ray', json_decode((string) $this->scalar("SELECT name FROM calendar_rooms WHERE id = {$this->xray}"), true)['en'] ?? null, 'the old name reads the same rows');
-        CreateCalendarResources::up($db); // twice is fine
-        self::assertSame(1, (int) $this->scalar("SELECT COUNT(*) FROM calendar_service_resources WHERE service_id = {$old} AND resource_id = {$this->xray}"), 'its room is its first need, once');
-
-        // down() needs nothing written by 366 in the way; drop that first.
-        $this->pdo->exec('DROP TABLE calendar_booking_resources');
+        // Back to the schema before 365, keeping the rooms made in setUp().
+        \Database\Migrations\CreateCalendarBookingResources::down($db);
         CreateCalendarResources::down($db);
-        self::assertSame('Chair 1', json_decode((string) $this->scalar("SELECT name FROM calendar_rooms WHERE id = {$this->chair1}"), true)['en'] ?? null);
+        self::assertSame(3, (int) $this->scalar('SELECT COUNT(*) FROM calendar_rooms WHERE tenant_id = 1'));
+
+        // What a workspace had then: a service that needs the X-ray, a
+        // booking of it, a booking of two services each with a room, and a
+        // meeting held in chair 2.
+        $this->pdo->exec("INSERT INTO calendar_services (tenant_id, name, description, duration_minutes, buffer_before_minutes, buffer_after_minutes, price_minor, currency, bookable_online, active, sort_order, room_id, created_at, updated_at)
+            VALUES (1, '{\"en\":\"Scan\"}', '{}', 30, 0, 0, NULL, 'JOD', TRUE, TRUE, 0, {$this->xray}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        $scan = (int) $this->scalar("SELECT MAX(id) FROM calendar_services WHERE tenant_id = 1");
+        $this->services->replaceStaff(1, $scan, [11, 12]);
+        $one = $this->rawBooking($scan, 11, '2026-11-16 07:00:00', '2026-11-16 07:30:00', $this->xray);
+        $two = $this->rawBooking($scan, 12, '2026-11-16 08:00:00', '2026-11-16 09:00:00', $this->chair1);
+        $this->pdo->exec("INSERT INTO calendar_booking_services (tenant_id, booking_id, service_id, profile_id, room_id, position, starts_at, ends_at, blocks_from, blocks_until, price_minor, created_at)
+            VALUES (1, {$two}, {$scan}, 12, {$this->chair1}, 0, '2026-11-16 08:00:00', '2026-11-16 08:30:00', '2026-11-16 08:00:00', '2026-11-16 08:30:00', NULL, CURRENT_TIMESTAMP),
+                   (1, {$two}, {$scan}, 12, {$this->xray}, 1, '2026-11-16 08:30:00', '2026-11-16 09:00:00', '2026-11-16 08:30:00', '2026-11-16 09:00:00', NULL, CURRENT_TIMESTAMP)");
+        $this->pdo->exec("INSERT INTO calendar_events (tenant_id, profile_id, title, notes, starts_at, ends_at, all_day, busy, room_id, status, created_at, updated_at)
+            VALUES (1, 13, 'Team meeting', '', '2026-11-16 10:00:00', '2026-11-16 11:00:00', FALSE, TRUE, {$this->chair2}, 'confirmed', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        $before = $this->rows('SELECT id, tenant_id, name, unit_id, active, sort_order FROM calendar_rooms ORDER BY id');
+
         CreateCalendarResources::up($db);
-        self::assertSame('room', $this->scalar("SELECT kind FROM calendar_resources WHERE id = {$this->chair1}"), 'down() dropped the kind; up() starts every resource as a room');
+        CreateCalendarResources::up($db);
+        \Database\Migrations\CreateCalendarBookingResources::up($db);
+        \Database\Migrations\CreateCalendarBookingResources::up($db);
+
+        self::assertSame($before, $this->rows('SELECT id, tenant_id, name, unit_id, active, sort_order FROM calendar_resources ORDER BY id'), 'every room, with its id');
+        self::assertSame(['room'], array_values(array_unique(array_column($this->rows('SELECT kind FROM calendar_resources'), 'kind'))), 'each one is a room until someone says otherwise');
+        self::assertSame([$one => $this->xray, $two => $this->chair1], array_map('intval', array_column($this->rows("SELECT id, room_id FROM calendar_bookings WHERE id IN ({$one}, {$two})"), 'room_id', 'id')));
+        self::assertSame([$this->chair1, $this->xray], array_map('intval', array_column($this->rows("SELECT room_id FROM calendar_booking_services WHERE booking_id = {$two} ORDER BY position"), 'room_id')));
+        self::assertSame([['resource_id' => $this->xray, 'group_key' => null]], $this->rooms->requirements(1, $scan), 'the service needs its room, once');
+        self::assertSame(1, (int) $this->scalar("SELECT COUNT(*) FROM calendar_events WHERE room_id = {$this->chair2}"));
+
+        // Still guarded: the X-ray and chair 1 are taken then, by every path.
+        self::assertNotEmpty($this->rooms->busy(1, $this->xray, $this->at('2026-11-16 00:00:00'), $this->at('2026-11-17 00:00:00'), $this->at($this->now)));
+        try {
+            $this->book($scan, 12, '2026-11-16 07:00:00'); // dentist 12 is free then
+            self::fail('The X-ray was taken before the migration and still is');
+        } catch (CalendarRejectedException $e) {
+            self::assertSame(CalendarRejectedException::ROOM_TAKEN, $e->extra['reason'] ?? null);
+        }
+        if ($this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'pgsql') {
+            $this->pdo->exec("SELECT whity_calendar_holds_sync(1, {$one})");
+            $this->pdo->exec("SELECT whity_calendar_holds_sync(1, {$two})");
+            self::assertSame(
+                [[$one, $this->xray], [$two, $this->chair1], [$two, $this->xray]],
+                array_map(static fn (array $r): array => [(int) $r['booking_id'], (int) $r['holder_id']], $this->rows("SELECT booking_id, holder_id FROM calendar_holds WHERE holder_kind = 'resource' AND booking_id IN ({$one}, {$two}) ORDER BY booking_id, holds_from")),
+                'the rooms are held, once each',
+            );
+        }
+
+        \Database\Migrations\CreateCalendarBookingResources::down($db);
+        CreateCalendarResources::down($db);
+        self::assertSame($before, $this->rows('SELECT id, tenant_id, name, unit_id, active, sort_order FROM calendar_rooms ORDER BY id'), 'down() gives the rooms back');
+        CreateCalendarResources::up($db);
+        \Database\Migrations\CreateCalendarBookingResources::up($db);
+    }
+
+    private function rawBooking(int $service, int $profile, string $from, string $until, int $room): int
+    {
+        $this->pdo->exec("INSERT INTO calendar_bookings (tenant_id, service_id, profile_id, customer_name, customer_email, customer_phone, customer_note,
+                starts_at, ends_at, blocks_from, blocks_until, status, source, currency, room_id, created_at, updated_at)
+            VALUES (1, {$service}, {$profile}, 'A patient', '', '', '', '{$from}', '{$until}', '{$from}', '{$until}', 'confirmed', 'staff', 'JOD', {$room}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        return (int) $this->scalar('SELECT MAX(id) FROM calendar_bookings WHERE tenant_id = 1');
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function rows(string $sql): array
+    {
+        $stmt = $this->pdo->query($sql);
+        self::assertNotFalse($stmt);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$row) {
+            foreach ($row as $k => $v) {
+                // Postgres and SQLite give numbers and booleans differently.
+                $row[$k] = is_bool($v) ? ($v ? 1 : 0) : (is_numeric($v) && !is_string($k) ? $v : (is_numeric($v) ? (string) $v : $v));
+            }
+        }
+
+        return array_values($rows);
     }
 
     // ---------------------------------------------------------------------
