@@ -8,6 +8,11 @@
  *
  * Read with settings:read; saving needs settings:write, which the server
  * checks. No card yet (Q14): built to section 21, with the save bar.
+ *
+ * Plugin screens (WHIT-1438, Q8): each enabled plugin's customer screens
+ * with a switch. A customer sees one only through their role, so when the
+ * workspace's customers lack its permission, turning it on (or Give your
+ * customers this screen) asks first, then adds it to the customer roles.
  */
 
 import { useState } from 'react';
@@ -24,16 +29,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { SaveBar } from '@whity/ui/save-bar';
 import { Switch } from '@whity/ui/switch';
 import { Textarea } from '@whity/ui/textarea';
-import { useTranslation } from '@whity/features/i18n';
+import { ConfirmAction } from '@whity/ui/confirm-action';
+import { localizedText } from '@whity/ui/localized-text';
+import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import type { components } from '@whity/api-client';
 
 type Settings = components['schemas']['CustomerAreaSettings'];
 const TABS = ['bookings', 'bills', 'messages'] as const;
 type TabId = (typeof TABS)[number];
-type Draft = Pick<Settings, 'enabled' | 'welcome_en' | 'welcome_ar' | 'how_to_pay_en' | 'how_to_pay_ar'> & { hidden_tabs: TabId[] };
+type Screen = Settings['screens'][number];
+type Draft = Pick<Settings, 'enabled' | 'welcome_en' | 'welcome_ar' | 'how_to_pay_en' | 'how_to_pay_ar' | 'hidden_screens'> & { hidden_tabs: TabId[] };
 
 export default function CustomerAreaSettingsPage() {
   const t = useTranslation('admin');
+  const language = useLanguageCode();
   const { addToast } = useToast();
   const { data, loading, forbidden, refetch } = useFetch(async () => {
     const { data: body, response } = await api.GET('/api/v1/settings/customer-area');
@@ -44,6 +53,7 @@ export default function CustomerAreaSettingsPage() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  const [giving, setGiving] = useState<Screen | null>(null);
 
   if (forbidden) {
     return <AccessDenied description={t('settings.customerArea.accessDenied', 'Ask a workspace admin to change the customer area.')} />;
@@ -57,6 +67,57 @@ export default function CustomerAreaSettingsPage() {
     bookings: t('settings.customerArea.tab.bookings', 'Bookings'),
     bills: t('settings.customerArea.tab.bills', 'Bills: quotes, invoices and receipts'),
     messages: t('settings.customerArea.tab.messages', 'Messages'),
+  };
+  const screenName = (screen: Screen) => localizedText(screen.label as Record<string, string> | string, language, null, screen.id);
+  const setScreen = (id: string, on: boolean) =>
+    update({ hidden_screens: on ? current.hidden_screens.filter((x) => x !== id) : [...current.hidden_screens.filter((x) => x !== id), id] });
+  const give = async (screen: Screen) => {
+    const { error, response } = await api.POST('/api/v1/settings/customer-area/screens/{screen}/grant', {
+      params: { path: { screen: screen.id } },
+      body: { confirm: true },
+    });
+    if (response.ok) {
+      // The server turned it on; keep any unsaved changes, with it on.
+      if (draft) setDraft({ ...draft, hidden_screens: draft.hidden_screens.filter((x) => x !== screen.id) });
+      refetch();
+      addToast(t('settings.customerArea.screens.given', 'Your customers can now open {name}', { name: screenName(screen) }), 'success');
+      return;
+    }
+    const text = (error as { error?: unknown } | undefined)?.error;
+    addToast(
+      response.status === 403
+        ? t('settings.customerArea.screens.notYours', 'You can only give customers what you can open yourself. Ask a workspace owner.')
+        : typeof text === 'string'
+          ? text
+          : t('settings.customerArea.screens.giveFailed', 'That didn’t work. Try again.'),
+      'error'
+    );
+  };
+  const rolesLine = (screen: Screen) => {
+    const changing = screen.roles.filter((r) => !r.has && r.skipped === null);
+    const staying = screen.roles.filter((r) => !r.has && r.skipped !== null);
+    const names = (list: Screen['roles']) =>
+      list
+        .map((r) =>
+          r.signup
+            ? t('settings.customerArea.screens.signupRole', '{name} (new customers get it)', { name: r.name })
+            : t('settings.customerArea.screens.roleCount', '{name} ({count} customers)', { name: r.name, count: String(r.customers) })
+        )
+        .join(language === 'ar' ? '، ' : ', ');
+    return [
+      changing.length > 0
+        ? t('settings.customerArea.screens.confirmChanging', 'We add {name} to these customer roles: {roles}.', { name: screenName(screen), roles: names(changing) })
+        : '',
+      staying.length > 0
+        ? t(
+            'settings.customerArea.screens.confirmStaying',
+            'These stay as they are, because your team or other workspaces also use them: {roles}. Change them in Settings › Roles if you need to.',
+            { roles: names(staying) }
+          )
+        : '',
+    ]
+      .filter((x) => x !== '')
+      .join(' ');
   };
   const address = data.handle ? `${typeof window === 'undefined' ? '' : window.location.origin}/@${data.handle}` : null;
 
@@ -139,6 +200,72 @@ export default function CustomerAreaSettingsPage() {
           })}
         </CardContent>
       </Card>
+
+      {data.screens.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('settings.customerArea.screens.title', 'From your plugins')}</CardTitle>
+            <CardDescription>
+              {t('settings.customerArea.screens.body', 'Screens your plugins add for customers. A customer sees one only when their role includes it.')}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            {data.screens.map((screen) => {
+              const on = !current.hidden_screens.includes(screen.id);
+              const canGive = screen.roles.some((r) => !r.has && r.skipped === null);
+              return (
+                <div key={screen.id} className="flex flex-wrap items-center gap-3 py-3 first:pt-0 last:pb-0" data-testid={`customer-area-screen-${screen.id}`}>
+                  <label className="flex min-h-10 flex-1 items-center gap-3">
+                    <Switch
+                      checked={on}
+                      onCheckedChange={(next) => {
+                        setScreen(screen.id, next);
+                        if (next && canGive) setGiving(screen);
+                      }}
+                      data-testid={`customer-area-screen-switch-${screen.id}`}
+                    />
+                    <span className="min-w-0">
+                      <span className="block">{screenName(screen)}</span>
+                      <span className="block text-sm text-muted-foreground">
+                        {screen.plugin}
+                        {' · '}
+                        {!on
+                          ? t('settings.customerArea.screens.off', 'Off: no customer sees it')
+                          : screen.customers_have
+                            ? t('settings.customerArea.screens.have', 'Your customers can open it')
+                            : canGive
+                              ? t('settings.customerArea.screens.lack', 'Your customers can’t open it yet')
+                              : t('settings.customerArea.screens.lackShared', 'Only customers whose role includes it can open it')}
+                      </span>
+                    </span>
+                  </label>
+                  {on && canGive && (
+                    <Button variant="outline" onClick={() => setGiving(screen)} data-testid={`customer-area-screen-give-${screen.id}`}>
+                      {t('settings.customerArea.screens.give', 'Give your customers this screen')}
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
+      <ConfirmAction
+        open={giving !== null}
+        onOpenChange={(open) => {
+          if (!open) setGiving(null);
+        }}
+        title={giving ? t('settings.customerArea.screens.confirmTitle', 'Let your customers open {name}?', { name: screenName(giving) }) : ''}
+        description={giving ? rolesLine(giving) : ''}
+        confirmLabel={t('settings.customerArea.screens.confirm', 'Give it to them')}
+        cancelLabel={t('settings.customerArea.screens.cancel', 'Not now')}
+        variant="default"
+        onConfirm={async () => {
+          if (giving) await give(giving);
+          setGiving(null);
+        }}
+      />
 
       <Card>
         <CardHeader>

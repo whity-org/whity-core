@@ -827,9 +827,14 @@ final class CustomerAreaApiHandler
         if ($this->pluginScreens === null || $this->hasPermission === null) {
             return [];
         }
+        // Screens the workspace turned off in Settings › Customer area (Q8):
+        // no tab, no Home card, and no page or token for them.
+        $hidden = json_decode($this->settings->effective($tenantId)[SettingsRegistry::CUSTOMER_AREA_HIDDEN_SCREENS] ?? '[]', true);
+        $hidden = is_array($hidden) ? $hidden : [];
         $out = array_values(array_filter(
             ($this->pluginScreens)(),
             fn (array $sc): bool => ($placement === null || $sc['placement'] === $placement)
+                && !in_array($sc['id'], $hidden, true)
                 && ($this->hasPermission)($profileId, (string) $sc['requiredPermission'], $tenantId)
         ));
         usort($out, static fn (array $a, array $b): int => [(int) $a['order'], (string) $a['id']] <=> [(int) $b['order'], (string) $b['id']]);

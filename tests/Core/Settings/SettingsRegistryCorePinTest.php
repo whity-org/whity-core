@@ -272,6 +272,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'customer_area.welcome_ar',
             'customer_area.how_to_pay_en',
             'customer_area.how_to_pay_ar',
+            'customer_area.hidden_screens',
         ];
     }
 
@@ -555,6 +556,7 @@ final class SettingsRegistryCorePinTest extends TestCase
             'customer_area.welcome_ar' => '',
             'customer_area.how_to_pay_en' => '',
             'customer_area.how_to_pay_ar' => '',
+            'customer_area.hidden_screens' => '[]',
         ];
     }
 

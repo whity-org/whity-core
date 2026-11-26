@@ -298,6 +298,17 @@ final class CustomerAreaApiHandlerRealEngineTest extends TestCase
         self::assertSame(404, $this->call('screenToken', 'example-bakery', ['screen' => 'courses'], 'POST', [])['status']);
     }
 
+    public function testAScreenTheWorkspaceTurnedOffShowsToNobody(): void
+    {
+        // WHIT-1438 (Q8): Settings › Customer area turned Courses off.
+        $this->settings->setTenant(1, 'customer_area.hidden_screens', '["courses"]');
+        $this->as(31);
+        self::assertNotContains('x:courses', array_column($this->call('area', 'example-bakery')['body']['data']['tabs'], 'id'));
+        self::assertSame(['next-lesson'], array_column($this->call('home', 'example-bakery')['body']['data']['cards'], 'id'), 'other screens stay');
+        self::assertSame(404, $this->call('screen', 'example-bakery', ['screen' => 'courses'])['status']);
+        self::assertSame(404, $this->call('screenToken', 'example-bakery', ['screen' => 'courses'], 'POST', [])['status']);
+    }
+
     public function testAScreenTokenIsBoundToThisWorkspaceAndMarkedForCustomers(): void
     {
         $this->as(31, ['type' => 'access', 'jti' => 'session-1', 'active_tenant_id' => 2]);
