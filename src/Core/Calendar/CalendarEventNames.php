@@ -24,6 +24,9 @@ final class CalendarEventNames
     public const BOOKING_CANCELLED = Events::BOOKING_CANCELLED;
     public const BOOKING_EXPIRED = Events::BOOKING_EXPIRED;
 
+    /** WHIT-1427 (SDK 1.175): came or didn't come, marked or cleared. */
+    public const ATTENDANCE_MARKED = Events::CALENDAR_ATTENDANCE_MARKED;
+
     private function __construct()
     {
     }

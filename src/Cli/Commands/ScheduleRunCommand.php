@@ -281,6 +281,15 @@ final class ScheduleRunCommand implements CliCommand
             ]);
         }
 
+        // WHIT-1427 (AP.4): end-of-day marking, once an hour; each workspace
+        // that turned it on marks only its own ended days.
+        if ((int) $now->format('i') === 0) {
+            $this->queue->dispatch(\Whity\Core\Calendar\AttendanceAutoMarkJob::NAME, [], [
+                'tenant_id' => 0,
+                'idempotency_key' => 'calendar-attendance-auto-' . $bucket,
+            ]);
+        }
+
         // WHIT-1417 (AP.14): booking reminders the queue lost, every five
         // minutes; each reminder is claimed when sent, so it goes out once.
         if ((int) $now->format('i') % 5 === 0) {

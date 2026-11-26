@@ -49,6 +49,13 @@ interface Draft {
   slotStep: string;
   reminder: string;
   hold: string;
+  /** WHIT-1427 (design section 39 §4): did they come. */
+  grace: string;
+  autoNoShow: boolean;
+  lateHours: string;
+  flagAfter: string;
+  windowMonths: string;
+  countLate: boolean;
   weekStart: string;
   weekend: string[];
 }
@@ -65,6 +72,12 @@ function draftOf(s: CalendarSettings): Draft {
     // WHIT-1417: every reminder, such as "24, 2".
     reminder: (s.reminders ?? (s.reminder_hours_before > 0 ? [s.reminder_hours_before] : [])).join(', '),
     hold: String(s.payment_hold_minutes),
+    grace: String(s.no_show_grace_minutes ?? 15),
+    autoNoShow: s.auto_no_show ?? false,
+    lateHours: String(s.late_cancel_hours ?? 24),
+    flagAfter: String(s.no_show_flag_after ?? 2),
+    windowMonths: String(s.no_show_window_months ?? 12),
+    countLate: s.no_show_count_late_cancels ?? true,
     weekStart: s.week_start,
     weekend: [...s.weekend_days].sort(),
   };
@@ -106,6 +119,12 @@ export default function CalendarSettingsPage() {
     if (current.slotStep !== saved.slotStep) changes.push(t('settings.slotStep', 'Free times every'));
     if (current.reminder !== saved.reminder) changes.push(t('settings.reminders', 'Reminders'));
     if (current.hold !== saved.hold) changes.push(t('settings.hold', 'Payment hold'));
+    if (current.grace !== saved.grace) changes.push(t('settings.grace', 'Ask after'));
+    if (current.autoNoShow !== saved.autoNoShow) changes.push(t('settings.autoNoShow', 'Mark at the end of the day'));
+    if (current.lateHours !== saved.lateHours) changes.push(t('settings.lateHours', 'Late cancel'));
+    if (current.flagAfter !== saved.flagAfter) changes.push(t('settings.flagAfter', 'Flag after'));
+    if (current.windowMonths !== saved.windowMonths) changes.push(t('settings.windowMonths', 'Count over'));
+    if (current.countLate !== saved.countLate) changes.push(t('settings.countLate', 'Late cancels count'));
     if (current.weekStart !== saved.weekStart) changes.push(t('settings.weekStart', 'First day of the week'));
     if (current.weekend.join(',') !== saved.weekend.join(',')) changes.push(t('settings.weekend', 'Weekend'));
   }
@@ -130,6 +149,14 @@ export default function CalendarSettingsPage() {
     if (reminder === null)
       return setProblem(t('settings.error.reminders', 'Reminders must be up to three different hours from 1 to 168, separated by commas, such as 24, 2.'));
     if (hold === null) return setProblem(t('settings.error.hold', 'The payment hold must be from 1 to 1440 minutes.'));
+    const grace = whole(current.grace, 0, 240);
+    const lateHours = whole(current.lateHours, 0, 168);
+    const flagAfter = whole(current.flagAfter, 0, 20);
+    const windowMonths = whole(current.windowMonths, 1, 36);
+    if (grace === null) return setProblem(t('settings.error.grace', 'Ask after must be from 0 to 240 minutes.'));
+    if (lateHours === null) return setProblem(t('settings.error.lateHours', 'A late cancel must be from 0 to 168 hours before.'));
+    if (flagAfter === null) return setProblem(t('settings.error.flagAfter', 'Flag after must be from 0 to 20 missed bookings.'));
+    if (windowMonths === null) return setProblem(t('settings.error.windowMonths', 'Count over must be from 1 to 36 months.'));
 
     const body: CalendarSettingsRequest = {
       booking_page_enabled: current.bookingPage,
@@ -141,6 +168,12 @@ export default function CalendarSettingsPage() {
       slot_step_minutes: Number(current.slotStep),
       reminders: reminder,
       payment_hold_minutes: hold,
+      no_show_grace_minutes: grace,
+      auto_no_show: current.autoNoShow,
+      late_cancel_hours: lateHours,
+      no_show_flag_after: flagAfter,
+      no_show_window_months: windowMonths,
+      no_show_count_late_cancels: current.countLate,
       week_start: current.weekStart as CalendarSettingsRequest['week_start'],
       weekend_days: current.weekend as CalendarSettingsRequest['weekend_days'],
     };
@@ -328,6 +361,99 @@ export default function CalendarSettingsPage() {
                   />
                 </ChangedField>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="settings-attendance">
+            <CardHeader>
+              <CardTitle>{t('settings.card.attendance', 'Did they come')}</CardTitle>
+              <CardDescription>
+                {t('settings.card.attendanceHint', 'How the desk records whether customers came, and when a customer’s missed bookings are pointed out to staff. Customers never see this.')}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-5">
+              <div className="grid gap-4 sm:grid-cols-2">
+                <ChangedField changed={current.grace !== saved.grace}>
+                  <Input
+                    id="settings-grace"
+                    type="number"
+                    min={0}
+                    max={240}
+                    label={t('settings.graceLabel', 'Ask after, in minutes')}
+                    helperText={t('settings.graceHint', 'How long after the start a booking appears in Did they come? 15 by default.')}
+                    value={current.grace}
+                    onChange={(e) => update({ grace: e.target.value })}
+                  />
+                </ChangedField>
+                <ChangedField changed={current.lateHours !== saved.lateHours}>
+                  <Input
+                    id="settings-late-hours"
+                    type="number"
+                    min={0}
+                    max={168}
+                    label={t('settings.lateHoursLabel', 'Late cancel, hours before')}
+                    helperText={t('settings.lateHoursHint', 'A cancel by or for the customer closer to the start than this is late. 24 by default.')}
+                    value={current.lateHours}
+                    onChange={(e) => update({ lateHours: e.target.value })}
+                  />
+                </ChangedField>
+                <ChangedField changed={current.flagAfter !== saved.flagAfter}>
+                  <Input
+                    id="settings-flag-after"
+                    type="number"
+                    min={0}
+                    max={20}
+                    label={t('settings.flagAfterLabel', 'Point out a customer after this many missed bookings')}
+                    helperText={t('settings.flagAfterHint', 'Staff see “Missed 2 of the last 5” on their bookings. 0 turns it off.')}
+                    value={current.flagAfter}
+                    onChange={(e) => update({ flagAfter: e.target.value })}
+                  />
+                </ChangedField>
+                <ChangedField changed={current.windowMonths !== saved.windowMonths}>
+                  <Input
+                    id="settings-window-months"
+                    type="number"
+                    min={1}
+                    max={36}
+                    label={t('settings.windowMonthsLabel', 'Count over, in months')}
+                    helperText={t('settings.windowMonthsHint', 'Only missed bookings this recent count. 12 by default.')}
+                    value={current.windowMonths}
+                    onChange={(e) => update({ windowMonths: e.target.value })}
+                  />
+                </ChangedField>
+              </div>
+              <ChangedField changed={current.countLate !== saved.countLate}>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('settings.countLate', 'Late cancels count')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t('settings.countLateHint', 'On: a late cancel counts as a missed booking, like not coming.')}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.countLate}
+                    onCheckedChange={(countLate) => update({ countLate })}
+                    aria-label={t('settings.countLate', 'Late cancels count')}
+                    data-testid="settings-count-late"
+                  />
+                </label>
+              </ChangedField>
+              <ChangedField changed={current.autoNoShow !== saved.autoNoShow}>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('settings.autoNoShow', 'Mark at the end of the day')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t('settings.autoNoShowHint', 'On: at the end of each day, bookings nobody marked become Didn’t come, marked by Whity. Anyone can change a mark afterwards. Off by default.')}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.autoNoShow}
+                    onCheckedChange={(autoNoShow) => update({ autoNoShow })}
+                    aria-label={t('settings.autoNoShow', 'Mark at the end of the day')}
+                    data-testid="settings-auto-no-show"
+                  />
+                </label>
+              </ChangedField>
             </CardContent>
           </Card>
 

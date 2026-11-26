@@ -211,7 +211,7 @@ final class WalkinQueue
                 'notify' => false,
             ]);
             $bookingId = self::int($booking['id'] ?? null) ?? throw new \RuntimeException('The calendar did not return the booking');
-            $this->booking->checkIn($tenantId, $bookingId, true);
+            $this->booking->checkIn($tenantId, $bookingId, true, $actor);
         } catch (\Throwable $e) {
             $this->db->prepare('UPDATE calendar_walkins SET status = :to WHERE tenant_id = :t AND id = :id AND status = :from')
                 ->execute([':to' => self::WAITING, ':t' => $tenantId, ':id' => $id, ':from' => self::ASSIGNING]);

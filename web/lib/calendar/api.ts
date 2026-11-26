@@ -37,6 +37,10 @@ export type CalendarEventRequest = Schemas['CalendarEventRequest'];
 export type CalendarRoom = Schemas['CalendarRoom'];
 export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
 export type CalendarToday = Schemas['CalendarToday'];
+/** WHIT-1427: did they come. */
+export type CalendarAttendance = 'attended' | 'no_show' | null;
+export type CalendarCustomerAttendance = Schemas['CalendarCustomerAttendance'];
+export type CalendarAttendanceRates = Schemas['CalendarAttendanceRates'];
 
 export const CALENDAR_READ = 'calendar:read';
 export const CALENDAR_WRITE = 'calendar:write';
@@ -251,11 +255,12 @@ export const calendarApi = {
       await api.POST('/api/v1/calendar/bookings/{id}/move', { params: { path: { id } }, body }),
       'The booking could not be moved'
     ),
-  cancelBooking: async (id: number, reason: string) =>
+  /** WHIT-1427 (AP.5): `cancelledFor` is whose cancel it is: the customer asked, or we cancelled. */
+  cancelBooking: async (id: number, reason: string, cancelledFor?: 'customer' | 'business') =>
     send<CalendarBooking>(
       await api.POST('/api/v1/calendar/bookings/{id}/cancel', {
         params: { path: { id } },
-        body: reason === '' ? {} : { reason },
+        body: { ...(reason === '' ? {} : { reason }), ...(cancelledFor ? { cancelled_for: cancelledFor } : {}) },
       }),
       'The booking could not be cancelled'
     ),
@@ -279,6 +284,30 @@ export const calendarApi = {
         ? await api.POST('/api/v1/calendar/bookings/{id}/check-in', { params: { path: { id } } })
         : await api.DELETE('/api/v1/calendar/bookings/{id}/check-in', { params: { path: { id } } }),
       'The check-in could not be saved'
+    ),
+  /** WHIT-1427 (AP.3): came, didn't come, or clear the mark. */
+  markAttendance: async (id: number, attendance: CalendarAttendance) =>
+    send<CalendarBooking>(
+      await api.POST('/api/v1/calendar/bookings/{id}/attendance', { params: { path: { id } }, body: { attendance } }),
+      'The mark could not be saved'
+    ),
+  /** WHIT-1427 (AP.4): Did they come? Today's bookings past their start that nobody marked. */
+  unmarked: async ({ date, unitId }: { date?: string | null; unitId?: number | null }) =>
+    read<CalendarBooking[]>(
+      await api.GET('/api/v1/calendar/attendance/unmarked', { params: { query: query({ date, unit_id: unitId }) } }),
+      'Did they come? could not be loaded'
+    ),
+  /** WHIT-1427 (AP.8): one customer's line and flag. */
+  customerAttendance: async ({ contactId, email }: { contactId?: number | null; email?: string | null }) =>
+    read<CalendarCustomerAttendance>(
+      await api.GET('/api/v1/calendar/customers/attendance', { params: { query: query({ contact_id: contactId, email }) } }),
+      "The customer's bookings could not be counted"
+    ),
+  /** WHIT-1427 (AP.10): start a customer's count again from today. */
+  resetCustomerAttendance: async (body: { contact_id?: number; email?: string }) =>
+    send<CalendarCustomerAttendance>(
+      await api.POST('/api/v1/calendar/customers/attendance/reset', { body }),
+      'The count could not be started again'
     ),
   today: async ({ date, unitId }: { date?: string | null; unitId?: number | null }) =>
     read<CalendarToday>(

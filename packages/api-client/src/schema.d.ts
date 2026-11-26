@@ -2491,6 +2491,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** No-show and late-cancel rates for a period (WHIT-1427, AP.6). Needs calendar:reports, except for your own profile_id */
+        get: operations["get_api_v1_calendar_attendance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/attendance/unmarked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Did they come? Today's bookings past their start (plus the grace minutes) that nobody marked */
+        get: operations["get_api_v1_calendar_attendance_unmarked"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/availability": {
         parameters: {
             query?: never;
@@ -2560,6 +2594,23 @@ export interface paths {
         put?: never;
         /** Accept a customer's request; it becomes a confirmed booking */
         post: operations["post_api_v1_calendar_bookings_id_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark whether the customer came, or clear the mark (WHIT-1427); an agent's call is a proposal */
+        post: operations["post_api_v1_calendar_bookings_id_attendance"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2796,6 +2847,40 @@ export interface paths {
         get: operations["get_api_v1_calendar_commission_staff"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/customers/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One customer's line and flag: came, didn't come, late cancels, since when */
+        get: operations["get_api_v1_calendar_customers_attendance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/customers/attendance/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Start a customer's count again from today (AP.10); recorded */
+        post: operations["post_api_v1_calendar_customers_attendance_reset"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17175,6 +17260,33 @@ export interface components {
             latest_applied_migration: string | null;
             pending_migration_count: number | null;
         };
+        CalendarAttendanceRates: {
+            from: string;
+            to: string;
+            came: number;
+            no_show: number;
+            late_cancels: number;
+            /** @description Not counted in any rate. */
+            early_cancels: number;
+            /** @description Past their start plus the grace minutes, confirmed, and not marked: left out of every rate. */
+            unmarked: number;
+            /** @description came + no_show + late_cancels. */
+            due: number;
+            /** @description no_show / due, 0 to 1; null when nothing is due. */
+            no_show_rate: number | null;
+            late_cancel_rate: number | null;
+            /** @description (no_show + late_cancels) / due. */
+            missed_rate: number | null;
+            /** @description unmarked / (due + unmarked). Above 0.1, show "Not all bookings are marked". */
+            unmarked_share: number | null;
+        };
+        CalendarAttendanceRequest: {
+            /**
+             * @description `attended` (came), `no_show` (didn't come), or null to clear the mark.
+             * @enum {string|null}
+             */
+            attendance: "attended" | "no_show" | null;
+        };
         CalendarBooking: {
             id: number;
             service_id: number;
@@ -17215,6 +17327,23 @@ export interface components {
             confirmed_by_customer_at?: string | null;
             /** @description Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14). */
             reminders?: components["schemas"]["CalendarBookingReminder"][];
+            /** @description The customer's contact. */
+            contact_id?: number | null;
+            /**
+             * @description Did they come (WHIT-1427, AP.3): `attended`, `no_show`, or null while nobody has said.
+             * @enum {string|null}
+             */
+            attendance?: "attended" | "no_show" | null;
+            attendance_at?: string | null;
+            /** @description Who marked it; null with `attendance_auto` when Whity marked it at the end of the day. */
+            attendance_by_profile_id?: number | null;
+            attendance_auto?: boolean;
+            /**
+             * @description A cancelled booking (AP.5): early or late by the customer or for them, business when the workspace cancelled.
+             * @enum {string|null}
+             */
+            cancel_kind?: "early" | "late" | "business" | null;
+            customer_flag?: components["schemas"]["CalendarCustomerFlag"];
             /** @description In lists: the room's name, language code => text. */
             room_name?: {
                 [key: string]: string;
@@ -17225,6 +17354,11 @@ export interface components {
         CalendarBookingCancelRequest: {
             /** @description Why, in a few words; shown to the customer. */
             reason?: string;
+            /**
+             * @description Staff only (WHIT-1427, AP.5): `customer` (the customer asked) counts as an early or late cancel by the window; `business` (we cancelled) never counts. Left out, no kind is recorded.
+             * @enum {string}
+             */
+            cancelled_for?: "customer" | "business";
         };
         CalendarBookingCreateRequest: {
             /** @description The service to book. Leave out when sending `services`. */
@@ -17369,6 +17503,26 @@ export interface components {
             sales?: string;
             commission?: string;
         };
+        CalendarCustomerAttendance: {
+            came: number;
+            no_show: number;
+            late_cancels: number;
+            /** @description When they first booked. */
+            since: string | null;
+            flag: components["schemas"]["CalendarCustomerFlag"];
+            window_months: number;
+        };
+        CalendarCustomerAttendanceResetRequest: {
+            /** @description The customer's contact; or give `email` for a booking without one. */
+            contact_id?: number;
+            /** @description The customer's email, for bookings made without a contact. */
+            email?: string;
+        };
+        /** @description Shown as "Missed {misses} of the last {of}" when the policy applies; null otherwise (WHIT-1427, AP.8, AP.10). */
+        CalendarCustomerFlag: {
+            misses: number;
+            of: number;
+        } | null;
         CalendarDayCount: {
             /** @description The workspace's calendar date, YYYY-MM-DD. */
             date: string;
@@ -17578,6 +17732,18 @@ export interface components {
             multi_service_booking?: boolean;
             /** @description On: the walk-in queue at the front desk (WHIT-1334). Default off. */
             walkins_enabled?: boolean;
+            /** @description Minutes after the start before a booking joins Did they come? (WHIT-1427). */
+            no_show_grace_minutes?: number;
+            /** @description On: at the end of the day, bookings nobody marked become Didn't come. Default off. */
+            auto_no_show?: boolean;
+            /** @description A cancel by or for the customer within this many hours of the start is late. */
+            late_cancel_hours?: number;
+            /** @description The customer flag counts misses over this many months. */
+            no_show_window_months?: number;
+            /** @description The flag shows from this many misses; 0 shows none. */
+            no_show_flag_after?: number;
+            /** @description Late cancels count as misses for the flag. */
+            no_show_count_late_cancels?: boolean;
         };
         CalendarSettingsRequest: {
             /** @description Turn the public booking page on or off. */
@@ -17607,6 +17773,18 @@ export interface components {
             multi_service_booking?: boolean;
             /** @description Turn the walk-in queue at the front desk on or off (WHIT-1334). Default off. */
             walkins_enabled?: boolean;
+            /** @description Minutes after the start before a booking joins Did they come? (WHIT-1427). Default 15. */
+            no_show_grace_minutes?: number;
+            /** @description At the end of the day, bookings nobody marked become Didn't come. Default off. */
+            auto_no_show?: boolean;
+            /** @description A cancel by or for the customer within this many hours of the start is late. Default 24. */
+            late_cancel_hours?: number;
+            /** @description The customer flag counts misses over this many months. Default 12. */
+            no_show_window_months?: number;
+            /** @description The flag shows from this many misses; 0 shows none. Default 2. */
+            no_show_flag_after?: number;
+            /** @description Late cancels count as misses for the flag. Default on. */
+            no_show_count_late_cancels?: boolean;
         };
         CalendarSlot: {
             starts_at: string;
@@ -40810,6 +40988,169 @@ export interface operations {
             };
         };
     };
+    get_api_v1_calendar_attendance: {
+        parameters: {
+            query?: {
+                /** @description Start, ISO 8601 with an offset. */
+                from?: string;
+                /** @description End (not included), up to 13 months after from. */
+                to?: string;
+                /** @description One staff member. */
+                profile_id?: number;
+                /** @description One service. */
+                service_id?: number;
+                /** @description One customer. */
+                contact_id?: number;
+                /** @description One customer without a contact. */
+                email?: string;
+                /** @description `staff`, `public`, `agent` or `walkin`. */
+                source?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Rates */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarAttendanceRates"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A period is needed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_attendance_unmarked: {
+        parameters: {
+            query?: {
+                /** @description A local day, `YYYY-MM-DD`. Default: today. */
+                date?: string;
+                /** @description Only this branch. */
+                unit_id?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Bookings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_calendar_availability: {
         parameters: {
             query: {
@@ -41207,6 +41548,97 @@ export interface operations {
                 };
             };
             /** @description Not a request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_attendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarAttendanceRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a confirmed booking, or it has not started */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -42488,6 +42920,176 @@ export interface operations {
             };
             /** @description Method not allowed */
             405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_customers_attendance: {
+        parameters: {
+            query?: {
+                /** @description The customer's contact. */
+                contact_id?: number;
+                /** @description Or their email, for bookings without a contact. */
+                email?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The customer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarCustomerAttendance"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No customer given */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_customers_attendance_reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarCustomerAttendanceResetRequest"];
+            };
+        };
+        responses: {
+            /** @description The customer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarCustomerAttendance"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No customer given */
+            422: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use DateTimeImmutable;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Calendar\AttendanceRepository;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
 use Whity\Core\Calendar\CalendarItems;
@@ -169,6 +170,13 @@ final class CalendarApiHandler
                 'instant_booking' => SettingsRegistry::CALENDAR_INSTANT_BOOKING,
                 'multi_service_booking' => SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING,
                 'walkins_enabled' => SettingsRegistry::CALENDAR_WALKINS_ENABLED,
+                // WHIT-1427: did they come.
+                'no_show_grace_minutes' => SettingsRegistry::CALENDAR_NO_SHOW_GRACE_MINUTES,
+                'auto_no_show' => SettingsRegistry::CALENDAR_AUTO_NO_SHOW,
+                'late_cancel_hours' => SettingsRegistry::CALENDAR_LATE_CANCEL_HOURS,
+                'no_show_window_months' => SettingsRegistry::CALENDAR_NO_SHOW_WINDOW_MONTHS,
+                'no_show_flag_after' => SettingsRegistry::CALENDAR_NO_SHOW_FLAG_AFTER,
+                'no_show_count_late_cancels' => SettingsRegistry::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS,
             ];
             $writes = [];
             foreach ($map as $field => $key) {
@@ -436,7 +444,8 @@ final class CalendarApiHandler
             ], true)));
             $rows = $this->bookings->list($tenantId, $profileId !== null ? [$profileId] : [], $from, $to, $statuses, $this->optionalInt($request, 'unit_id'));
 
-            return Response::json(['data' => array_map([BookingRepository::class, 'toApi'], $rows)]);
+            // WHIT-1427 (AP.8): each customer's flag, read once for the whole range.
+            return Response::json(['data' => $this->booking->withCustomerFlags($tenantId, array_map([BookingRepository::class, 'toApi'], $rows))]);
         });
     }
 
@@ -536,8 +545,10 @@ final class CalendarApiHandler
         return $this->run($request, 'bookings', function (int $tenantId) use ($request, $params): Response {
             $body = JsonBody::parsed($request);
             $reason = is_string($body['reason'] ?? null) ? trim($body['reason']) : '';
+            // WHIT-1427 (AP.5): "The customer asked" or "We cancelled".
+            $for = is_string($body['cancelled_for'] ?? null) ? $body['cancelled_for'] : null;
 
-            return Response::json(['data' => $this->booking->cancel($tenantId, (int) $params['id'], 'staff', $reason)]);
+            return Response::json(['data' => $this->booking->cancel($tenantId, (int) $params['id'], 'staff', $reason, $for)]);
         });
     }
 
@@ -581,7 +592,105 @@ final class CalendarApiHandler
      */
     public function checkIn(Request $request, array $params): Response
     {
-        return $this->run($request, 'bookings', fn (int $tenantId): Response => Response::json(['data' => $this->booking->checkIn($tenantId, (int) $params['id'], $request->getMethod() !== 'DELETE')]));
+        return $this->run($request, 'bookings', fn (int $tenantId, int $actor): Response => Response::json(['data' => $this->booking->checkIn($tenantId, (int) $params['id'], $request->getMethod() !== 'DELETE', $actor)]));
+    }
+
+    /**
+     * Came, didn't come, or clear the mark (WHIT-1427, AP.3). An agent's call
+     * is a proposal a person approves: the route declares no undo window.
+     *
+     * @param array<string, string> $params
+     */
+    public function markAttendance(Request $request, array $params): Response
+    {
+        return $this->run($request, 'attendance', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            if (!array_key_exists('attendance', $body) || ($body['attendance'] !== null && !is_string($body['attendance']))) {
+                throw new CalendarRejectedException('attendance is attended, no_show or null.', 422);
+            }
+
+            return Response::json(['data' => $this->booking->markAttendance($tenantId, (int) $params['id'], $body['attendance'], $actor)]);
+        });
+    }
+
+    /** Did they come? Today's bookings past their start that nobody marked (WHIT-1427, AP.4). */
+    public function unmarkedAttendance(Request $request): Response
+    {
+        return $this->run($request, 'attendance', function (int $tenantId) use ($request): Response {
+            $date = $this->query($request)['date'] ?? null;
+
+            return Response::json(['data' => $this->booking->unmarkedToday($tenantId, is_string($date) && $date !== '' ? $date : null, $this->optionalInt($request, 'unit_id'))]);
+        });
+    }
+
+    /**
+     * The rates for a period (WHIT-1427, AP.6). `calendar:reports`, or your
+     * own rate (`profile_id` = you) with `calendar:read` (AP.9).
+     */
+    public function attendanceRates(Request $request): Response
+    {
+        return $this->run($request, 'attendance', function (int $tenantId, int $actor) use ($request): Response {
+            [$from, $to] = $this->longRange($request);
+            $profileId = $this->optionalInt($request, 'profile_id');
+            $own = $profileId !== null && $profileId === $actor;
+            if (!$own && !($actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_REPORTS, $tenantId))) {
+                throw new CalendarRejectedException('Seeing these rates needs the calendar:reports permission. You can always see your own.', 403);
+            }
+            $q = $this->query($request);
+            $source = is_string($q['source'] ?? null) && in_array($q['source'], [
+                BookingRepository::SOURCE_STAFF, BookingRepository::SOURCE_PUBLIC, BookingRepository::SOURCE_AGENT, BookingRepository::SOURCE_WALKIN,
+            ], true) ? $q['source'] : null;
+            $customer = AttendanceRepository::keyFor($this->optionalInt($request, 'contact_id'), is_string($q['email'] ?? null) ? $q['email'] : null);
+
+            return Response::json(['data' => $this->booking->attendanceRates($tenantId, $from, $to, [
+                'profile_id' => $profileId,
+                'service_id' => $this->optionalInt($request, 'service_id'),
+                'customer' => $customer,
+                'source' => $source,
+            ])]);
+        });
+    }
+
+    /** One customer's line and flag (WHIT-1427, AP.8): `contact_id` or `email`. */
+    public function customerAttendance(Request $request): Response
+    {
+        return $this->run($request, 'attendance', function (int $tenantId) use ($request): Response {
+            $q = $this->query($request);
+            $key = AttendanceRepository::keyFor($this->optionalInt($request, 'contact_id'), is_string($q['email'] ?? null) ? $q['email'] : null)
+                ?? throw new CalendarRejectedException('Give contact_id or email.', 422);
+
+            return Response::json(['data' => $this->booking->customerAttendance($tenantId, $key)]);
+        });
+    }
+
+    /** "Start again from today" for a customer's count (WHIT-1427, AP.10); `calendar:manage`. */
+    public function resetCustomerAttendance(Request $request): Response
+    {
+        return $this->run($request, 'attendance', function (int $tenantId, int $actor) use ($request): Response {
+            $body = JsonBody::parsed($request);
+            $key = AttendanceRepository::keyFor(is_int($body['contact_id'] ?? null) ? $body['contact_id'] : null, is_string($body['email'] ?? null) ? $body['email'] : null)
+                ?? throw new CalendarRejectedException('Give contact_id or email.', 422);
+            $this->booking->resetCustomerAttendance($tenantId, $key, $actor);
+
+            return Response::json(['data' => $this->booking->customerAttendance($tenantId, $key)]);
+        });
+    }
+
+    /**
+     * A period for the rates: `from` and `to`, up to 13 months.
+     *
+     * @return array{0: DateTimeImmutable, 1: DateTimeImmutable}
+     */
+    private function longRange(Request $request): array
+    {
+        $q = $this->query($request);
+        $from = Interval::fromApi($q['from'] ?? null) ?? throw new CalendarRejectedException('from must be a date and time with an offset', 422);
+        $to = Interval::fromApi($q['to'] ?? null) ?? throw new CalendarRejectedException('to must be a date and time with an offset', 422);
+        if ($to <= $from || $to > $from->modify('+400 days')) {
+            throw new CalendarRejectedException('Choose a period of up to 13 months.', 422);
+        }
+
+        return [$from, $to];
     }
 
     /** The Today panel: booked, checked in, open requests and reminders sent (design 3.3). */
@@ -635,6 +744,19 @@ final class CalendarApiHandler
                 $manages,
                 $this->optionalInt($request, 'unit_id'),
             );
+            // WHIT-1427 (AP.8): each booking's customer flag, read once for the range.
+            $shown = [];
+            foreach ($items as $i => $item) {
+                if (is_array($item['booking'] ?? null)) {
+                    $shown[$i] = $item['booking'];
+                }
+            }
+            if ($shown !== []) {
+                $flagged = $this->booking->withCustomerFlags($tenantId, array_values($shown));
+                foreach (array_keys($shown) as $n => $i) {
+                    $items[$i]['booking'] = $flagged[$n];
+                }
+            }
             $unavailable = [];
             if ($withTasks && $this->taskDueDates !== null && $actor > 0
                 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::TASKS_READ, $tenantId)) {

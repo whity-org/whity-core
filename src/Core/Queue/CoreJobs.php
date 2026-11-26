@@ -247,6 +247,23 @@ final class CoreJobs
                 new \Whity\Core\Calendar\BookingReminderJob($reminderBookings, $calendarQueue),
                 false
             );
+            // WHIT-1427 (AP.4): end-of-day marking, once an hour, where a
+            // workspace turned it on. Internal: only schedule:run queues it.
+            $attendanceBookings = \Whity\Core\Calendar\CalendarServices::bookingService(
+                $pdo,
+                $calendarSettings,
+                null,
+                $coreSender,
+                \Whity\Core\Http\FrontendUrls::fromEnv(),
+                $calendarQueue,
+                $calendarLogger
+            );
+            $attendanceBookings->setAudit(new \Whity\Core\Audit\AuditLogger($pdo, $logger));
+            $registry->register(
+                \Whity\Core\Calendar\AttendanceAutoMarkJob::NAME,
+                new \Whity\Core\Calendar\AttendanceAutoMarkJob($attendanceBookings),
+                false
+            );
             // WHIT-1417 (AP.14): every 5 minutes, any due reminder the queue
             // lost is queued again. Internal: only schedule:run queues it.
             $registry->register(

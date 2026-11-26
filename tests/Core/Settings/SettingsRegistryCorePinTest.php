@@ -213,6 +213,13 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.multi_service_booking',
             // WHIT-1334: the walk-in queue at the front desk.
             'calendar.walkins_enabled',
+            // WHIT-1427: did they come (AP.3-AP.5, AP.10).
+            'calendar.no_show_grace_minutes',
+            'calendar.auto_no_show',
+            'calendar.late_cancel_hours',
+            'calendar.no_show_window_months',
+            'calendar.no_show_flag_after',
+            'calendar.no_show_count_late_cancels',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // #2386: menu items and Settings pages hidden on this instance.
@@ -498,6 +505,12 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.instant_booking' => 'true',
             'calendar.multi_service_booking' => 'false',
             'calendar.walkins_enabled' => 'false',
+            'calendar.no_show_grace_minutes' => '15',
+            'calendar.auto_no_show' => 'false',
+            'calendar.late_cancel_hours' => '24',
+            'calendar.no_show_window_months' => '12',
+            'calendar.no_show_flag_after' => '2',
+            'calendar.no_show_count_late_cancels' => 'true',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',

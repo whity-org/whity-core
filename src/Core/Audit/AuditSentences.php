@@ -58,6 +58,8 @@ final class AuditSentences
      *   audit.sentence.audit_exported = {actor} exported the audit log
      *   audit.sentence.auth_2fa_disabled = {actor} turned off two-step sign-in
      *   audit.sentence.auth_2fa_enabled = {actor} turned on two-step sign-in
+     *   audit.sentence.calendar_attendance_marked = {actor} marked whether a customer came
+     *   audit.sentence.calendar_attendance_reset = {actor} started a customer's count again
      *   audit.sentence.auth_2fa_recovery_approved = {actor} approved a two-step recovery
      *   audit.sentence.auth_2fa_recovery_confirm_failed = A two-step recovery link failed
      *   audit.sentence.auth_2fa_recovery_forced = {actor} reset two-step sign-in for {target}
@@ -183,6 +185,8 @@ final class AuditSentences
         'agent.updated' => '{actor} changed agent {target}',
         'audit.exported' => '{actor} exported the audit log',
         'auth.2fa.disabled' => '{actor} turned off two-step sign-in',
+        'calendar.attendance.marked' => '{actor} marked whether a customer came',
+        'calendar.attendance.reset' => '{actor} started a customer\'s count again',
         'auth.2fa.enabled' => '{actor} turned on two-step sign-in',
         'auth.2fa.verify_failure' => '{actor} entered a wrong two-step code',
         'auth.2fa.verify_success' => '{actor} confirmed a two-step code',

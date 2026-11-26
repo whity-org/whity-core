@@ -498,6 +498,10 @@ final class CorePermissions
     // see what each earned. Granted by capability to roles holding
     // calendar:manage.
     public const CALENDAR_COMMISSION = 'calendar:commission';
+    // WHIT-1427 (design section 39 §4, AP.9): appointment reports, the
+    // no-show and late-cancel rates. Granted by capability to roles holding
+    // calendar:manage (migration 364). Everyone sees their own rate without it.
+    public const CALENDAR_REPORTS = 'calendar:reports';
 
     // CONTACTS (migrations 261 and 262, design 3.3 A8). Customers and
     // suppliers as one record, with tags and spreadsheet import. Read and
@@ -695,6 +699,7 @@ final class CorePermissions
             self::CALENDAR_MANAGE,
             self::CALENDAR_FRONT_DESK,
             self::CALENDAR_COMMISSION,
+            self::CALENDAR_REPORTS,
             self::CONTACTS_READ,
             self::CONTACTS_WRITE,
             self::CONTACTS_IMPORT,

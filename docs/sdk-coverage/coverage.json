@@ -1,6 +1,6 @@
 {
     "$comment": "Plugin SDK coverage matrix: the single source of truth. Edit this file, then run `php scripts/sdk-coverage.php` to regenerate docs/wiki/Plugin-SDK-Coverage.md. CI fails when sdk_version is behind Sdk::VERSION, when an SDK minor in sdk/CHANGELOG.md is not named by any `since`, or when the generated page is stale. Security notes say only that a design is needed; vulnerabilities go through SECURITY.md, never here.",
-    "sdk_version": "1.174.0",
+    "sdk_version": "1.175.0",
     "core_version": "0.2.32",
     "updated": "2026-11-25",
     "ratings": {
@@ -1772,6 +1772,10 @@
                 {
                     "what": "Calendar\\TimeOff host service: create, cancel and list a person's time off as the acting person, idempotent by the plugin's own reference",
                     "since": "1.120"
+                },
+                {
+                    "what": "calendar.attendance.marked event: a booking marked as came or didn't come, or cleared, by a person or at the end of the day",
+                    "since": "1.175"
                 }
             ],
             "missing": [

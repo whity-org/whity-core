@@ -300,6 +300,8 @@ The tables are generated from [`Whity\Sdk\Hooks\EventCatalogue`](../../sdk/src/H
 | `booking.rescheduled.async` | `BOOKING_RESCHEDULED_ASYNC` | queued | 1.98 |  |  |
 | `booking.cancelled` | `BOOKING_CANCELLED` | observe | 1.98 |  |  |
 | `booking.cancelled.async` | `BOOKING_CANCELLED_ASYNC` | queued | 1.98 |  |  |
+| `calendar.attendance.marked` | `CALENDAR_ATTENDANCE_MARKED` | observe | 1.175 | `tenant_id`, `id`, `profile_id`, `service_id`, `attendance`, `previous`, `auto`, `acting_profile_id` | A booking was marked as came or didn't come, or the mark was cleared, by a person or by Whity at the end of the day (WHIT-1427). `attendance` is `attended`, `no_show` or null; `auto` is true and `acting_profile_id` null when Whity marked it. |
+| `calendar.attendance.marked.async` | `CALENDAR_ATTENDANCE_MARKED_ASYNC` | queued | 1.175 |  |  |
 | `booking.expired` | `BOOKING_EXPIRED` | observe | 1.98 |  | A payment hold lapsed and the time is free again. |
 | `booking.expired.async` | `BOOKING_EXPIRED_ASYNC` | queued | 1.98 |  |  |
 

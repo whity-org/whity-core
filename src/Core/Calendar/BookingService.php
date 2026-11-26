@@ -79,6 +79,11 @@ final class BookingService
 
     private ?RoomRepository $rooms = null;
 
+    /** WHIT-1427: every attendance mark is audited (AP.3). */
+    private ?\Whity\Core\Audit\AuditLoggerInterface $audit = null;
+
+    private ?AttendanceRepository $attendance = null;
+
     public function __construct(
         private readonly PDO $db,
         private readonly CalendarRepository $calendar,
@@ -128,6 +133,17 @@ final class BookingService
     public function setPlugins(CalendarPlugins $plugins): void
     {
         $this->plugins = $plugins;
+    }
+
+    /** Attendance marks are recorded here (WHIT-1427, AP.3). */
+    public function setAudit(\Whity\Core\Audit\AuditLoggerInterface $audit): void
+    {
+        $this->audit = $audit;
+    }
+
+    public function attendanceRepository(): AttendanceRepository
+    {
+        return $this->attendance ??= new AttendanceRepository($this->db);
     }
 
     /** Where the customer's manage page lives; a payment step returns them there. */
@@ -659,14 +675,240 @@ final class BookingService
      *
      * @return array<string, mixed>
      */
-    public function checkIn(int $tenantId, int $bookingId, bool $arrived): array
+    public function checkIn(int $tenantId, int $bookingId, bool $arrived, ?int $actor = null): array
     {
-        $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
         if (!$this->bookings->checkIn($tenantId, $bookingId, $arrived ? $this->now() : null)) {
             throw new CalendarRejectedException('Only a confirmed booking can be checked in.', 422);
         }
+        // WHIT-1427 (AP.3): arriving is coming; undoing the check-in undoes that.
+        $was = is_string($row['attendance'] ?? null) ? $row['attendance'] : null;
+        if ($arrived && $was !== BookingRepository::ATTENDED) {
+            $this->recordAttendance($tenantId, $row, BookingRepository::ATTENDED, $actor, false);
+        } elseif (!$arrived && $was === BookingRepository::ATTENDED) {
+            $this->recordAttendance($tenantId, $row, null, $actor, false);
+        }
 
         return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * Came, didn't come, or clear the mark (WHIT-1427, AP.3, AP.4). Only a
+     * confirmed booking whose time has started; a mark can always be changed.
+     * Who and when are kept and audited, and the change is announced.
+     *
+     * @return array<string, mixed>
+     */
+    public function markAttendance(int $tenantId, int $bookingId, ?string $attendance, ?int $actor): array
+    {
+        if ($attendance !== null && $attendance !== BookingRepository::ATTENDED && $attendance !== BookingRepository::NO_SHOW) {
+            throw new CalendarRejectedException('attendance is attended, no_show or null.', 422);
+        }
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if ($row['status'] !== BookingRepository::STATUS_CONFIRMED) {
+            throw new CalendarRejectedException('Only a confirmed booking can be marked.', 422);
+        }
+        if ($attendance !== null && Interval::fromDb((string) $row['starts_at']) > $this->now()) {
+            throw new CalendarRejectedException('This booking hasn\'t started yet. Check them in when they arrive.', 422);
+        }
+        if ($attendance === BookingRepository::NO_SHOW && $row['checked_in_at'] !== null) {
+            // They didn't come after all: the check-in goes with the mark.
+            $this->bookings->checkIn($tenantId, $bookingId, null);
+        }
+        if (($row['attendance'] ?? null) !== $attendance || \Whity\Core\Db\DbBool::of($row['attendance_auto'] ?? false)) {
+            $this->recordAttendance($tenantId, $row, $attendance, $actor, false);
+        }
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * End-of-day marking (WHIT-1427, AP.4, Q2): in each workspace that turned
+     * it on, confirmed bookings nobody marked whose day has ended in the
+     * workspace's zone become Didn't come, marked by Whity. Only bookings from
+     * the last two days and since the switch was turned on. Returns how many.
+     */
+    public function autoMarkNoShows(): int
+    {
+        $marked = 0;
+        foreach ($this->attendanceRepository()->autoNoShowWorkspaces() as $tenantId => $onSince) {
+            try {
+                $settings = $this->settingsFor($tenantId);
+                if (!$settings->autoNoShow) {
+                    continue;
+                }
+                $midnight = $this->now()->setTimezone($settings->zone)->setTime(0, 0)->setTimezone(new DateTimeZone('UTC'));
+                $from = $midnight->modify('-2 days');
+                $on = $onSince !== '' ? Interval::fromDb($onSince) : $from;
+                if ($on > $from) {
+                    $from = $on;
+                }
+                foreach ($this->attendanceRepository()->unmarkedIds($tenantId, $from, $midnight) as $id) {
+                    $row = $this->bookings->find($tenantId, $id);
+                    if ($row !== null && $row['attendance'] === null && $this->recordAttendance($tenantId, $row, BookingRepository::NO_SHOW, null, true)) {
+                        $marked++;
+                    }
+                }
+            } catch (Throwable $e) {
+                \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] end-of-day marking failed for workspace ' . $tenantId, $e);
+            }
+        }
+
+        return $marked;
+    }
+
+    /**
+     * Today's bookings that started at least the grace minutes ago and nobody
+     * has marked: the desk's Did they come? list (WHIT-1427, AP.4).
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function unmarkedToday(int $tenantId, ?string $date, ?int $unitId): array
+    {
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $day = $date !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) === 1
+            ? new DateTimeImmutable($date . ' 00:00:00', $settings->zone)
+            : $now->setTimezone($settings->zone)->setTime(0, 0);
+        $from = $day->setTimezone(new DateTimeZone('UTC'));
+        $to = $day->modify('+1 day')->setTimezone(new DateTimeZone('UTC'));
+        $cutoff = $now->modify('-' . $settings->noShowGraceMinutes . ' minutes');
+        $out = [];
+        foreach ($this->bookings->list($tenantId, [], $from, $to, [BookingRepository::STATUS_CONFIRMED], $unitId) as $row) {
+            if (($row['attendance'] ?? null) === null && Interval::fromDb((string) $row['starts_at']) <= $cutoff) {
+                $out[] = BookingRepository::toApi($row);
+            }
+        }
+
+        return $this->withCustomerFlags($tenantId, $out);
+    }
+
+    /**
+     * The flag "Missed 2 of the last 5" on each booking's customer (WHIT-1427,
+     * AP.8, AP.10), as `customer_flag` {misses, of}, or null when the policy
+     * does not apply. Counted over the window, or since the count started again.
+     *
+     * @param list<array<string, mixed>> $bookings {@see BookingRepository::toApi()}
+     * @return list<array<string, mixed>>
+     */
+    public function withCustomerFlags(int $tenantId, array $bookings): array
+    {
+        $settings = $this->settingsFor($tenantId);
+        if ($bookings === [] || $settings->noShowFlagAfter <= 0) {
+            return array_map(static fn (array $b): array => $b + ['customer_flag' => null], $bookings);
+        }
+        $keys = [];
+        foreach ($bookings as $b) {
+            $key = AttendanceRepository::customerKey($b);
+            if ($key !== null) {
+                $keys[] = $key;
+            }
+        }
+        $now = $this->now();
+        $history = $this->attendanceRepository()->history($tenantId, $keys, $now->modify('-' . $settings->noShowWindowMonths . ' months'), $now, $settings->noShowCountLateCancels);
+
+        return array_map(static function (array $b) use ($history, $settings): array {
+            $key = AttendanceRepository::customerKey($b);
+            $missedFlags = $key !== null ? ($history[$key] ?? []) : [];
+            $misses = count(array_filter($missedFlags));
+            $b['customer_flag'] = $misses >= $settings->noShowFlagAfter ? ['misses' => $misses, 'of' => count($missedFlags)] : null;
+
+            return $b;
+        }, $bookings);
+    }
+
+    /**
+     * One customer's line and flag (WHIT-1427, AP.8): came, didn't come and
+     * late cancels over all time, since their first booking, and the flag.
+     *
+     * @return array{came: int, no_show: int, late_cancels: int, since: ?string, flag: ?array{misses: int, of: int}, window_months: int}
+     */
+    public function customerAttendance(int $tenantId, string $key): array
+    {
+        $settings = $this->settingsFor($tenantId);
+        $now = $this->now();
+        $totals = $this->attendanceRepository()->customerTotals($tenantId, $key, $now);
+        $history = $this->attendanceRepository()->history($tenantId, [$key], $now->modify('-' . $settings->noShowWindowMonths . ' months'), $now, $settings->noShowCountLateCancels)[$key] ?? [];
+        $misses = count(array_filter($history));
+
+        return [
+            'came' => $totals['came'],
+            'no_show' => $totals['no_show'],
+            'late_cancels' => $totals['late_cancels'],
+            'since' => $totals['first_at'],
+            'flag' => $settings->noShowFlagAfter > 0 && $misses >= $settings->noShowFlagAfter ? ['misses' => $misses, 'of' => count($history)] : null,
+            'window_months' => $settings->noShowWindowMonths,
+        ];
+    }
+
+    /** "Start again from today" for a customer's count (AP.10), recorded and audited. */
+    public function resetCustomerAttendance(int $tenantId, string $key, int $actor): void
+    {
+        $this->attendanceRepository()->reset($tenantId, $key, $this->now(), $actor);
+        try {
+            $this->audit?->record('calendar.attendance.reset', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $actor > 0 ? $actor : null,
+                'target_type' => 'contact',
+                'target_id' => str_starts_with($key, 'c:') ? (int) substr($key, 2) : null,
+                'metadata' => ['customer' => str_starts_with($key, 'c:') ? $key : 'email'],
+            ]);
+        } catch (Throwable $e) {
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not audit a count started again', $e);
+        }
+    }
+
+    /**
+     * The rates for a period (WHIT-1427, AP.6), in the workspace's zone.
+     *
+     * @param array{profile_id?: ?int, service_id?: ?int, customer?: ?string, source?: ?string} $filters
+     * @return array<string, mixed>
+     */
+    public function attendanceRates(int $tenantId, DateTimeImmutable $from, DateTimeImmutable $to, array $filters): array
+    {
+        $settings = $this->settingsFor($tenantId);
+        $cutoff = $this->now()->modify('-' . $settings->noShowGraceMinutes . ' minutes');
+
+        return ['from' => Interval::toApi($from), 'to' => Interval::toApi($to)]
+            + $this->attendanceRepository()->counts($tenantId, $from, $to, $cutoff, $filters);
+    }
+
+    /**
+     * Save a mark, then audit and announce it. False when the booking is no
+     * longer confirmed.
+     *
+     * @param array<string, mixed> $row as {@see BookingRepository::find()} returns it
+     */
+    private function recordAttendance(int $tenantId, array $row, ?string $attendance, ?int $actor, bool $auto): bool
+    {
+        $id = (int) $row['id'];
+        if (!$this->bookings->setAttendance($tenantId, $id, $attendance, $this->now(), $actor !== null && $actor > 0 ? $actor : null, $auto)) {
+            return false;
+        }
+        $previous = is_string($row['attendance'] ?? null) ? $row['attendance'] : null;
+        try {
+            $this->audit?->record('calendar.attendance.marked', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $actor !== null && $actor > 0 ? $actor : null,
+                'target_type' => 'booking',
+                'target_id' => $id,
+                'metadata' => ['attendance' => $attendance, 'previous' => $previous, 'auto' => $auto],
+            ]);
+        } catch (Throwable $e) {
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not audit an attendance mark', $e);
+        }
+        $this->announce(CalendarEventNames::ATTENDANCE_MARKED, [
+            'id' => $id,
+            'tenant_id' => $tenantId,
+            'profile_id' => (int) $row['profile_id'],
+            'service_id' => (int) $row['service_id'],
+            'attendance' => $attendance,
+            'previous' => $previous,
+            'auto' => $auto,
+            'acting_profile_id' => $actor !== null && $actor > 0 ? $actor : null,
+        ]);
+
+        return true;
     }
 
     /**
@@ -816,16 +1058,37 @@ final class BookingService
         return $this->afterWrite($tenantId, $bookingId);
     }
 
-    /** @return array<string, mixed> */
-    public function cancel(int $tenantId, int $bookingId, string $by, string $reason): array
+    /**
+     * WHIT-1427 (AP.5): `$for` says whose cancel it is when staff cancel:
+     * `customer` (the customer asked) counts early or late by the window,
+     * `business` (we cancelled) never counts, and null records no kind. A
+     * customer cancelling on their link is always theirs.
+     *
+     * @return array<string, mixed>
+     */
+    public function cancel(int $tenantId, int $bookingId, string $by, string $reason, ?string $for = null): array
     {
-        $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        if ($for !== null && $for !== 'customer' && $for !== 'business') {
+            throw new CalendarRejectedException('cancelled_for is customer or business.', 422);
+        }
+        $kind = null;
+        if ($by === 'customer' || $for === 'customer') {
+            // Only a confirmed booking counts: a request or an unpaid hold was never due.
+            if ($row['status'] === BookingRepository::STATUS_CONFIRMED) {
+                $hours = $this->settingsFor($tenantId)->lateCancelHours;
+                $late = Interval::fromDb((string) $row['starts_at'])->getTimestamp() - $this->now()->getTimestamp() < $hours * 3600;
+                $kind = $late ? BookingRepository::CANCEL_LATE : BookingRepository::CANCEL_EARLY;
+            }
+        } elseif ($for === 'business') {
+            $kind = BookingRepository::CANCEL_BUSINESS;
+        }
         $done = $this->bookings->transition(
             $tenantId,
             $bookingId,
             BookingRepository::LIVE,
             BookingRepository::STATUS_CANCELLED,
-            ['cancelled_by' => $by, 'cancel_reason' => mb_substr($reason, 0, 500)],
+            ['cancelled_by' => $by, 'cancel_reason' => mb_substr($reason, 0, 500), 'cancel_kind' => $kind],
         );
         if (!$done) {
             throw new CalendarRejectedException('This booking is already cancelled or has ended.', 422);
@@ -1109,6 +1372,8 @@ final class BookingService
         $booking['staff_name'] = $this->calendar->displayName((int) $row['profile_id']);
         // WHIT-1417 (AP.14): every reminder sent, with its channel and outcome.
         $booking['reminders'] = $this->bookings->reminderLog($tenantId, $id);
+        // WHIT-1427 (AP.8): the customer's flag.
+        $booking = $this->withCustomerFlags($tenantId, [$booking])[0];
         // WHIT-1173: a booking of several services reads as one to everything
         // that shows a booking's service (the emails, reminders, calendar
         // files, the customer's page): their names joined, the whole length
