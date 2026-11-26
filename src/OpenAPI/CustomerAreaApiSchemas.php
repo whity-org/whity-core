@@ -190,7 +190,7 @@ final class CustomerAreaApiSchemas
                 ],
             ],
             [
-                'method' => 'POST', 'path' => '/api/settings/customer-area/screens/{screen}/grant', 'requiredRole' => null, 'requiredPermission' => 'roles:write',
+                'method' => 'POST', 'path' => '/api/settings/customer-area/screens/{screen:[a-z][a-z0-9-]{0,63}}/grant', 'requiredRole' => null, 'requiredPermission' => 'roles:write',
                 'schema' => [
                     'summary' => 'Give customers a plugin screen',
                     'description' => 'After the admin confirms (WHIT-1438, Q8): adds the screen\'s permission to the customer sign-up role and the roles of existing customers, '
