@@ -21311,11 +21311,6 @@ final class CoreApiSchemas
     }
 
     /**
-     * Components of the workspace plugin routes ({@see self::workspacePluginRoutes()}).
-     *
-     * @return array<string, array<string, mixed>>
-     */
-    /**
      * The desktop app's own update check (WC-app-self-update; whity-desktop
      * ADR 0001, decisions 2b and 6): an enrolled device asks with its token
      * whether a newer build of the app exists for its platform and channel.
@@ -21364,6 +21359,11 @@ final class CoreApiSchemas
         ];
     }
 
+    /**
+     * Components of the workspace plugin routes ({@see self::workspacePluginRoutes()}).
+     *
+     * @return array<string, array<string, mixed>>
+     */
     private static function workspacePluginComponents(): array
     {
         $label = self::object([

@@ -94,18 +94,21 @@ final class DesktopAppUpdateApiHandler
             || !isset(self::CHANNELS[$channel])) {
             return new Response(204);
         }
+        // At most two channels are ever offered, so the SQL is fixed and only
+        // the values are bound; a stable device binds stable twice.
         $offered = self::CHANNELS[$channel];
-        $placeholders = implode(', ', array_fill(0, count($offered), '?'));
+        $first = $offered[0];
+        $second = $offered[1] ?? $offered[0];
 
         try {
             $stmt = $this->pdo->prepare(
                 'SELECT version, url, signature, notes, pub_date
                  FROM desktop_app_releases
-                 WHERE target = ? AND channel IN (' . $placeholders . ')
+                 WHERE target = :target AND (channel = :first OR channel = :second)
                  ORDER BY released_at DESC
                  LIMIT 1'
             );
-            $stmt->execute([$target, ...$offered]);
+            $stmt->execute([':target' => $target, ':first' => $first, ':second' => $second]);
             /** @var array<string, mixed>|false $row */
             $row = $stmt->fetch(PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
