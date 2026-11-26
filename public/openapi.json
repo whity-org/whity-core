@@ -34431,6 +34431,253 @@
                 ]
             }
         },
+        "/api/v1/desktop-plugins": {
+            "get": {
+                "operationId": "get_api_v1_desktop_plugins",
+                "summary": "The desktop plugin releases, with attestations",
+                "tags": [
+                    "desktop"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Every catalogued release, grouped by plugin, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DesktopPluginCatalogueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/desktop-plugins/revocations": {
+            "get": {
+                "operationId": "get_api_v1_desktop_plugins_revocations",
+                "summary": "The signed plugin revocation list this instance accepted",
+                "tags": [
+                    "desktop"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The accepted list as its signed envelope, or data null when none was accepted yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DesktopPluginRevocationsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/desktop-plugins/{name}/versions/{version}/download": {
+            "get": {
+                "operationId": "get_api_v1_desktop_plugins_name_versions_version_download",
+                "summary": "One release's package",
+                "tags": [
+                    "desktop"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The package zip; its SHA-256 is the catalogue's",
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such release",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/document-agent-requests/next": {
             "post": {
                 "operationId": "document_agent_requests_next",
@@ -119256,6 +119503,104 @@
                         "$ref": "#/components/schemas/DemoCatalogItem"
                     }
                 }
+            },
+            "DesktopPluginCatalogueEntry": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "latestVersion": {
+                        "type": "string"
+                    },
+                    "versions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DesktopPluginVersion"
+                        }
+                    }
+                },
+                "required": [
+                    "name",
+                    "latestVersion",
+                    "versions"
+                ]
+            },
+            "DesktopPluginCatalogueResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DesktopPluginCatalogueEntry"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DesktopPluginRevocationsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "sequence": {
+                                "type": "integer"
+                            },
+                            "issuedAt": {
+                                "type": "integer"
+                            },
+                            "expiresAt": {
+                                "type": "integer"
+                            },
+                            "envelope": {
+                                "type": "string",
+                                "description": "The signed whity.revocations/1 envelope, as accepted."
+                            }
+                        },
+                        "required": [
+                            "sequence",
+                            "issuedAt",
+                            "expiresAt",
+                            "envelope"
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DesktopPluginVersion": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string"
+                    },
+                    "sha256": {
+                        "type": "string"
+                    },
+                    "sizeBytes": {
+                        "type": "integer"
+                    },
+                    "releasedAt": {
+                        "type": "string"
+                    },
+                    "attestation": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Whity's signed whity.attestation/1 envelope for exactly this package, when core holds one that is not revoked. The device verifies it against the keys pinned in the app."
+                    }
+                },
+                "required": [
+                    "version",
+                    "sha256",
+                    "sizeBytes",
+                    "releasedAt",
+                    "attestation"
+                ]
             },
             "DeviceProvisionRequest": {
                 "type": "object",
