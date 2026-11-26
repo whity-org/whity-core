@@ -2690,6 +2690,8 @@ $router->register('GET', '/api/plugins/store/licences/{slug}', [$installFromStor
 // follow-up.
 $desktopPluginsHandler = new \Whity\Api\DesktopPluginsApiHandler(__DIR__ . '/../storage/desktop-plugins', $db->getPdo());
 $router->register('GET', '/api/desktop-plugins', [$desktopPluginsHandler, 'catalog'], null, null, CorePermissions::DESKTOP_PLUGINS_READ);
+// WHIT-1420: the signed revocation list this instance accepted, for devices.
+$router->register('GET', '/api/desktop-plugins/revocations', [$desktopPluginsHandler, 'revocations'], null, null, CorePermissions::DESKTOP_PLUGINS_READ);
 $router->register('GET', '/api/desktop-plugins/{name}/versions/{version}/download', [$desktopPluginsHandler, 'download'], null, null, CorePermissions::DESKTOP_PLUGINS_READ);
 
 // Desktop app self-update manifest (WC-app-self-update). Same authenticated-

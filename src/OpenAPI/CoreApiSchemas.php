@@ -137,6 +137,7 @@ final class CoreApiSchemas
             self::themeRoutes(),
             self::desktopAppUpdateRoutes(),
             self::identityRoutes(),
+            self::desktopPluginRoutes(),
             self::meEmailsRoutes(),
             self::tenantEmailDomainRoutes(),
             self::tenantEntitlementRoutes(),
@@ -5498,6 +5499,30 @@ final class CoreApiSchemas
             ], ['provider_key', 'display_name']),
             // WHIT-1168: `password_sign_in` false = the server signs people in
             // only through these providers; pages then drop the password form.
+            // WHIT-1420: what a Whity Desktop device reads to reconcile its plugins.
+            'DesktopPluginVersion' => self::object([
+                'version' => self::str(),
+                'sha256' => self::str(),
+                'sizeBytes' => self::int(),
+                'releasedAt' => self::str(),
+                'attestation' => ['type' => 'string', 'nullable' => true, 'description' => "Whity's signed whity.attestation/1 envelope for exactly this package, when core holds one that is not revoked. The device verifies it against the keys pinned in the app."],
+            ], ['version', 'sha256', 'sizeBytes', 'releasedAt', 'attestation']),
+            'DesktopPluginCatalogueEntry' => self::object([
+                'name' => self::str(),
+                'latestVersion' => self::str(),
+                'versions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DesktopPluginVersion')],
+            ], ['name', 'latestVersion', 'versions']),
+            'DesktopPluginCatalogueResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DesktopPluginCatalogueEntry')],
+            ], ['data']),
+            'DesktopPluginRevocationsResponse' => self::object([
+                'data' => array_merge(self::object([
+                    'sequence' => self::int(),
+                    'issuedAt' => self::int(),
+                    'expiresAt' => self::int(),
+                    'envelope' => ['type' => 'string', 'description' => 'The signed whity.revocations/1 envelope, as accepted.'],
+                ], ['sequence', 'issuedAt', 'expiresAt', 'envelope']), ['nullable' => true]),
+            ], ['data']),
             'SsoProviderListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SsoProvider')],
                 'password_sign_in' => self::bool(),
@@ -13497,6 +13522,49 @@ final class CoreApiSchemas
                     ] + $recordErrors,
                 ],
             ],
+        ];
+    }
+
+    /**
+     * What a Whity Desktop device reads to reconcile the plugins it runs
+     * (WC-desktop-plugins, WHIT-1420): the catalogue of packaged releases with
+     * Whity's attestation per package, the package bytes, and the signed
+     * revocation list this instance accepted. All under `desktop-plugins:read`
+     * with the device's bearer token.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function desktopPluginRoutes(): array
+    {
+        return [
+            self::permissionRoute('GET', '/api/desktop-plugins', 'desktop-plugins:read', [
+                'summary' => 'The desktop plugin releases, with attestations',
+                'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('Every catalogued release, grouped by plugin, newest first', 'DesktopPluginCatalogueResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/desktop-plugins/revocations', 'desktop-plugins:read', [
+                'summary' => 'The signed plugin revocation list this instance accepted',
+                'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('The accepted list as its signed envelope, or data null when none was accepted yet', 'DesktopPluginRevocationsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/desktop-plugins/{name}/versions/{version}/download', 'desktop-plugins:read', [
+                'summary' => 'One release\'s package',
+                'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => ['description' => 'The package zip; its SHA-256 is the catalogue\'s', 'content' => ['application/zip' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('No such release'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 

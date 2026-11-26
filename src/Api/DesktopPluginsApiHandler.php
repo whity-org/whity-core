@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
+use Whity\Core\Log\ScrubbedErrorLog;
 use Whity\Core\Request;
 use Whity\Core\Response;
 
@@ -77,10 +78,18 @@ class DesktopPluginsApiHandler
     public function catalog(Request $request, array $params = []): Response
     {
         try {
+            // WHIT-1420: each release carries Whity's attestation for exactly these
+            // bytes when core holds one (plugin_version_marks, not revoked), so a
+            // device can check the signature itself against the keys pinned in
+            // the app. Core relays the signed document; it grants nothing here.
             $stmt = $this->pdo->prepare(
-                'SELECT plugin_name, version, sha256, size_bytes, released_at
-                 FROM desktop_plugin_releases
-                 ORDER BY plugin_name, released_at DESC'
+                'SELECT r.plugin_name, r.version, r.sha256, r.size_bytes, r.released_at,
+                        (SELECT m.attestation FROM plugin_version_marks m
+                          WHERE m.plugin_name = r.plugin_name AND m.version = r.version
+                            AND m.package_sha256 = r.sha256 AND m.revoked_at IS NULL
+                          ORDER BY m.granted_at DESC LIMIT 1) AS attestation
+                 FROM desktop_plugin_releases r
+                 ORDER BY r.plugin_name, r.released_at DESC'
             );
             $stmt->execute();
             /** @var array<int, array<string, mixed>> $rows */
@@ -94,6 +103,7 @@ class DesktopPluginsApiHandler
                     'sha256' => (string) $row['sha256'],
                     'sizeBytes' => (int) $row['size_bytes'],
                     'releasedAt' => (string) $row['released_at'],
+                    'attestation' => is_string($row['attestation'] ?? null) && $row['attestation'] !== '' ? $row['attestation'] : null,
                 ];
 
                 if (!isset($byPlugin[$name])) {
@@ -110,6 +120,36 @@ class DesktopPluginsApiHandler
         } catch (\Throwable $e) {
             error_log('[DesktopPluginsApiHandler] catalog failed: ' . $e->getMessage());
             return Response::error('Failed to list desktop plugin releases', 500);
+        }
+    }
+
+    /**
+     * GET /api/desktop-plugins/revocations (WHIT-1420): the signed revocation
+     * list this instance accepted, as the envelope it was accepted in, so a
+     * device applies the same list under the same pinned keys. `data` is null
+     * while the instance has accepted none.
+     *
+     * @param array<string, string> $params Route parameters (unused).
+     */
+    public function revocations(Request $request, array $params = []): Response
+    {
+        try {
+            $stmt = $this->pdo->prepare('SELECT sequence, issued_at, expires_at, body FROM plugin_revocation_state WHERE id = 1');
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            if ($row === false) {
+                return Response::json(['data' => null], 200);
+            }
+
+            return Response::json(['data' => [
+                'sequence' => (int) $row['sequence'],
+                'issuedAt' => (int) $row['issued_at'],
+                'expiresAt' => (int) $row['expires_at'],
+                'envelope' => (string) $row['body'],
+            ]], 200);
+        } catch (\Throwable $e) {
+            ScrubbedErrorLog::failure('[DesktopPluginsApiHandler] revocations failed', $e);
+            return Response::error('Failed to read the revocation list', 500);
         }
     }
 
