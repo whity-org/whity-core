@@ -22,6 +22,7 @@ use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\RoomRepository;
 use Whity\Core\Calendar\ServiceChoices;
 use Whity\Core\Calendar\ServiceRepository;
+use Whity\Core\Calendar\VisitRecords;
 use Whity\Core\Form\FormRejectedException;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\i18n\LocalizedTextRejected;
@@ -810,6 +811,176 @@ final class CalendarApiHandler
 
             return Response::json(['data' => $this->booking->applyLateStaff($tenantId, $this->staffOr404($tenantId, (int) $params['profileId']), $minutes, $ids, $actor)]);
         });
+    }
+
+    /**
+     * WHIT-1443 (AP.20): the forms a service asks for.
+     *
+     * @param array<string, string> $params
+     */
+    public function serviceForms(Request $request, array $params): Response
+    {
+        return $this->run($request, 'intake', fn (int $tenantId): Response => Response::json([
+            'data' => $this->booking->intake()->forService($tenantId, (int) $params['id']),
+        ]));
+    }
+
+    /**
+     * WHIT-1443 (AP.20): replace the forms a service asks for.
+     *
+     * @param array<string, string> $params
+     */
+    public function putServiceForms(Request $request, array $params): Response
+    {
+        return $this->run($request, 'intake', function (int $tenantId) use ($request, $params): Response {
+            $this->services->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Service');
+            $forms = JsonBody::parsed($request)['forms'] ?? null;
+            if (!is_array($forms) || !array_is_list($forms)) {
+                throw new CalendarRejectedException('forms is a list', 422);
+            }
+            $this->booking->intake()->replaceForService($tenantId, (int) $params['id'], $forms);
+
+            return Response::json(['data' => $this->booking->intake()->forService($tenantId, (int) $params['id'])]);
+        });
+    }
+
+    /**
+     * WHIT-1443 (AP.20): Send again (`send` true, emailed to the customer) or
+     * Fill in at the desk (a link for the tablet).
+     *
+     * @param array<string, string> $params
+     */
+    public function intakeLink(Request $request, array $params): Response
+    {
+        return $this->run($request, 'intake', function (int $tenantId) use ($request, $params): Response {
+            $send = (JsonBody::parsed($request)['send'] ?? false) === true;
+            $link = $this->booking->intakeLink($tenantId, (int) $params['id'], (int) $params['formId'], $send);
+
+            return Response::json(['data' => $send ? ['sent' => $link['sent']] : ['url' => $link['url'] . '&kiosk=1']], 201);
+        });
+    }
+
+    /**
+     * WHIT-1443 (AP.21): the visit record, for someone with
+     * calendar:visit_notes or the person treating the customer. Audited.
+     *
+     * @param array<string, string> $params
+     */
+    public function visit(Request $request, array $params): Response
+    {
+        return $this->run($request, 'visit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $bookingId = $this->visitAllowed($request, $tenantId, $actor, (int) $params['id']);
+
+            return Response::json(['data' => $this->booking->visits()->read($tenantId, $bookingId, $actor)]);
+        });
+    }
+
+    /**
+     * Write the visit notes; refused once the visit is finished.
+     *
+     * @param array<string, string> $params
+     */
+    public function putVisit(Request $request, array $params): Response
+    {
+        return $this->run($request, 'visit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $bookingId = $this->visitAllowed($request, $tenantId, $actor, (int) $params['id']);
+            $body = JsonBody::parsed($request)['body'] ?? null;
+            if (!is_string($body)) {
+                throw new CalendarRejectedException('body is the notes, as text', 422);
+            }
+
+            return Response::json(['data' => $this->booking->visits()->write($tenantId, $bookingId, $body, $actor)]);
+        });
+    }
+
+    /**
+     * Finish visit: the notes are signed and never change again.
+     *
+     * @param array<string, string> $params
+     */
+    public function finishVisit(Request $request, array $params): Response
+    {
+        return $this->run($request, 'visit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $bookingId = $this->visitAllowed($request, $tenantId, $actor, (int) $params['id']);
+
+            return Response::json(['data' => $this->booking->visits()->finish($tenantId, $bookingId, $actor)]);
+        });
+    }
+
+    /**
+     * Add a dated correction to a finished visit.
+     *
+     * @param array<string, string> $params
+     */
+    public function correctVisit(Request $request, array $params): Response
+    {
+        return $this->run($request, 'visit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $bookingId = $this->visitAllowed($request, $tenantId, $actor, (int) $params['id']);
+            $body = JsonBody::parsed($request)['body'] ?? null;
+            if (!is_string($body)) {
+                throw new CalendarRejectedException('body is the correction, as text', 422);
+            }
+
+            return Response::json(['data' => $this->booking->visits()->correct($tenantId, $bookingId, $body, $actor)], 201);
+        });
+    }
+
+    /**
+     * Keep a file on the visit (multipart `file`), in the tenant's own storage.
+     *
+     * @param array<string, string> $params
+     */
+    public function addVisitFile(Request $request, array $params): Response
+    {
+        return $this->run($request, 'visit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $bookingId = $this->visitAllowed($request, $tenantId, $actor, (int) $params['id']);
+            try {
+                $part = \Whity\Http\UploadedFilePart::read($request, 'file');
+            } catch (\Whity\Http\UploadedFilePartException $e) {
+                return Response::error($e->clientMessage, $e->status);
+            }
+
+            return Response::json(['data' => $this->booking->visits()->addFile($tenantId, $bookingId, $part['bytes'], $part['media_type'], $part['filename'], $actor)], 201);
+        });
+    }
+
+    /**
+     * A visit file's bytes, for someone allowed to see the visit. Audited.
+     *
+     * @param array<string, string> $params
+     */
+    public function visitFile(Request $request, array $params): Response
+    {
+        return $this->run($request, 'visit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $bookingId = $this->booking->visits()->bookingOfFile($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('File');
+            $this->visitAllowed($request, $tenantId, $actor, $bookingId);
+            $file = $this->booking->visits()->fileBytes($tenantId, (int) $params['id'], $actor);
+            $name = preg_replace('/[^\x20-\x7e]/', '_', str_replace(['"', '\\', "\r", "\n"], '', $file['filename'])) ?? 'file';
+
+            return new Response(200, $file['bytes'], [
+                'Content-Type' => $file['content_type'],
+                'Content-Length' => (string) strlen($file['bytes']),
+                'Content-Disposition' => 'attachment; filename="' . $name . '"',
+                'X-Content-Type-Options' => 'nosniff',
+                'Cache-Control' => 'private, no-store',
+            ]);
+        });
+    }
+
+    /**
+     * The booking's id, when the caller may see its visit record: with
+     * calendar:visit_notes, or as the person treating the customer. An agent
+     * needs the permission itself. Otherwise 403, saying nothing about it.
+     */
+    private function visitAllowed(Request $request, int $tenantId, int $actor, int $bookingId): int
+    {
+        $booking = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        $has = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_VISIT_NOTES, $tenantId);
+        if (!VisitRecords::may($booking, $actor, $has, self::isAgent($request))) {
+            throw new CalendarRejectedException('Only the person treating them, or someone allowed to see visit records, can open this.', 403, ['required' => CorePermissions::CALENDAR_VISIT_NOTES]);
+        }
+
+        return $bookingId;
     }
 
     /**

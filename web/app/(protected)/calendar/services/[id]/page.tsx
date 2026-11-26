@@ -23,6 +23,7 @@ import { Input } from '@/components/ui/input';
 import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
+import { ServiceFormsCard } from '@/components/calendar/service-forms';
 import { useCalendarAccess } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
@@ -614,6 +615,9 @@ export default function CalendarServicePage() {
               </CardContent>
             </Card>
           </fieldset>
+
+          {/* WHIT-1443 (AP.20): the forms customers fill for this service. */}
+          <ServiceFormsCard serviceId={id} canManage={!readOnly} />
 
           {problem && (
             <Alert variant="destructive" data-testid="service-problem">

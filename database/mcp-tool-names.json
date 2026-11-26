@@ -487,6 +487,18 @@
     "en": "List the waitlist",
     "ar": "عرض قائمة الانتظار"
   },
+  "get_api_calendar_services_id_forms": {
+    "en": "List a service's intake forms",
+    "ar": "عرض نماذج الخدمة قبل الزيارة"
+  },
+  "get_api_calendar_bookings_id_visit": {
+    "en": "Read a visit record",
+    "ar": "عرض سجل الزيارة"
+  },
+  "get_api_calendar_visit_files_id": {
+    "en": "Read a file on a visit",
+    "ar": "عرض ملف في سجل الزيارة"
+  },
   "get_api_calendar_rooms": {
     "en": "List rooms",
     "ar": "عرض الغرف"
@@ -534,6 +546,22 @@
   "post_api_calendar_staff_profileid_late": {
     "en": "Move a late staff member's bookings and tell the customers",
     "ar": "نقل حجوزات موظف متأخر وإبلاغ العملاء"
+  },
+  "post_api_calendar_bookings_id_intake_formid": {
+    "en": "Send an intake form again, or open it at the desk",
+    "ar": "إرسال نموذج الزيارة مجددًا أو فتحه في الاستقبال"
+  },
+  "post_api_calendar_bookings_id_visit_finish": {
+    "en": "Finish a visit",
+    "ar": "إنهاء الزيارة"
+  },
+  "post_api_calendar_bookings_id_visit_corrections": {
+    "en": "Add a correction to a visit",
+    "ar": "إضافة تصحيح إلى الزيارة"
+  },
+  "post_api_calendar_bookings_id_visit_files": {
+    "en": "Add a file to a visit",
+    "ar": "إضافة ملف إلى الزيارة"
   },
   "post_api_calendar_bookings_id_resources": {
     "en": "Change the room or equipment a booking holds",
@@ -2537,6 +2565,14 @@
   "put_api_calendar_my_view": {
     "en": "Change your own calendar choices",
     "ar": "تغيير اختياراتك في التقويم"
+  },
+  "put_api_calendar_bookings_id_visit": {
+    "en": "Write a visit's notes",
+    "ar": "كتابة ملاحظات الزيارة"
+  },
+  "put_api_calendar_services_id_forms": {
+    "en": "Set a service's intake forms",
+    "ar": "تحديد نماذج الخدمة قبل الزيارة"
   },
   "put_api_calendar_settings": {
     "en": "Change the calendar settings",

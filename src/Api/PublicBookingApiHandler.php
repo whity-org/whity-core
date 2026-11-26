@@ -312,6 +312,8 @@ final class PublicBookingApiHandler
             return Response::json(['data' => self::forCustomer($booking) + [
                 'manage_token' => $booking['manage_token'] ?? null,
                 'payment' => $booking['payment'] ?? null,
+                // WHIT-1443 (AP.20): the forms to fill before the visit.
+                'intake_forms' => array_map(static fn (array $f): array => ['name' => $f['name'], 'url' => $f['url']], $booking['intake_forms'] ?? []),
                 // WHIT-1440 (AP.16): the zone of the person's branch, or the workspace's.
                 'time_zone' => $booking['time_zone'] ?? $this->booking->settingsFor($tenantId)->zone->getName(),
             ]], 201);

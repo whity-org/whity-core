@@ -66,6 +66,25 @@ interface PublicForm {
   built_on_whity?: boolean;
   /** READINESS TM-20: set when the submit asks for a bot-check token. */
   bot_check?: { provider: string; site_key: string } | null;
+  /** WHIT-1443 (AP.20): from a booking's form link, what the customer gave when they booked. */
+  intake?: { name: string; email: string; phone: string } | null;
+}
+
+/**
+ * WHIT-1443 (AP.20): a booking's form link fills in what the customer already
+ * gave, in the text fields whose key says what they hold: one for an email,
+ * one for a phone or mobile, one for a name. Anything they typed stays.
+ */
+function intakeAnswers(fields: FillableField[], intake: NonNullable<PublicForm['intake']>): Record<string, Answer> {
+  const out: Record<string, Answer> = {};
+  for (const field of fields) {
+    const key = field.field_key;
+    if (field.field_type !== 'text') continue;
+    if (/e-?mail/i.test(key) && intake.email !== '') out[key] = intake.email;
+    else if (/phone|mobile/i.test(key) && intake.phone !== '') out[key] = intake.phone;
+    else if (/name/i.test(key) && intake.name !== '') out[key] = intake.name;
+  }
+  return out;
 }
 
 /**
@@ -116,6 +135,8 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
   const [botFailed, setBotFailed] = useState(false);
   const [resetKey, setResetKey] = useState(0);
   const [website, setWebsite] = useState('');
+  const [intake, setIntake] = useState<string | null>(null);
+  const [kiosk, setKiosk] = useState(false);
   const onToken = useCallback((token: string | null) => {
     setBotToken(token);
     if (token !== null) setBotFailed(false);
@@ -124,10 +145,15 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
 
   useEffect(() => {
     let cancelled = false;
-    const returned = new URLSearchParams(window.location.search).get('sso');
+    const search = new URLSearchParams(window.location.search);
+    const returned = search.get('sso');
     const outcome = SSO_OUTCOMES.find((o) => o === returned) ?? null;
+    // WHIT-1443 (AP.20): a booking's form link, and the desk's tablet.
+    const intakeToken = search.get('intake');
+    const token = intakeToken !== null && /^[a-f0-9]{64}$/.test(intakeToken) ? intakeToken : null;
+    const atTheDesk = search.get('kiosk') === '1';
 
-    api.GET('/api/v1/public/forms/{slug}', { params: { path: { slug } } })
+    api.GET('/api/v1/public/forms/{slug}', { params: { path: { slug }, ...(token !== null ? { query: { intake: token } } : {}) } })
       .then(({ data, error, response }) => {
         const body = ((data ?? error ?? {}) as unknown) as { data?: PublicForm; error?: string };
         if (cancelled) return;
@@ -139,6 +165,12 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
           return;
         }
         setForm(body.data);
+        setIntake(token);
+        setKiosk(atTheDesk);
+        if (body.data.intake) {
+          const filled = intakeAnswers(body.data.fields, body.data.intake);
+          setAnswers((current) => ({ ...filled, ...current }));
+        }
         setSsoOutcome(outcome);
       })
       .catch(() => {
@@ -204,7 +236,7 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
     // The client sends the CSRF header (`X-Requested-With`) a cookie-authenticated write needs.
     const { data: sentBody, error: sentError, response } = await api.POST('/api/v1/public/forms/{slug}/submissions', {
       params: { path: { slug } },
-      body: { data: toSend, website, ...(botToken !== null ? { bot_token: botToken } : {}) } as never,
+      body: { data: toSend, website, ...(botToken !== null ? { bot_token: botToken } : {}), ...(intake !== null ? { intake } : {}) } as never,
     });
     const body = ((sentBody ?? sentError ?? {}) as unknown) as RefusalBody & { data?: { reference?: string | null } };
     if (!response.ok) {
@@ -292,7 +324,9 @@ export default function PublicFormPage({ params }: { params: Promise<{ slug: str
         <CardHeader>
           <CardTitle>{t('fill.sentPublicTitle', 'Thank you, your response has been recorded')}</CardTitle>
           <CardDescription>
-            {t('fill.sentPublic', '{title} was submitted successfully. You may close this page.', { title })}
+            {kiosk
+              ? t('fill.sentKiosk', 'Thank you. Please hand the tablet back to the desk.')
+              : t('fill.sentPublic', '{title} was submitted successfully. You may close this page.', { title })}
           </CardDescription>
           {reference !== null && (
             <p className="text-sm font-medium">{t('fill.reference', 'Your reference: {reference}', { reference })}</p>

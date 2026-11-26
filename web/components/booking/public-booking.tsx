@@ -968,6 +968,22 @@ function BookedView({ page, result }: { page: PublicBookingPage; result: BookedR
       <CardContent className="space-y-5">
         <BookingFacts booking={booking} timeZone={timeZone} />
 
+        {/* WHIT-1443 (AP.20): the forms to fill before the visit. */}
+        {(result.intakeForms ?? []).length > 0 && (
+          <div className="space-y-2" data-testid="book-intake">
+            <p className="m-0 font-medium text-foreground">{t('done.intake', 'Before your visit, please fill in:')}</p>
+            <ul className="m-0 grid gap-2 p-0">
+              {(result.intakeForms ?? []).map((form) => (
+                <li key={form.url} className="list-none">
+                  <a href={form.url} className="inline-flex min-h-12 items-center font-medium text-primary hover:underline">
+                    {form.name}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {payment && (
           <div className="space-y-3 rounded-card border border-warning bg-warning-tint px-4 py-4" data-testid="book-payment">
             <p className="text-foreground">

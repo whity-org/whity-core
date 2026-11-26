@@ -45,6 +45,10 @@ export type CalendarLateResult = Schemas['CalendarLateResult'];
 export type CalendarWalkin = Schemas['CalendarWalkin'];
 export type DeskStatus = 'expected' | 'arrived' | 'with_staff' | 'done';
 export type CalendarWaitlistEntry = Schemas['CalendarWaitlistEntry'];
+export type CalendarServiceForm = Schemas['CalendarServiceForm'];
+export type CalendarIntakeStatus = Schemas['CalendarIntakeStatus'];
+export type CalendarVisitRecord = Schemas['CalendarVisitRecord'];
+export type CalendarVisitFile = Schemas['CalendarVisitFile'];
 export type CalendarWaitlistRequest = Schemas['CalendarWaitlistRequest'];
 export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
 export type CalendarToday = Schemas['CalendarToday'];
@@ -401,6 +405,46 @@ export const calendarApi = {
       await api.POST('/api/v1/calendar/staff/{profileId}/late', { params: { path: { profileId } }, body: { minutes, booking_ids: bookingIds } }),
       'The bookings could not be moved'
     ),
+  /** WHIT-1443 (AP.20): the forms a service asks for. */
+  serviceForms: async (serviceId: number) =>
+    read<CalendarServiceForm[]>(await api.GET('/api/v1/calendar/services/{id}/forms', { params: { path: { id: serviceId } } }), 'The forms could not be loaded'),
+  saveServiceForms: async (serviceId: number, forms: Schemas['CalendarServiceFormsRequest']['forms']) =>
+    send<CalendarServiceForm[]>(
+      await api.PUT('/api/v1/calendar/services/{id}/forms', { params: { path: { id: serviceId } }, body: { forms } }),
+      'The forms could not be saved'
+    ),
+  /** Send again (`send`), or a link to fill it in at the desk. */
+  intakeLink: async (bookingId: number, formId: number, sendIt: boolean) =>
+    send<Schemas['CalendarIntakeLink']>(
+      await api.POST('/api/v1/calendar/bookings/{id}/intake/{formId}', { params: { path: { id: bookingId, formId } }, body: { send: sendIt } }),
+      sendIt ? 'The form could not be sent' : 'The form could not be opened'
+    ),
+  /** WHIT-1443 (AP.21): the visit record; a 403 when the person may not see it. */
+  visit: async (bookingId: number) =>
+    read<CalendarVisitRecord>(await api.GET('/api/v1/calendar/bookings/{id}/visit', { params: { path: { id: bookingId } } }), 'The visit record could not be loaded'),
+  saveVisitNotes: async (bookingId: number, body: string) =>
+    send<CalendarVisitRecord>(await api.PUT('/api/v1/calendar/bookings/{id}/visit', { params: { path: { id: bookingId } }, body: { body } }), 'The notes could not be saved'),
+  finishVisit: async (bookingId: number) =>
+    send<CalendarVisitRecord>(await api.POST('/api/v1/calendar/bookings/{id}/visit/finish', { params: { path: { id: bookingId } } }), 'The visit could not be finished'),
+  correctVisit: async (bookingId: number, body: string) =>
+    send<CalendarVisitRecord>(
+      await api.POST('/api/v1/calendar/bookings/{id}/visit/corrections', { params: { path: { id: bookingId } }, body: { body } }),
+      'The correction could not be added'
+    ),
+  addVisitFile: async (bookingId: number, file: File) => {
+    const body = new FormData();
+    body.append('file', file);
+    return send<CalendarVisitFile>(
+      await api.POST('/api/v1/calendar/bookings/{id}/visit/files', {
+        params: { path: { id: bookingId } },
+        body: body as never,
+        bodySerializer: (b: unknown) => b as FormData,
+      }),
+      'The file could not be added'
+    );
+  },
+  visitFileUrl: (fileId: number) => `/api/v1/calendar/visit-files/${fileId}`,
+
   /** WHIT-1442 (AP.23): the waitlist. */
   waitlist: async () => {
     const result = await api.GET('/api/v1/calendar/waitlist');

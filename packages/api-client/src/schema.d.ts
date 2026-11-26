@@ -2686,6 +2686,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/intake/{formId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send a booking's intake form again, or get a link to fill it in at the desk (WHIT-1443) */
+        post: operations["post_api_v1_calendar_bookings_id_intake_formid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/late": {
         parameters: {
             query?: never;
@@ -2751,6 +2768,78 @@ export interface paths {
          * @description The request moves to the new time and stays a request; the customer is emailed and takes it from their link.
          */
         post: operations["post_api_v1_calendar_bookings_id_suggest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/visit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A booking's visit record: notes, corrections, forms and files. Only with calendar:visit_notes or as the person treating the customer; an agent needs the permission. Every read is audited (WHIT-1443) */
+        get: operations["get_api_v1_calendar_bookings_id_visit"];
+        /** Write the visit notes; refused once the visit is finished (WHIT-1443); an agent's call is a proposal */
+        put: operations["put_api_v1_calendar_bookings_id_visit"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/visit/corrections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Add a dated correction to a finished visit (WHIT-1443); an agent's call is a proposal */
+        post: operations["post_api_v1_calendar_bookings_id_visit_corrections"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/visit/files": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Keep a file on a visit: a PDF, a photo or a text file up to 20 MB, in the tenant's own storage (WHIT-1443); an agent's call is a proposal
+         * @description multipart/form-data with the file in `file`. The type is read from the file itself.
+         */
+        post: operations["post_api_v1_calendar_bookings_id_visit_files"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/bookings/{id}/visit/finish": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Finish visit: the notes are signed and never change again (WHIT-1443); an agent's call is a proposal */
+        post: operations["post_api_v1_calendar_bookings_id_visit_finish"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3234,6 +3323,24 @@ export interface paths {
         patch: operations["patch_api_v1_calendar_services_id"];
         trace?: never;
     };
+    "/api/v1/calendar/services/{id}/forms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The forms a service asks customers to fill in (WHIT-1443) */
+        get: operations["get_api_v1_calendar_services_id_forms"];
+        /** Set the forms a service asks for: on booking or before the visit, for new customers or every visit, required or not (WHIT-1443) */
+        put: operations["put_api_v1_calendar_services_id_forms"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/settings": {
         parameters: {
             query?: never;
@@ -3393,6 +3500,23 @@ export interface paths {
         };
         /** Today at a glance: booked, checked in, open requests and reminders sent */
         get: operations["get_api_v1_calendar_today"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/visit-files/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A visit file's bytes, for someone allowed to see the visit. Audited (WHIT-1443) */
+        get: operations["get_api_v1_calendar_visit_files_id"];
         put?: never;
         post?: never;
         delete?: never;
@@ -17700,6 +17824,7 @@ export interface components {
             updated_at?: string | null;
             /** @description `expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441). */
             desk_status?: string;
+            intake?: components["schemas"]["CalendarIntakeStatus"];
             customer_flag?: components["schemas"]["CalendarCustomerFlag"];
             /** @description Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first. */
             resources?: components["schemas"]["CalendarBookingResource"][];
@@ -18026,6 +18151,37 @@ export interface components {
             /** @description Every working-hours row for the week; the list replaces what is there. */
             hours: components["schemas"]["CalendarHours"][];
         };
+        CalendarIntakeLink: {
+            /** @description Fill in at the desk: the form page in kiosk mode. */
+            url?: string;
+            /** @description Send again: sent, failed or no_address. */
+            sent?: string | null;
+        };
+        CalendarIntakeLinkRequest: {
+            /** @description True: email the customer the link (Send again). False: return a link to fill it in at the desk. */
+            send?: boolean;
+        };
+        CalendarIntakeStatus: {
+            /**
+             * @description Every required form sent, one missing, or none asked for (WHIT-1443). A missing form never blocks check-in.
+             * @enum {string}
+             */
+            status: "done" | "not_done" | "not_needed";
+            forms: {
+                form_id: number;
+                name: string;
+                /** @description Its name in each language. */
+                names?: {
+                    [key: string]: string;
+                };
+                required: boolean;
+                /** @enum {string} */
+                fill_when?: "on_booking" | "before_visit";
+                done: boolean;
+                submission_id?: number | null;
+                submitted_at?: string | null;
+            }[];
+        };
         CalendarItem: {
             /** @description The kind and the record: "booking:7", "event:12", "time_off:5". */
             id: string;
@@ -18140,6 +18296,43 @@ export interface components {
             needs_approval?: boolean;
             /** @description The inventory service item that holds its name and price (WHIT-1334). */
             item_id?: number | null;
+        };
+        CalendarServiceForm: {
+            form_id: number;
+            name: string;
+            /** @description Its name in each language. */
+            names?: {
+                [key: string]: string;
+            };
+            /** @enum {string} */
+            fill_when: "on_booking" | "before_visit";
+            /**
+             * @description `new`: only a customer's first visit.
+             * @enum {string}
+             */
+            who: "new" | "every";
+            required: boolean;
+            /** @description The form has a public link, so customers can fill it in. */
+            public?: boolean;
+        };
+        CalendarServiceFormsRequest: {
+            /** @description The forms, in order; the list replaces what is there. */
+            forms: {
+                /** @description A form of this workspace. */
+                form_id: number;
+                /**
+                 * @description Default before_visit.
+                 * @enum {string}
+                 */
+                fill_when?: "on_booking" | "before_visit";
+                /**
+                 * @description Default every.
+                 * @enum {string}
+                 */
+                who?: "new" | "every";
+                /** @description Default true. */
+                required?: boolean;
+            }[];
         };
         CalendarServiceNeed: {
             /** @description A specific room or piece of equipment. */
@@ -18369,6 +18562,58 @@ export interface components {
             also_show?: ("team_events" | "time_off" | "cancelled" | "meetings" | "tasks_due")[];
             /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
             sidebar_open?: boolean;
+        };
+        CalendarVisitCorrectionRequest: {
+            /** @description What is added to a finished visit, dated and signed. */
+            body: string;
+        };
+        CalendarVisitFile: {
+            id: number;
+            filename: string;
+            content_type: string;
+            byte_size: number;
+            added_by?: components["schemas"]["CalendarVisitPerson"];
+            created_at: string;
+        };
+        CalendarVisitNotesRequest: {
+            /** @description The notes, as text. Refused once the visit is finished. */
+            body: string;
+        };
+        CalendarVisitPerson: {
+            profile_id: number;
+            name: string;
+        } | null;
+        CalendarVisitRecord: {
+            booking_id: number;
+            notes?: {
+                body?: string;
+                author?: components["schemas"]["CalendarVisitPerson"];
+                created_at?: string;
+                updated_at?: string;
+                finished_at?: string | null;
+                finished_by?: components["schemas"]["CalendarVisitPerson"];
+            } | null;
+            /** @description Finish visit was pressed: the notes never change; corrections are added. */
+            finished: boolean;
+            corrections: {
+                id: number;
+                body: string;
+                author?: components["schemas"]["CalendarVisitPerson"];
+                created_at: string;
+            }[];
+            files: components["schemas"]["CalendarVisitFile"][];
+            forms: {
+                id: number;
+                form_id: number;
+                name: string;
+                /** @description Its name in each language. */
+                names?: {
+                    [key: string]: string;
+                };
+                submitted_at: string;
+                /** @description The form's printout (FP.1). */
+                printout_path: string;
+            }[];
         };
         CalendarWaitlistEntry: {
             id: number;
@@ -22385,6 +22630,8 @@ export interface components {
             data: {
                 [key: string]: unknown;
             };
+            /** @description The public page only (WHIT-1443): the `intake` token from a booking's form link, so the submission records that booking and customer. Ignored when it is not one for this form. */
+            intake?: string;
         };
         FormSubmissionCreateResponse: {
             data: components["schemas"]["FormSubmission"];
@@ -25920,6 +26167,12 @@ export interface components {
                 form_id?: number | null;
                 /** @description Whether the page shows "Built on Whity". */
                 built_on_whity?: boolean;
+                /** @description With `?intake=` from a booking's form link: what the customer gave when they booked, to fill in. Left out otherwise. */
+                intake?: {
+                    name?: string;
+                    email?: string;
+                    phone?: string;
+                } | null;
             };
         };
         PublicFormSubmissionResponse: {
@@ -42783,6 +43036,98 @@ export interface operations {
             };
         };
     };
+    post_api_v1_calendar_bookings_id_intake_formid: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+                formId: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarIntakeLinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Sent, or the link */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarIntakeLink"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a form this booking asks for, the form has no public link, or the customer has no email */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     post_api_v1_calendar_bookings_id_late: {
         parameters: {
             query?: never;
@@ -43155,6 +43500,422 @@ export interface operations {
                 };
             };
             /** @description Not a request */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_bookings_id_visit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarVisitRecord"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the treating person, and no calendar:visit_notes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_calendar_bookings_id_visit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarVisitNotesRequest"];
+            };
+        };
+        responses: {
+            /** @description The record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarVisitRecord"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the treating person, and no calendar:visit_notes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The visit is finished: add a correction */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_visit_corrections: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarVisitCorrectionRequest"];
+            };
+        };
+        responses: {
+            /** @description The record */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarVisitRecord"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the treating person, and no calendar:visit_notes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The visit is not finished yet, or nothing written */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_visit_files: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarVisitFile"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the treating person, and no calendar:visit_notes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Empty, too large or not a type kept on visits */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_visit_finish: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarVisitRecord"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the treating person, and no calendar:visit_notes */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Already finished */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No notes yet */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -45816,6 +46577,166 @@ export interface operations {
             };
         };
     };
+    get_api_v1_calendar_services_id_forms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The forms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarServiceForm"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    put_api_v1_calendar_services_id_forms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarServiceFormsRequest"];
+            };
+        };
+        responses: {
+            /** @description The forms */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarServiceForm"][];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such service or form */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description A bad value, or more than 8 forms */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_calendar_settings: {
         parameters: {
             query?: never;
@@ -46854,6 +47775,71 @@ export interface operations {
                 };
             };
             /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_visit_files_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file's bytes, with its type */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not the treating person, and no calendar:visit_notes */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -94671,7 +95657,10 @@ export interface operations {
     };
     get_api_v1_public_forms_slug: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description WHIT-1443: the token from the form link in a booking email; the answer then carries `intake`, what the customer gave when they booked. */
+                intake?: string;
+            };
             header?: never;
             path: {
                 slug: string;

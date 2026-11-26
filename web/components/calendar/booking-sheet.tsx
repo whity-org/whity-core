@@ -67,6 +67,7 @@ import { dateInZone, type CalendarDate } from '@/lib/calendar/layout';
 import { SlotPicker } from './slot-picker';
 import { ServiceList, isSeveral, useServicesName } from './booking-services';
 import { useCalendarWords } from './use-calendar-words';
+import { IntakeSection, VisitRecordSection } from './visit-record';
 
 const ANYONE = 'anyone';
 /** Moving a booking of several services: each keeps its own person. */
@@ -179,14 +180,19 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
             </SheetHeader>
 
             {mode === 'view' ? (
-              <BookingFacts
-                booking={booking}
-                service={service}
-                person={person}
-                timeZone={timeZone}
-                canChange={canChange && open}
-                onResourcesChanged={(changed) => onChanged(changed, 'resourcesChanged')}
-              />
+              <>
+                <BookingFacts
+                  booking={booking}
+                  service={service}
+                  person={person}
+                  timeZone={timeZone}
+                  canChange={canChange && open}
+                  onResourcesChanged={(changed) => onChanged(changed, 'resourcesChanged')}
+                />
+                {/* WHIT-1443 (AP.20, AP.21): the forms to fill, and the visit record. */}
+                <IntakeSection booking={booking} canChange={canChange && open} />
+                <VisitRecordSection key={booking.id} booking={booking} timeZone={timeZone} />
+              </>
             ) : (
               <MovePanel
                 booking={booking}

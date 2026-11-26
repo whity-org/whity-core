@@ -2000,6 +2000,7 @@ final class CoreApiSchemas
                         . 'genuine link is told they are early or late rather than that the link is '
                         . 'wrong.',
                     'tags' => ['forms'],
+                    'parameters' => [self::queryParam('intake', 'string', 'WHIT-1443: the token from the form link in a booking email; the answer then carries `intake`, what the customer gave when they booked.')],
                     'responses' => [
                         200 => self::jsonResponse('The form, as a stranger may see it', 'PublicFormResponse'),
                         404 => self::errorResponse('No publicly-open form is served at this address'),
@@ -10391,6 +10392,7 @@ final class CoreApiSchemas
                 // which is why this is `additionalProperties: true` rather than a
                 // narrower map: one schema cannot express "shaped by another row".
                 'data' => ['type' => 'object', 'additionalProperties' => true, 'description' => 'Answers keyed by field key, each typed by its field: text, number, boolean, or a list for multiselect.'],
+                'intake' => self::str() + ['description' => 'The public page only (WHIT-1443): the `intake` token from a booking\'s form link, so the submission records that booking and customer. Ignored when it is not one for this form.'],
             ], ['data']),
             // ---- the public link (migration 132) ----
             // Both boundaries optional and either nullable: null means "no
@@ -10443,6 +10445,12 @@ final class CoreApiSchemas
                 'form_id' => self::int(true) + ['description' => 'Given only when sign-in is required: the form to fill in once signed in.'],
                 // WHIT-932: false when the workspace's plan removes the credit.
                 'built_on_whity' => self::bool() + ['description' => 'Whether the page shows "Built on Whity".'],
+                // WHIT-1443 (AP.20): from the customer's own booking link only.
+                'intake' => ['type' => 'object', 'nullable' => true, 'description' => 'With `?intake=` from a booking\'s form link: what the customer gave when they booked, to fill in. Left out otherwise.', 'properties' => [
+                    'name' => self::str(),
+                    'email' => self::str(),
+                    'phone' => self::str(),
+                ]],
             ], ['slug', 'name', 'fields', 'sections', 'accepts_submissions'])),
             // A field, reduced to what drawing it requires. `id`, `tenant_id` and
             // `form_id` are internal identifiers a stranger has no use for and
@@ -11571,6 +11579,7 @@ final class CoreApiSchemas
                 'late_marked_at' => self::str(true),
                 'updated_at' => self::str(true),
                 'desk_status' => self::str() + ['description' => '`expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441).'],
+                'intake' => SchemaBuilder::ref('CalendarIntakeStatus'),
                 'customer_flag' => SchemaBuilder::ref('CalendarCustomerFlag'),
                 'resources' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingResource'), 'description' => 'Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first.'],
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
@@ -11644,6 +11653,80 @@ final class CoreApiSchemas
                 'bookings' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBooking'), 'description' => 'With `since`, cancelled and expired ones too, so they can be dropped.'],
                 'waitlist_count' => self::int() + ['description' => 'How many are on the waitlist (WHIT-1442).'],
             ], ['date', 'time_zone', 'now', 'full', 'bookings', 'waitlist_count']),
+            'CalendarIntakeStatus' => self::object([
+                'status' => self::str() + ['enum' => ['done', 'not_done', 'not_needed'], 'description' => 'Every required form sent, one missing, or none asked for (WHIT-1443). A missing form never blocks check-in.'],
+                'forms' => ['type' => 'array', 'items' => self::object([
+                    'form_id' => self::int(),
+                    'name' => self::str(),
+                    'names' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Its name in each language.'],
+                    'required' => self::bool(),
+                    'fill_when' => self::str() + ['enum' => ['on_booking', 'before_visit']],
+                    'done' => self::bool(),
+                    'submission_id' => self::int(true),
+                    'submitted_at' => self::str(true),
+                ], ['form_id', 'name', 'required', 'done'])],
+            ], ['status', 'forms']),
+            'CalendarServiceForm' => self::object([
+                'form_id' => self::int(),
+                'name' => self::str(),
+                'names' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Its name in each language.'],
+                'fill_when' => self::str() + ['enum' => ['on_booking', 'before_visit']],
+                'who' => self::str() + ['enum' => ['new', 'every'], 'description' => '`new`: only a customer\'s first visit.'],
+                'required' => self::bool(),
+                'public' => self::bool() + ['description' => 'The form has a public link, so customers can fill it in.'],
+            ], ['form_id', 'name', 'fill_when', 'who', 'required']),
+            'CalendarServiceFormsRequest' => self::object([
+                'forms' => ['type' => 'array', 'maxItems' => 8, 'description' => 'The forms, in order; the list replaces what is there.', 'items' => self::object([
+                    'form_id' => self::int() + ['description' => 'A form of this workspace.'],
+                    'fill_when' => self::str() + ['enum' => ['on_booking', 'before_visit'], 'description' => 'Default before_visit.'],
+                    'who' => self::str() + ['enum' => ['new', 'every'], 'description' => 'Default every.'],
+                    'required' => self::bool() + ['description' => 'Default true.'],
+                ], ['form_id'])],
+            ], ['forms']),
+            'CalendarIntakeLinkRequest' => self::object([
+                'send' => self::bool() + ['description' => 'True: email the customer the link (Send again). False: return a link to fill it in at the desk.'],
+            ], []),
+            'CalendarIntakeLink' => self::object([
+                'url' => self::str() + ['description' => 'Fill in at the desk: the form page in kiosk mode.'],
+                'sent' => self::str(true) + ['description' => 'Send again: sent, failed or no_address.'],
+            ], []),
+            'CalendarVisitPerson' => ['type' => 'object', 'nullable' => true, 'properties' => ['profile_id' => self::int(), 'name' => self::str()], 'required' => ['profile_id', 'name']],
+            'CalendarVisitRecord' => self::object([
+                'booking_id' => self::int(),
+                'notes' => ['type' => 'object', 'nullable' => true, 'properties' => [
+                    'body' => self::str(),
+                    'author' => SchemaBuilder::ref('CalendarVisitPerson'),
+                    'created_at' => self::str(),
+                    'updated_at' => self::str(),
+                    'finished_at' => self::str(true),
+                    'finished_by' => SchemaBuilder::ref('CalendarVisitPerson'),
+                ]],
+                'finished' => self::bool() + ['description' => 'Finish visit was pressed: the notes never change; corrections are added.'],
+                'corrections' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'body' => self::str(), 'author' => SchemaBuilder::ref('CalendarVisitPerson'), 'created_at' => self::str()], ['id', 'body', 'created_at'])],
+                'files' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarVisitFile')],
+                'forms' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::int(),
+                    'form_id' => self::int(),
+                    'name' => self::str(),
+                    'names' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Its name in each language.'],
+                    'submitted_at' => self::str(),
+                    'printout_path' => self::str() + ['description' => 'The form\'s printout (FP.1).'],
+                ], ['id', 'form_id', 'name', 'submitted_at', 'printout_path'])],
+            ], ['booking_id', 'finished', 'corrections', 'files', 'forms']),
+            'CalendarVisitFile' => self::object([
+                'id' => self::int(),
+                'filename' => self::str(),
+                'content_type' => self::str(),
+                'byte_size' => self::int(),
+                'added_by' => SchemaBuilder::ref('CalendarVisitPerson'),
+                'created_at' => self::str(),
+            ], ['id', 'filename', 'content_type', 'byte_size', 'created_at']),
+            'CalendarVisitNotesRequest' => self::object([
+                'body' => self::str() + ['maxLength' => 20000, 'description' => 'The notes, as text. Refused once the visit is finished.'],
+            ], ['body']),
+            'CalendarVisitCorrectionRequest' => self::object([
+                'body' => self::str() + ['maxLength' => 20000, 'description' => 'What is added to a finished visit, dated and signed.'],
+            ], ['body']),
             'CalendarWaitlistEntry' => self::object([
                 'id' => self::int(),
                 'contact_id' => self::int(true),
@@ -21049,6 +21132,89 @@ final class CoreApiSchemas
                     200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
                     404 => self::errorResponse('Not found'),
                     422 => self::errorResponse('Not a confirmed booking, or it has not started'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/services/{id:\d+}/forms', 'calendar:read', [
+                'summary' => 'The forms a service asks customers to fill in (WHIT-1443)',
+                'tags' => ['calendar'],
+                'responses' => [200 => self::jsonResponse('The forms', self::listEnvelope('CalendarServiceForm'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/services/{id:\d+}/forms', 'calendar:manage', [
+                'summary' => 'Set the forms a service asks for: on booking or before the visit, for new customers or every visit, required or not (WHIT-1443)',
+                'tags' => ['calendar'],
+                'request' => 'CalendarServiceFormsRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The forms', self::listEnvelope('CalendarServiceForm')),
+                    404 => self::errorResponse('No such service or form'),
+                    422 => self::errorResponse('A bad value, or more than 8 forms'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/intake/{formId:\d+}', 'calendar:write', [
+                'summary' => 'Send a booking\'s intake form again, or get a link to fill it in at the desk (WHIT-1443)',
+                'tags' => ['calendar'],
+                'request' => 'CalendarIntakeLinkRequest',
+                'responses' => [
+                    201 => self::jsonResponse('Sent, or the link', self::dataEnvelope(SchemaBuilder::ref('CalendarIntakeLink'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a form this booking asks for, the form has no public link, or the customer has no email'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/bookings/{id:\d+}/visit', 'calendar:read', [
+                'summary' => 'A booking\'s visit record: notes, corrections, forms and files. Only with calendar:visit_notes or as the person treating the customer; an agent needs the permission. Every read is audited (WHIT-1443)',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The record', self::dataEnvelope(SchemaBuilder::ref('CalendarVisitRecord'))),
+                    403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/bookings/{id:\d+}/visit', 'calendar:read', [
+                'summary' => 'Write the visit notes; refused once the visit is finished (WHIT-1443); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarVisitNotesRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The record', self::dataEnvelope(SchemaBuilder::ref('CalendarVisitRecord'))),
+                    403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
+                    409 => self::errorResponse('The visit is finished: add a correction'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/visit/finish', 'calendar:read', [
+                'summary' => 'Finish visit: the notes are signed and never change again (WHIT-1443); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The record', self::dataEnvelope(SchemaBuilder::ref('CalendarVisitRecord'))),
+                    403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
+                    409 => self::errorResponse('Already finished'),
+                    422 => self::errorResponse('No notes yet'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/visit/corrections', 'calendar:read', [
+                'summary' => 'Add a dated correction to a finished visit (WHIT-1443); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarVisitCorrectionRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The record', self::dataEnvelope(SchemaBuilder::ref('CalendarVisitRecord'))),
+                    403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
+                    422 => self::errorResponse('The visit is not finished yet, or nothing written'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/visit/files', 'calendar:read', [
+                'summary' => 'Keep a file on a visit: a PDF, a photo or a text file up to 20 MB, in the tenant\'s own storage (WHIT-1443); an agent\'s call is a proposal',
+                'description' => 'multipart/form-data with the file in `file`. The type is read from the file itself.',
+                'tags' => ['calendar'],
+                'responses' => [
+                    201 => self::jsonResponse('The file', self::dataEnvelope(SchemaBuilder::ref('CalendarVisitFile'))),
+                    403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
+                    422 => self::errorResponse('Empty, too large or not a type kept on visits'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/visit-files/{id:\d+}', 'calendar:read', [
+                'summary' => 'A visit file\'s bytes, for someone allowed to see the visit. Audited (WHIT-1443)',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => ['description' => 'The file\'s bytes, with its type'],
+                    403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
+                    404 => self::errorResponse('Not found'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/waitlist', 'calendar:read', [

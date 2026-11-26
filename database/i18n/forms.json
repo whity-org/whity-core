@@ -345,6 +345,7 @@
         "fill.resent": "Your changes to {title} were sent. It appears under your own submissions.",
         "fill.resentTitle": "Sent again",
         "fill.send": "Send",
+        "fill.sentKiosk": "Thank you. Please hand the tablet back to the desk.",
         "fill.sentMember": "{title} was recorded. It appears under your own submissions.",
         "fill.sentMemberTitle": "Submitted",
         "fill.sentPublic": "{title} was submitted successfully. You may close this page.",

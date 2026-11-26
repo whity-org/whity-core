@@ -52,6 +52,8 @@ export interface BookedResult {
   booking: PublicBooking;
   manageToken: string | null;
   payment: BookingPayment | null;
+  /** WHIT-1443 (AP.20): the forms to fill before the visit. */
+  intakeForms?: { name: string; url: string }[];
 }
 
 /** A refused request: the status the screen branches on and the field the server named. */
@@ -269,7 +271,7 @@ export const publicBookingApi = {
   },
 
   async book(workspace: string, body: PublicBookingRequest): Promise<BookedResult> {
-    const res = await send<{ data: PublicBooking & { manage_token?: string | null; payment?: unknown }; payment?: unknown }>(
+    const res = await send<{ data: PublicBooking & { manage_token?: string | null; payment?: unknown; intake_forms?: { name: string; url: string }[] }; payment?: unknown }>(
       `${PAGE(workspace)}/bookings`,
       { method: 'POST', body: JSON.stringify(body) }
     );
@@ -278,6 +280,8 @@ export const publicBookingApi = {
       booking: res.data,
       manageToken: res.data.manage_token ?? null,
       payment: readPayment(res.payment ?? res.data.payment ?? null),
+      // WHIT-1443 (AP.20): only links to this workspace's own form pages.
+      intakeForms: (res.data.intake_forms ?? []).filter((f) => typeof f.url === 'string' && /^https?:\/\/[^/]+\/f\/[^/?]+\?intake=[a-f0-9]{64}$/.test(f.url)),
     };
   },
 
