@@ -59,9 +59,34 @@ final class TemplateCatalogue
         foreach ($composed['templates'] as $template) {
             $out[] = $template + ['pluginOn' => $on[(string) $template['key']] ?? true];
         }
+        usort($out, self::byOrder(...));
         $out[] = self::blank();
 
         return $out;
+    }
+
+    /**
+     * Cards in the order their templates give (SDK 1.176, WHIT-1436): the
+     * lowest `order` first, then those without one, each by English name, so
+     * a third-party template without an order falls in after Whity's own.
+     *
+     * @param array<string, mixed> $a
+     * @param array<string, mixed> $b
+     */
+    private static function byOrder(array $a, array $b): int
+    {
+        $orderA = is_int($a['order'] ?? null) ? $a['order'] : PHP_INT_MAX;
+        $orderB = is_int($b['order'] ?? null) ? $b['order'] : PHP_INT_MAX;
+
+        return [$orderA, self::englishName($a)] <=> [$orderB, self::englishName($b)];
+    }
+
+    /** @param array<string, mixed> $template */
+    private static function englishName(array $template): string
+    {
+        $name = $template['name'] ?? null;
+
+        return mb_strtolower(is_array($name) && is_string($name['en'] ?? null) ? $name['en'] : (is_string($name) ? $name : ''));
     }
 
     /**
