@@ -1,6 +1,6 @@
 {
   "name": "@whity/plugin-sdk",
-  "version": "1.175.0",
+  "version": "1.176.0",
   "description": "What a Whity plugin's frontend needs: the block contract and types, a typed builder, a client for the plugin's own routes, page walking, bilingual text and test helpers. Versioned in lockstep with the PHP SDK, whity/plugin-sdk.",
   "license": "MIT",
   "repository": {

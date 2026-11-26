@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.176
+
+TEMPLATE ORDER (design section 40 §4; the owner's order of 17 Nov 2026): a workspace template may give `order`, a whole number from 1 to 9999, and core shows the cards lowest first. Templates without one come after, by English name, so a third-party template falls in after Whity's own; Start blank stays last. A template built on another (`extends`) has its own `order`, not its parent's. Whity's seven templates use 10 to 70 in the owner's order (coffee house, study house, meeting rooms, salon, clinic, bakery, car dealership), whichever plugin each comes from now (WHIT-1436).
+
+Purely additive for plugins: a new optional manifest key (an older host refuses a manifest with it, so require `^1.176`).
+
 ## 1.175
 
 DID THEY COME (design section 39 §4, AP.3, AP.8; owner, 25 Nov 2026, "Accept all"): `Hooks\Events::CALENDAR_ATTENDANCE_MARKED` (`calendar.attendance.marked`, with its `.async` twin) fires after a booking is marked as came or didn't come, or the mark is cleared, by a person or by Whity at the end of the day. Payload: `tenant_id`, `id` (the booking), `profile_id`, `service_id`, `attendance` (`attended`, `no_show` or null), `previous`, `auto` and `acting_profile_id` (null for Whity). Core: `calendar_bookings.attendance` and `cancel_kind`, `POST /api/calendar/bookings/{id}/attendance`, `GET /api/calendar/attendance` and `/attendance/unmarked`, `GET /api/calendar/customers/attendance` and its reset, and the `calendar:reports` permission (WHIT-1427).

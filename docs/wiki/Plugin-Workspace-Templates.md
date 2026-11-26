@@ -46,6 +46,7 @@ Checked by `Whity\Sdk\Manifest\WorkspaceTemplateValidator::errors()`. A template
 | `theme` | no | The theme that suits this business, by id (`templates.market`), usually one your plugin ships with `PluginThemesInterface` (SDK 1.125). SDK 1.131: older hosts refuse a manifest with it, so require `^1.131`. See below |
 | `extends`, `remove`, `hidesParent` | no | SDK 1.170: build on another template, see below |
 | `changes` | no | SDK 1.170: up to 20 `{version, summary}`, newest first, what each version added |
+| `order` | no | SDK 1.176: a whole number from 1 to 9999, where the card goes among the others, lowest first. Templates without one come after, by English name; Start blank is always last. Whity's own use 10 to 70 |
 | `offer` | no | `plugin` (the name of the plugin made for this business), `trialDays` (1 to 90, the trial started from the template's setup), and `free` and `paid`: 1 to 6 lines each. Hidden until that plugin is installed and paid, so a template can carry its offer before the plugin exists |
 
 ### Guided setup step kinds

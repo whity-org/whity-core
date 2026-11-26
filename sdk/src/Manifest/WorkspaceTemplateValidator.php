@@ -51,6 +51,10 @@ namespace Whity\Sdk\Manifest;
  * plugin adds to another plugin's template. Older hosts refuse these keys, so
  * a plugin using them requires `^1.170`.
  *
+ * SDK 1.176 (WHIT-1436): `order` places the template's card among the
+ * others, lowest first; templates without one come after, by name. A plugin
+ * using it requires `^1.176`.
+ *
  * SDK 1.172 (WHIT-1419, design section 40.3): `pipelines` are review routes in
  * Flows for the template's forms. Each stage names one of the template's roles
  * by key; people are never named. A plugin using them requires `^1.172`.
@@ -92,7 +96,7 @@ final class WorkspaceTemplateValidator
 
     public const DOCUMENT_KINDS = ['note', 'letter', 'template', 'label'];
 
-    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup', 'offer', 'theme', 'extends', 'remove', 'hidesParent', 'changes'];
+    private const TOP_KEYS = ['key', 'version', 'name', 'summary', 'icon', 'setsUp', 'settings', 'calendar', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup', 'offer', 'theme', 'extends', 'remove', 'hidesParent', 'changes', 'order'];
 
     /** What a template that extends another may drop from it (SDK 1.170), by list. */
     public const REMOVABLE = ['services', 'roles', 'forms', 'documents', 'pipelines', 'steps'];
@@ -101,6 +105,9 @@ final class WorkspaceTemplateValidator
     private const EXTENSION_KEYS = ['key', 'version', 'target', 'setsUp', 'services', 'roles', 'forms', 'documents', 'pipelines', 'examples', 'setup'];
 
     public const MAX_CHANGES = 20;
+
+    /** The highest `order` a template may give (SDK 1.176). */
+    public const MAX_ORDER = 9999;
     private const KEY_PATTERN = '/^[a-z][a-z0-9-]{0,40}$/';
     private const PERMISSION_PATTERN = '/^[a-z][a-z0-9_]*(:[a-z][a-z0-9_]*)+$/';
     private const ICON_PATTERN = '/^[a-z0-9-]{1,64}$/';
@@ -138,6 +145,9 @@ final class WorkspaceTemplateValidator
         }
         array_push($errors, ...self::textErrors($template['name'] ?? null, 'template.name', 40));
         array_push($errors, ...self::textErrors($template['summary'] ?? null, 'template.summary', 160));
+        if (array_key_exists('order', $template) && (!is_int($template['order']) || $template['order'] < 1 || $template['order'] > self::MAX_ORDER)) {
+            $errors[] = 'template.order: a whole number from 1 to ' . self::MAX_ORDER;
+        }
         if (isset($template['icon']) && (!is_string($template['icon']) || preg_match(self::ICON_PATTERN, $template['icon']) !== 1)) {
             $errors[] = 'template.icon: an icon name';
         }
