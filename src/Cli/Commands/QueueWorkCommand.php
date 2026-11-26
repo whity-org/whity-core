@@ -322,6 +322,7 @@ final class QueueWorkCommand implements CliCommand
                 $activation = new \Whity\Core\Plugin\Workspace\CodePluginActivation($pdo);
                 // WHIT-1125: and pause while a paid plugin is read-only there.
                 $activation->usePaidAccess(static fn (): array => $loaded->loader?->getPaidAccess() ?? []);
+                $activation->useTemplateKeys(static fn (): array => $loaded->loader?->getWorkspaceTemplateKeysByPlugin() ?? []);
                 $entitlements = new \Whity\Core\Entitlement\EntitlementService(new \Whity\Core\Entitlement\TenantEntitlementRepository($pdo));
                 $activation->useEntitlements(static function (int $tenantId, string $key) use ($entitlements): bool {
                     try {

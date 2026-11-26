@@ -175,11 +175,61 @@ PHP);
         self::assertNull($this->list('en')['templates'][1]['theme'], 'Blank has none');
     }
 
-    public function testATemplateIsOnlyOfferedWhereItsPluginIsOn(): void
+    /**
+     * WHIT-1433. Owner, 26 Nov 2026: "a plugin(template) should be turned on
+     * only for workspaces that need it". A template plugin off here is still
+     * offered, and choosing its template turns it on, for someone who may.
+     */
+    public function testATemplateOfAPluginOffHereIsOfferedAndChoosingItTurnsThePluginOn(): void
     {
+        TenantContext::setTenantId(self::BAKERY);
         $this->activation->setAccess('WsTemplates', CodePluginActivation::CHOOSE);
+        $cards = $this->list('en')['templates'];
+        self::assertSame(['bakery', 'blank'], array_column($cards, 'key'));
+        self::assertFalse($cards[0]['pluginOn']);
+        self::assertTrue($cards[1]['pluginOn']);
+
+        $request = new Request('POST', '/api/v1/workspace/templates/bakery/apply', ['content-type' => 'application/json'], '{"examples":false}');
+        $request->user = (object) ['profile_id' => self::AMRO];
+
+        $refused = $this->handler('en', static fn (): bool => false)->apply($request, ['key' => 'bakery']);
+        self::assertSame(403, $refused->getStatusCode(), 'Turning the plugin on needs plugins:enable');
+        self::assertFalse($this->activation->isOn('WsTemplates', self::BAKERY));
+        self::assertSame(0, $this->rows('workspace_template_runs'));
+
+        self::assertSame(200, $this->handler('en', static fn (): bool => true)->apply($request, ['key' => 'bakery'])->getStatusCode());
+        self::assertTrue($this->activation->isOn('WsTemplates', self::BAKERY), 'Choosing the template turned its plugin on here');
+        self::assertTrue($this->list('en')['templates'][0]['pluginOn']);
+        self::assertSame(1, $this->rows('workspace_template_runs'));
+    }
+
+    public function testATemplateOfAPluginTheOperatorKeepsOrThatCannotBeTurnedOnIsNotOffered(): void
+    {
+        $this->activation->setAccess('WsTemplates', CodePluginActivation::OPERATOR);
 
         self::assertSame(['blank'], array_column($this->list('en')['templates'], 'key'));
+    }
+
+    /**
+     * WHIT-1433: a workspace that applied a template before its plugin was
+     * left for each workspace to choose gets the plugin turned on; one that
+     * never used it, or turned it off, keeps it off.
+     */
+    public function testATemplatePluginTurnsOnOnlyWhereItsTemplateWasApplied(): void
+    {
+        $this->activation->useTemplateKeys(fn (): array => $this->loader->getWorkspaceTemplateKeysByPlugin());
+        $this->pdo->exec("INSERT INTO tenants (id, name) VALUES (2, 'example-salon'), (3, 'example-studio')");
+        $runs = new TemplateRuns($this->pdo);
+        $runs->start(self::BAKERY, 'bakery', 'WorkspaceTemplates', 2, self::AMRO);
+        $runs->start(3, 'bakery', 'WorkspaceTemplates', 2, self::AMRO);
+        $this->activation->setEnabled(3, 'WsTemplates', false, self::AMRO);
+        $this->activation->setAccess('WsTemplates', CodePluginActivation::CHOOSE);
+
+        self::assertTrue($this->activation->isOn('WsTemplates', self::BAKERY), 'It applied the bakery template');
+        self::assertFalse($this->activation->isOn('WsTemplates', 2), 'It never used the template');
+        self::assertFalse($this->activation->isOn('WsTemplates', 3), 'It turned the plugin off: that choice stays');
+        self::assertTrue($this->activation->workspaceRows(self::BAKERY)['WsTemplates']['enabled'], 'Recorded, so it is asked once');
+        self::assertArrayNotHasKey('WsTemplates', $this->activation->workspaceRows(2), 'Nothing written where it is not used');
     }
 
     public function testChoosingBlankIsRemembered(): void
@@ -428,7 +478,8 @@ PHP);
         return $body['data'];
     }
 
-    private function handler(string $language): WorkspaceTemplatesApiHandler
+    /** @param (\Closure(int, int): bool)|null $mayTurnOnPlugins */
+    private function handler(string $language, ?\Closure $mayTurnOnPlugins = null): WorkspaceTemplatesApiHandler
     {
         $runs = new TemplateRuns($this->pdo);
 
@@ -440,6 +491,7 @@ PHP);
             null,
             static fn (): string => $language,
             static fn (): TemplateSetup => new TemplateSetup(new FakeSetup()),
+            $mayTurnOnPlugins,
         );
         $handler->useDisplayNames(fn (): array => $this->loader->getDisplayNames());
         $handler->useThemes(fn (int $tenantId, string $id): ?array => $this->themeInstalled && $id === 'templates.market'

@@ -28408,6 +28408,8 @@ export interface components {
             key: string;
             /** @description The plugin that offers it; null for core's Blank */
             plugin?: string | null;
+            /** @description Whether that plugin is on in this workspace (WHIT-1433). A template plugin is on only where it is used; choosing a template of one that is off turns it on, which needs plugins:enable */
+            pluginOn?: boolean;
             version: number;
             name: string;
             summary: string;

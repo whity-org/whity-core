@@ -21518,6 +21518,7 @@ final class CoreApiSchemas
             'WorkspaceTemplateCard' => self::object([
                 'key' => self::str(),
                 'plugin' => ['type' => 'string', 'nullable' => true, 'description' => 'The plugin that offers it; null for core\'s Blank'],
+                'pluginOn' => self::bool() + ['description' => 'Whether that plugin is on in this workspace (WHIT-1433). A template plugin is on only where it is used; choosing a template of one that is off turns it on, which needs plugins:enable'],
                 'version' => self::int(),
                 'name' => self::str(),
                 'summary' => self::str(),
