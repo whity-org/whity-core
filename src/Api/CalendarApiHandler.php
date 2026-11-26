@@ -6,6 +6,7 @@ namespace Whity\Api;
 
 use DateTimeImmutable;
 use Whity\Auth\RoleChecker;
+use Whity\Core\Calendar\AttendanceReport;
 use Whity\Core\Calendar\AttendanceRepository;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
@@ -648,6 +649,67 @@ final class CalendarApiHandler
                 'customer' => $customer,
                 'source' => $source,
             ])]);
+        });
+    }
+
+    /**
+     * Reports › Appointments (WHIT-1437, AP.6–AP.9): the rates for a period,
+     * broken down one way (`by`), with the period before for the trend, as
+     * JSON or `format=csv`. `period` is a named period in the workspace's zone
+     * (this month by default), or `from` and `to`. `calendar:reports`; without
+     * it, a person gets only their own bookings (`profile_id` is them).
+     */
+    public function attendanceReport(Request $request): Response
+    {
+        return $this->run($request, 'attendance', function (int $tenantId, int $actor) use ($request): Response {
+            $q = $this->query($request);
+            $settings = $this->booking->settingsFor($tenantId);
+            $now = $this->booking->now();
+            if (isset($q['from']) || isset($q['to'])) {
+                [$from, $to] = $this->longRange($request);
+                $previousFrom = $from->modify('-' . max(1, $to->getTimestamp() - $from->getTimestamp()) . ' seconds');
+            } else {
+                $name = is_string($q['period'] ?? null) && $q['period'] !== '' ? $q['period'] : 'this_month';
+                if (!in_array($name, AttendanceReport::PERIODS, true)) {
+                    throw new CalendarRejectedException('period is one of ' . implode(', ', AttendanceReport::PERIODS) . '.', 422);
+                }
+                [$from, $to, $previousFrom] = AttendanceReport::period($name, $now, $settings);
+            }
+            $profileId = $this->optionalInt($request, 'profile_id');
+            $reports = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_REPORTS, $tenantId);
+            if (!$reports) {
+                if ($profileId !== null && $profileId !== $actor) {
+                    throw new CalendarRejectedException('Seeing other people\'s rates needs the calendar:reports permission. You can always see your own.', 403);
+                }
+                $profileId = $actor;
+            }
+            $source = is_string($q['source'] ?? null) && in_array($q['source'], [
+                BookingRepository::SOURCE_STAFF, BookingRepository::SOURCE_PUBLIC, BookingRepository::SOURCE_AGENT, BookingRepository::SOURCE_WALKIN,
+            ], true) ? $q['source'] : null;
+            $by = is_string($q['by'] ?? null) && $q['by'] !== '' ? $q['by'] : 'staff';
+            $report = (new AttendanceReport($this->calendar->db(), $this->calendar, $this->services))->build(
+                $tenantId,
+                $from,
+                $to,
+                $previousFrom,
+                $by,
+                ['profile_id' => $profileId, 'service_id' => $this->optionalInt($request, 'service_id'), 'source' => $source],
+                $settings,
+                $now,
+            ) + ['own' => !$reports, 'time_zone' => $settings->zone->getName()];
+
+            if (($q['format'] ?? '') === 'csv') {
+                $language = is_string($q['lang'] ?? null) ? $q['lang'] : 'en';
+
+                return new Response(200, AttendanceReport::csv($report, $language), [
+                    'Content-Type' => 'text/csv; charset=utf-8',
+                    'Content-Disposition' => 'attachment; filename="appointments-' . $by . '-' . substr((string) $report['from'], 0, 10) . '.csv"',
+                    'Cache-Control' => 'private, no-store',
+                    'X-Content-Type-Options' => 'nosniff',
+                ]);
+            }
+
+            return Response::json(['data' => $report]);
         });
     }
 

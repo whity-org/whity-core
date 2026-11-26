@@ -29,6 +29,7 @@ it('opens the pages as a sheet from the page name', async () => {
     '/calendar/services',
     '/calendar/rooms',
     '/calendar/hours',
+    '/calendar/reports',
     '/calendar/settings',
   ]);
   expect(links[1]).toHaveAttribute('aria-current', 'page');

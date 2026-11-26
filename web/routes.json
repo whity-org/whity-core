@@ -1067,6 +1067,16 @@
       "since": "0.2.28"
     },
     {
+      "path": "/calendar/reports",
+      "kind": "page",
+      "area": "protected",
+      "nav_ids": [
+        "calendar"
+      ],
+      "settings_ids": [],
+      "since": "0.2.32"
+    },
+    {
       "path": "/calendar/rooms",
       "kind": "page",
       "area": "protected",

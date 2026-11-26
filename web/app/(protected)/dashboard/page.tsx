@@ -14,6 +14,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { useAuth } from '@/lib/auth-context';
 import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
+import { AppointmentsReportCard } from '@/components/calendar/appointments-report-card';
 import { FinishSettingUp } from './finish-setting-up';
 import { TemplateExamples } from './template-examples';
 import { TemplateUpdateNotices } from '@/components/workspace-templates/template-updates';
@@ -80,6 +81,8 @@ export default function DashboardPage() {
         </div>
         <div className="grid gap-6">
           <AgentsToday refreshKey={refreshKey} />
+          {/* WHIT-1437 (AP.8): this month's appointments, for people who see the reports. */}
+          {capabilities.has('calendar:reports') && <AppointmentsReportCard />}
           <FinishSettingUp canSetUp={capabilities.has('settings:write')} apps={dashboard.data?.setup ?? NO_SETUP} />
         </div>
       </div>

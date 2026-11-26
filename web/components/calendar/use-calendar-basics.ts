@@ -22,6 +22,7 @@ import { safeTimeZone } from '@whity/features/datetime';
 import {
   CALENDAR_MANAGE,
   CALENDAR_READ,
+  CALENDAR_REPORTS,
   CALENDAR_WRITE,
   calendarApi,
   type CalendarRoom,
@@ -62,6 +63,8 @@ export interface CalendarAccess {
   canRead: boolean;
   canWrite: boolean;
   canManage: boolean;
+  /** WHIT-1437 (AP.9): everyone's rates; without it, only one's own. */
+  canReports: boolean;
   /** The signed-in person's profile id. */
   me: number | null;
   /** Whether the person may change `profileId`'s calendar (their own on write, anyone's on manage). */
@@ -75,16 +78,18 @@ export function useCalendarAccess(): CalendarAccess {
   const canRead = has(CALENDAR_READ);
   const canWrite = has(CALENDAR_WRITE);
   const canManage = has(CALENDAR_MANAGE);
+  const canReports = has(CALENDAR_REPORTS);
   return useMemo(
     () => ({
       loading,
       canRead,
       canWrite,
       canManage,
+      canReports,
       me,
       canChange: (profileId: number) => canManage || (canWrite && profileId === me),
     }),
-    [loading, canRead, canWrite, canManage, me]
+    [loading, canRead, canWrite, canManage, canReports, me]
   );
 }
 
