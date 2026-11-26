@@ -134,10 +134,11 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
     public function waitlistOffer(int $tenantId, array $offer): string
     {
         try {
-            $email = trim($offer['to']);
-            if ($email === '' || filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
+            $checked = \Whity\Http\Validation\FieldValidator::check(['to' => $offer['to']], ['to' => \Whity\Http\Validation\Field::email()->required()]);
+            if ($checked->first() !== null) {
                 return BookingRepository::REMINDER_NO_ADDRESS;
             }
+            $email = $checked->value('to');
             $effective = $this->settings->effective($tenantId);
             $calendar = CalendarSettings::fromSettings($effective);
             $arabic = $offer['language'] !== ''

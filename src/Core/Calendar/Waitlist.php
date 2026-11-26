@@ -12,6 +12,8 @@ use Whity\Core\Contacts\CustomerContacts;
 use Whity\Core\i18n\LocalizedText;
 use Whity\Core\Log\ScrubbedErrorLog;
 use Whity\Core\Security\PublicToken;
+use Whity\Http\Validation\Field;
+use Whity\Http\Validation\FieldValidator;
 
 /**
  * The waitlist (WHIT-1442, design section 39 §8, register AP.23).
@@ -75,17 +77,21 @@ final class Waitlist
         if ($profileId !== null && !in_array($profileId, $service['staff_profile_ids'], true)) {
             throw new CalendarRejectedException('That person does not offer this service.', 422);
         }
-        $name = trim(is_string($v['name'] ?? null) ? $v['name'] : '');
-        $email = trim(is_string($v['email'] ?? null) ? $v['email'] : '');
-        $phone = trim(is_string($v['phone'] ?? null) ? $v['phone'] : '');
-        if ($name === '' || mb_strlen($name) > 200) {
-            throw new CalendarRejectedException('Add their name.', 422, ['field' => 'name']);
+        // The shared field validator (#2174), as booking uses.
+        $checked = FieldValidator::check($v, [
+            'name' => Field::text()->required()->max(200),
+            'email' => Field::email()->max(320),
+            'phone' => Field::phone(),
+        ]);
+        $sentence = ['name' => 'Add their name.', 'email' => 'That email doesn’t look right.', 'phone' => 'That phone number doesn’t look right.'];
+        if (($first = $checked->first()) !== null) {
+            throw new CalendarRejectedException($sentence[$first] ?? 'Check their details.', 422, ['field' => $first]);
         }
+        $name = $checked->value('name');
+        $email = $checked->value('email');
+        $phone = $checked->value('phone');
         if ($email === '' && $phone === '') {
             throw new CalendarRejectedException('Add an email or a phone, so we can tell them when a time is free.', 422, ['field' => 'email']);
-        }
-        if ($email !== '' && filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            throw new CalendarRejectedException('That email doesn’t look right.', 422, ['field' => 'email']);
         }
         $settings = $this->booking->settingsFor($tenantId);
         $today = $this->booking->now()->setTimezone($settings->zone)->format('Y-m-d');
