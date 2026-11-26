@@ -626,6 +626,8 @@
         "audit.sentence.auth_two_factor_policy_enrollment_required": "{actor} must set up two-step sign-in",
         "audit.sentence.auth_two_factor_policy_login_refused": "{actor} was refused sign-in because two-step sign-in is not set up",
         "audit.sentence.billing_plan_changed": "{actor} changed the plan",
+        "audit.sentence.calendar_attendance_marked": "{actor} marked whether a customer came",
+        "audit.sentence.calendar_attendance_reset": "{actor} started a customer's count again",
         "audit.sentence.documents_comment_reopened": "{actor} reopened a comment",
         "audit.sentence.documents_comment_resolved": "{actor} resolved a comment",
         "audit.sentence.documents_document_withdrawn": "{actor} withdrew a document",

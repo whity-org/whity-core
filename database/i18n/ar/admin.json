@@ -627,6 +627,8 @@
         "audit.sentence.auth_two_factor_policy_enrollment_required": "{actor}: مطلوب إعداد التحقق بخطوتين",
         "audit.sentence.auth_two_factor_policy_login_refused": "{actor}: رُفض الدخول لعدم إعداد التحقق بخطوتين",
         "audit.sentence.billing_plan_changed": "{actor}: تغيير الباقة",
+        "audit.sentence.calendar_attendance_marked": "سجّل {actor} إن كان الزبون قد حضر",
+        "audit.sentence.calendar_attendance_reset": "بدأ {actor} عدّ مواعيد زبون من جديد",
         "audit.sentence.documents_comment_reopened": "{actor}: إعادة فتح تعليق",
         "audit.sentence.documents_comment_resolved": "{actor}: إغلاق تعليق",
         "audit.sentence.documents_document_withdrawn": "{actor}: سحب مستند",

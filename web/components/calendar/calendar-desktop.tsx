@@ -53,7 +53,7 @@ import { BookingDetails } from './booking-details';
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
 import { EventDialog } from './event-dialog';
-import { RequestsCard } from './appointments-side';
+import { DidTheyComeCard, RequestsCard } from './appointments-side';
 import { BookingLinkCard } from './booking-link';
 import { TimeGrid, hoursToDraw, type CalItem } from './time-grid';
 import { QuickBooking, useGridEditing } from './calendar-editing';
@@ -339,6 +339,7 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
         onNewBooking={() => setNewBooking(true)}
         footer={
           <>
+            <DidTheyComeCard unitId={null} reloadKey={reloadKey} timeZone={timeZone} canChange={access.canWrite} onChanged={refetch} />
             {(requests.data ?? []).length > 0 && (
               <RequestsCard
                 requests={requests.data ?? []}
@@ -549,7 +550,11 @@ export function CalendarDesktop({ basics }: { basics: CalendarBasics }) {
                     ? t('booking.checkedInToast', '{name} checked in', { name: changed.customer.name ?? '' })
                     : what === 'notCheckedIn'
                       ? t('booking.checkInUndone', 'Check-in undone')
-                      : t('booking.moved', 'Booking moved'),
+                      : what === 'cameMarked'
+                        ? t('booking.cameToast', '{name} came', { name: changed.customer.name ?? '' })
+                        : what === 'noShowMarked'
+                          ? t('booking.noShowToast', '{name} didn’t come', { name: changed.customer.name ?? '' })
+                          : t('booking.moved', 'Booking moved'),
             'success'
           );
           refetch();

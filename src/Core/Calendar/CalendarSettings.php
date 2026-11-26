@@ -40,6 +40,18 @@ final class CalendarSettings
          * @var list<int>
          */
         public readonly array $reminderHours = [24],
+        /** WHIT-1427 (AP.4): minutes after the start before Did they come? asks. */
+        public readonly int $noShowGraceMinutes = 15,
+        /** WHIT-1427 (AP.4, Q2): end-of-day marking. */
+        public readonly bool $autoNoShow = false,
+        /** WHIT-1427 (AP.5): a cancel within this many hours of the start is late. */
+        public readonly int $lateCancelHours = 24,
+        /** WHIT-1427 (AP.10): the flag counts misses over this many months... */
+        public readonly int $noShowWindowMonths = 12,
+        /** ...from this many misses (0 = no flag)... */
+        public readonly int $noShowFlagAfter = 2,
+        /** ...late cancels included unless turned off. */
+        public readonly bool $noShowCountLateCancels = true,
     ) {
     }
 
@@ -93,6 +105,12 @@ final class CalendarSettings
             ($effective[SettingsRegistry::CALENDAR_MULTI_SERVICE_BOOKING] ?? 'false') === 'true',
             ($effective[SettingsRegistry::CALENDAR_WALKINS_ENABLED] ?? 'false') === 'true',
             $reminderHours,
+            $int(SettingsRegistry::CALENDAR_NO_SHOW_GRACE_MINUTES, 15),
+            ($effective[SettingsRegistry::CALENDAR_AUTO_NO_SHOW] ?? 'false') === 'true',
+            $int(SettingsRegistry::CALENDAR_LATE_CANCEL_HOURS, 24),
+            max(1, $int(SettingsRegistry::CALENDAR_NO_SHOW_WINDOW_MONTHS, 12)),
+            $int(SettingsRegistry::CALENDAR_NO_SHOW_FLAG_AFTER, 2),
+            ($effective[SettingsRegistry::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS] ?? 'true') !== 'false',
         );
     }
 
@@ -138,6 +156,12 @@ final class CalendarSettings
             'instant_booking' => $this->instantBooking,
             'multi_service_booking' => $this->multiServiceBooking,
             'walkins_enabled' => $this->walkinsEnabled,
+            'no_show_grace_minutes' => $this->noShowGraceMinutes,
+            'auto_no_show' => $this->autoNoShow,
+            'late_cancel_hours' => $this->lateCancelHours,
+            'no_show_window_months' => $this->noShowWindowMonths,
+            'no_show_flag_after' => $this->noShowFlagAfter,
+            'no_show_count_late_cancels' => $this->noShowCountLateCancels,
         ];
     }
 }

@@ -541,7 +541,20 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
         canChange={access.canWrite}
         onChanged={(changed, what) => {
           setSheet((current) => (current === null ? null : { booking: changed, startWith: null }));
-          addToast(what === 'cancelled' ? t('booking.cancelled', 'Booking cancelled') : t('booking.moved', 'Booking moved'), 'success');
+          addToast(
+            what === 'cancelled'
+              ? t('booking.cancelled', 'Booking cancelled')
+              : what === 'cameMarked'
+                ? t('booking.cameToast', '{name} came', { name: changed.customer.name ?? '' })
+                : what === 'noShowMarked'
+                  ? t('booking.noShowToast', '{name} didn’t come', { name: changed.customer.name ?? '' })
+                  : what === 'checkedIn'
+                    ? t('booking.checkedInToast', '{name} checked in', { name: changed.customer.name ?? '' })
+                    : what === 'notCheckedIn'
+                      ? t('booking.checkInUndone', 'Check-in undone')
+                      : t('booking.moved', 'Booking moved'),
+            'success'
+          );
           refetch();
         }}
       />

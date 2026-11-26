@@ -159,7 +159,8 @@ final class SettingsApiRealEngineTest extends TestCase
         // 58 since WHIT-1334: calendar.walkins_enabled.
         // 59 since #1730: documents.qr_public_signer_names.
         // 60 since WHIT-1417: calendar.reminders.
-        self::assertCount(60, $data['registry']);
+        // 66 since WHIT-1427: six calendar.* keys for did they come.
+        self::assertCount(66, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }

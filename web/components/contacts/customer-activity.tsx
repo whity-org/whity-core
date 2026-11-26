@@ -12,6 +12,7 @@ import { useLanguageCode, useTranslation } from '@whity/features/i18n';
 import { useDateDisplay } from '@whity/features/datetime';
 import { api } from '@/lib/api/client';
 import { useFetch } from '@/hooks/useFetch';
+import { CustomerAttendanceLine } from './customer-attendance';
 
 type Title = string | Record<string, string>;
 
@@ -81,6 +82,8 @@ export function CustomerActivity({ contactId }: { contactId: number }) {
         return (
           <div key={section} className="space-y-1">
             <h3 className="text-sm font-medium">{heading[section]}</h3>
+            {/* WHIT-1427 (AP.8): came, didn't come and late cancels, with the flag. */}
+            {section === 'bookings' && <CustomerAttendanceLine contactId={contactId} />}
             {items.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('contacts.activity.none', 'None yet.')}</p>
             ) : (

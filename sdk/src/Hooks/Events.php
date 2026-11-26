@@ -617,6 +617,18 @@ final class Events
     public const CALENDAR_COMMISSION_CLOSED = 'calendar.commission.closed';
     public const CALENDAR_COMMISSION_CLOSED_ASYNC = 'calendar.commission.closed.async';
 
+    // ---- did they come (SDK 1.175, WHIT-1427, design section 39 §4) ----
+    /**
+     * A booking was marked as came or didn't come, or the mark was cleared,
+     * by a person or by Whity at the end of the day. Fired after the change is
+     * saved. Payload: `tenant_id`, `id` (the booking), `profile_id` (the staff
+     * member), `service_id`, `attendance` (`attended`, `no_show` or null),
+     * `previous` (what it was), `auto` (true when Whity marked it at the end
+     * of the day) and `acting_profile_id` (null for Whity).
+     */
+    public const CALENDAR_ATTENDANCE_MARKED = 'calendar.attendance.marked';
+    public const CALENDAR_ATTENDANCE_MARKED_ASYNC = 'calendar.attendance.marked.async';
+
     // ---- accounting: the ledger and periods (SDK 1.154, WHIT-1318, design section 32) ----
     /**
      * FILTER hook, before a journal entry posts, inside its transaction.

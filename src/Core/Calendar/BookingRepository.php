@@ -7,6 +7,7 @@ namespace Whity\Core\Calendar;
 use Whity\Core\i18n\LocalizedText;
 use DateTimeImmutable;
 use PDO;
+use Whity\Core\Db\DbBool;
 
 /**
  * Bookings (migration 248). Tenant first on every method; the manage-token
@@ -39,7 +40,16 @@ final class BookingRepository
         b.customer_phone, b.customer_note, b.starts_at, b.ends_at, b.blocks_from, b.blocks_until, b.status,
         b.hold_expires_at, b.source, b.price_minor, b.currency, b.payment_ref, b.reminder_due_at, b.reminder_sent_at,
         b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id,
-        b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence, b.confirmed_by_customer_at';
+        b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence, b.confirmed_by_customer_at,
+        b.contact_id, b.attendance, b.attendance_at, b.attendance_by_profile_id, b.attendance_auto, b.cancel_kind';
+
+    /** WHIT-1427 (AP.3): what happened to a booking. */
+    public const ATTENDED = 'attended';
+    public const NO_SHOW = 'no_show';
+    /** WHIT-1427 (AP.5): a cancel by or for the customer, before or inside the window, or by the business. */
+    public const CANCEL_EARLY = 'early';
+    public const CANCEL_LATE = 'late';
+    public const CANCEL_BUSINESS = 'business';
 
     /** WHIT-1417: what happened to one reminder on one channel. */
     public const REMINDER_SENT = 'sent';
@@ -341,7 +351,7 @@ final class BookingRepository
     {
         $set = ['status = :to', 'updated_at = :now'];
         $params = [':to' => $to, ':now' => Interval::toDb(new DateTimeImmutable()), ':tenant_id' => $tenantId, ':id' => $id];
-        foreach (['cancelled_by', 'cancel_reason', 'payment_ref'] as $column) {
+        foreach (['cancelled_by', 'cancel_reason', 'payment_ref', 'cancel_kind'] as $column) {
             if (array_key_exists($column, $extra)) {
                 $set[] = $column . ' = :' . $column;
                 $params[':' . $column] = $extra[$column];
@@ -381,6 +391,30 @@ final class BookingRepository
         );
         $stmt->bindValue(':at', $at !== null ? Interval::toDb($at) : null, $at === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
         $stmt->bindValue(':now', Interval::toDb(new DateTimeImmutable()));
+        $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+        $stmt->bindValue(':id', $id, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /**
+     * Record whether the customer came (WHIT-1427, AP.3), or clear it. Only a
+     * confirmed booking. `$by` is the person; null with `$auto` is Whity at the
+     * end of the day. Returns false when the booking is not confirmed.
+     */
+    public function setAttendance(int $tenantId, int $id, ?string $attendance, DateTimeImmutable $now, ?int $by, bool $auto = false): bool
+    {
+        $stmt = $this->db->prepare(
+            "UPDATE calendar_bookings
+                SET attendance = :attendance, attendance_at = :at, attendance_by_profile_id = :by,
+                    attendance_auto = " . ($auto ? 'TRUE' : 'FALSE') . ", updated_at = :now
+              WHERE tenant_id = :tenant_id AND id = :id AND status = 'confirmed'"
+        );
+        $stmt->bindValue(':attendance', $attendance, $attendance === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':at', $attendance !== null ? Interval::toDb($now) : null, $attendance === null ? PDO::PARAM_NULL : PDO::PARAM_STR);
+        $stmt->bindValue(':by', $attendance !== null ? $by : null, $attendance !== null && $by !== null ? PDO::PARAM_INT : PDO::PARAM_NULL);
+        $stmt->bindValue(':now', Interval::toDb($now));
         $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
         $stmt->bindValue(':id', $id, PDO::PARAM_INT);
         $stmt->execute();
@@ -592,6 +626,13 @@ final class BookingRepository
             'reminder_sent_at' => $at($r['reminder_sent_at'] ?? null),
             // WHIT-1417: the customer pressed I'm coming.
             'confirmed_by_customer_at' => $at($r['confirmed_by_customer_at'] ?? null),
+            'contact_id' => isset($r['contact_id']) ? (int) $r['contact_id'] : null,
+            // WHIT-1427 (AP.3, AP.5): did they come, and how it was cancelled.
+            'attendance' => isset($r['attendance']) && is_string($r['attendance']) ? $r['attendance'] : null,
+            'attendance_at' => $at($r['attendance_at'] ?? null),
+            'attendance_by_profile_id' => isset($r['attendance_by_profile_id']) ? (int) $r['attendance_by_profile_id'] : null,
+            'attendance_auto' => DbBool::of($r['attendance_auto'] ?? false),
+            'cancel_kind' => isset($r['cancel_kind']) && is_string($r['cancel_kind']) ? $r['cancel_kind'] : null,
             // The calendar file's revision (E2): raised by every move and the cancel.
             'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
         ];

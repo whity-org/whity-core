@@ -116,6 +116,107 @@ export function RequestsCard({ requests, services, staff, timeZone, canChange, o
   );
 }
 
+/**
+ * Did they come? (WHIT-1427, design section 39 §4.1, AP.4): today's bookings
+ * that started at least the grace minutes ago and nobody marked, each with
+ * Came and Didn't come. A booking stays until someone answers. Both answers
+ * can be changed on the booking, so neither asks first.
+ */
+export function DidTheyComeCard({
+  unitId,
+  reloadKey,
+  timeZone,
+  canChange,
+  onChanged,
+}: {
+  unitId: number | null;
+  reloadKey: number;
+  timeZone: string;
+  canChange: boolean;
+  onChanged: () => void;
+}) {
+  const t = useTranslation('calendar');
+  const words = useCalendarWords();
+  const dates = useDateDisplay({ timeZone });
+  const { addToast } = useToast();
+  const [busy, setBusy] = useState<number | null>(null);
+  const [answered, setAnswered] = useState<number[]>([]);
+  const { data } = useFetch(() => calendarApi.unmarked({ unitId }), [unitId, reloadKey]);
+  const waiting = (data ?? []).filter((b) => !answered.includes(b.id));
+  if (waiting.length === 0) return null;
+
+  const mark = async (booking: CalendarBooking, attendance: 'attended' | 'no_show') => {
+    setBusy(booking.id);
+    try {
+      await calendarApi.markAttendance(booking.id, attendance);
+      setAnswered((ids) => [...ids, booking.id]);
+      addToast(
+        attendance === 'attended'
+          ? t('booking.cameToast', '{name} came', { name: booking.customer.name ?? '' })
+          : t('booking.noShowToast', '{name} didn’t come', { name: booking.customer.name ?? '' }),
+        'success'
+      );
+      onChanged();
+    } catch (error) {
+      addToast(words.errorText(error, t('booking.actError', 'That didn’t work. Try again.')), 'error');
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <Card data-testid="calendar-did-they-come">
+      <CardHeader>
+        <CardTitle>{t('attendance.title', 'Did they come?')}</CardTitle>
+        <CardDescription>{t('attendance.description', 'Bookings that have started and nobody has marked yet')}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {waiting.map((booking) => {
+          const name = booking.customer.name ?? t('booking.noName', 'No name given');
+          return (
+            <div key={booking.id} className="grid gap-2" data-testid={`calendar-unmarked-${booking.id}`}>
+              <div className="flex items-center gap-3">
+                <Avatar name={name} size={32} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-foreground">{name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    <span dir="ltr" className="tabular-nums">{dates.time(booking.starts_at) ?? '—'}</span>
+                    {booking.customer_flag
+                      ? ` · ${t('flag.missed', 'Missed {misses} of the last {of}', { misses: booking.customer_flag.misses, of: booking.customer_flag.of })}`
+                      : ''}
+                  </p>
+                </div>
+              </div>
+              {canChange && (
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void mark(booking, 'attended')}
+                    loading={busy === booking.id}
+                    data-testid={`calendar-unmarked-came-${booking.id}`}
+                  >
+                    {t('attendance.came', 'Came')}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void mark(booking, 'no_show')}
+                    loading={busy === booking.id}
+                    data-testid={`calendar-unmarked-no-show-${booking.id}`}
+                  >
+                    {t('booking.noShow', 'Didn’t come')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function TodayCard({ unitId, reloadKey, settings }: { unitId: number | null; reloadKey: number; settings: CalendarSettings }) {
   const t = useTranslation('calendar');
   const { data, error } = useFetch(() => calendarApi.today({ unitId }), [unitId, reloadKey]);
