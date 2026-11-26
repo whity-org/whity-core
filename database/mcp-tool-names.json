@@ -499,6 +499,26 @@
     "en": "Today at a glance",
     "ar": "نظرة على اليوم"
   },
+  "post_api_calendar_bookings_id_attendance": {
+    "en": "Mark whether the customer came",
+    "ar": "تسجيل إن كان الزبون قد حضر"
+  },
+  "get_api_calendar_attendance_unmarked": {
+    "en": "List bookings nobody has marked as came or didn't come",
+    "ar": "عرض المواعيد التي لم يُسجَّل حضورها"
+  },
+  "get_api_calendar_attendance": {
+    "en": "Get no-show and late-cancel rates",
+    "ar": "عرض نسبة عدم الحضور والإلغاء المتأخر"
+  },
+  "get_api_calendar_customers_attendance": {
+    "en": "Get a customer's attendance and flag",
+    "ar": "عرض حضور زبون وتنبيهه"
+  },
+  "post_api_calendar_customers_attendance_reset": {
+    "en": "Start a customer's count again from today",
+    "ar": "بدء عدّ مواعيد زبون من جديد"
+  },
   "get_api_chat_chats": {
     "en": "List the team chats you are in",
     "ar": "عرض محادثات الفريق التي أنت فيها"

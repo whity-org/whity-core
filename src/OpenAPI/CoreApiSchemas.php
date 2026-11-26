@@ -11577,7 +11577,7 @@ final class CoreApiSchemas
             ], ['came', 'no_show', 'late_cancels', 'since', 'flag', 'window_months']),
             'CalendarCustomerAttendanceResetRequest' => self::object([
                 'contact_id' => self::int() + ['description' => 'The customer\'s contact; or give `email` for a booking without one.'],
-                'email' => self::str(),
+                'email' => self::str() + ['description' => 'The customer\'s email, for bookings made without a contact.'],
             ], []),
             'CalendarEvent' => self::object([
                 'id' => self::int(),

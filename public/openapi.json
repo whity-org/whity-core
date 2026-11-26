@@ -113345,7 +113345,8 @@
                         "description": "The customer's contact; or give `email` for a booking without one."
                     },
                     "email": {
-                        "type": "string"
+                        "type": "string",
+                        "description": "The customer's email, for bookings made without a contact."
                     }
                 }
             },

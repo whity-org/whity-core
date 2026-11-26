@@ -17464,6 +17464,7 @@ export interface components {
         CalendarCustomerAttendanceResetRequest: {
             /** @description The customer's contact; or give `email` for a booking without one. */
             contact_id?: number;
+            /** @description The customer's email, for bookings made without a contact. */
             email?: string;
         };
         /** @description Shown as "Missed {misses} of the last {of}" when the policy applies; null otherwise (WHIT-1427, AP.8, AP.10). */
