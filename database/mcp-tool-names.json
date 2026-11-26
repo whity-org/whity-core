@@ -467,6 +467,14 @@
     "en": "Read your own calendar choices",
     "ar": "عرض اختياراتك في التقويم"
   },
+  "get_api_calendar_branches": {
+    "en": "List branches and their time zones",
+    "ar": "عرض الفروع ومناطقها الزمنية"
+  },
+  "get_api_calendar_busy_checks": {
+    "en": "List calendars that could not be checked",
+    "ar": "عرض التقاويم التي تعذّر فحصها"
+  },
   "get_api_calendar_rooms": {
     "en": "List rooms",
     "ar": "عرض الغرف"
@@ -1382,6 +1390,10 @@
   "patch_api_calendar_events_id": {
     "en": "Change a calendar event",
     "ar": "تعديل حدث في التقويم"
+  },
+  "patch_api_calendar_branches_id": {
+    "en": "Set a branch's time zone",
+    "ar": "تحديد المنطقة الزمنية لفرع"
   },
   "patch_api_calendar_rooms_id": {
     "en": "Change a room",

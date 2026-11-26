@@ -2723,6 +2723,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/branches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List branches with their time zones, the ones staff or rooms are in first */
+        get: operations["get_api_v1_calendar_branches"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/branches/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Set or clear a branch's time zone; its staff's hours are read in it from then on */
+        patch: operations["patch_api_v1_calendar_branches_id"];
+        trace?: never;
+    };
+    "/api/v1/calendar/busy-checks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** External calendars that could not be read in the last day; everyone's with calendar:manage, otherwise your own */
+        get: operations["get_api_v1_calendar_busy_checks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/commission/closes": {
         parameters: {
             query?: never;
@@ -17422,6 +17473,8 @@ export interface components {
              * @enum {string|null}
              */
             cancel_kind?: "early" | "late" | "business" | null;
+            /** @description The zone of the person's branch (WHIT-1440); null is the workspace's. */
+            time_zone?: string | null;
             customer_flag?: components["schemas"]["CalendarCustomerFlag"];
             /** @description Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first. */
             resources?: components["schemas"]["CalendarBookingResource"][];
@@ -17534,6 +17587,32 @@ export interface components {
             starts_at: string;
             /** @description Suggest another person. Default: the same one. */
             profile_id?: number;
+        };
+        CalendarBranch: {
+            id: number;
+            name: string;
+            /** @description Its own IANA zone; null uses the workspace's. */
+            time_zone: string | null;
+            /** @description Staff or rooms are in it. */
+            in_use: boolean;
+        };
+        CalendarBranchList: {
+            data: components["schemas"]["CalendarBranch"][];
+            /** @description The zone a branch without its own uses. */
+            workspace_time_zone: string;
+        };
+        CalendarBranchRequest: {
+            /** @description An IANA zone such as Asia/Amman, or null to use the workspace's. */
+            time_zone: string | null;
+        };
+        CalendarBusyCheck: {
+            profile_id: number;
+            /** @description The person whose calendar could not be read. */
+            name: string;
+            /** @description The calendar, such as the Google Calendar plugin's name; `external` when unnamed. */
+            source: string;
+            /** @description The latest failure. */
+            failed_at: string;
         };
         CalendarCommissionClose: {
             id: number;
@@ -17778,6 +17857,8 @@ export interface components {
             active: boolean;
             sort_order: number;
             staff_profile_ids: number[];
+            /** @description Who provides it, each with their own length, buffer after and price (WHIT-1440); null is the service's. */
+            staff?: components["schemas"]["CalendarServicePerson"][];
             /** @description The first specific room it needs; booked with the person. `resources` lists every need. */
             room_id?: number | null;
             /** @description What it needs, in order: specific rooms and equipment, or any one from a group (WHIT-1439). */
@@ -17792,6 +17873,16 @@ export interface components {
             resource_id: number | null;
             /** @description Or any free one from this group, such as "Chairs". */
             group_key: string | null;
+        };
+        CalendarServicePerson: {
+            /** @description The member of staff. */
+            profile_id: number;
+            /** @description Their own length; null is the service's. */
+            duration_minutes?: number | null;
+            /** @description Their own time kept free after; null is the service's. */
+            buffer_after_minutes?: number | null;
+            /** @description Their own price in minor units; null is the service's. */
+            price_minor?: number | null;
         };
         CalendarServiceRequest: {
             /** @description Text, or a `{ar, en}` map. */
@@ -17814,8 +17905,10 @@ export interface components {
             active?: boolean;
             /** @description Position in lists; lower comes first. */
             sort_order?: number;
-            /** @description The staff who provide it; the list replaces what is there. */
+            /** @description The staff who provide it; the list replaces what is there. Each keeps their own values. */
             staff_profile_ids?: number[];
+            /** @description The staff who provide it, each with their own length, buffer after and price (null is the service's). Replaces `staff_profile_ids` when sent (WHIT-1440). */
+            staff?: components["schemas"]["CalendarServicePerson"][];
             /** @description Older clients: the one room it needs; null for none. Left out when `resources` is sent. */
             room_id?: number | null;
             /** @description What it needs, in order: each a `resource_id`, or a `group_key` for any free one from that group (WHIT-1439). */
@@ -17922,6 +18015,8 @@ export interface components {
             feed_enabled: boolean;
             /** @description The branch (organisational unit) they work in. */
             unit_id?: number | null;
+            /** @description Their branch's time zone (WHIT-1440); null is the workspace's. */
+            time_zone?: string | null;
         };
         CalendarStaffRequest: {
             /** @description The branch they work in; null for none. */
@@ -17939,6 +18034,11 @@ export interface components {
             starts_at: string;
             ends_at: string;
             note: string;
+        };
+        CalendarTimeOffCreated: {
+            data: components["schemas"]["CalendarTimeOff"];
+            /** @description Time off only: the bookings it covers, to move (each asks the customer first) or keep (WHIT-1440). */
+            covered_bookings: components["schemas"]["CalendarBooking"][];
         };
         CalendarTimeOffRequest: {
             /** @description Whose calendar. Default: yours. */
@@ -25182,12 +25282,20 @@ export interface components {
                 price_minor: number | null;
                 currency: string;
                 staff_profile_ids: number[];
+                /** @description Each person's own length and price (WHIT-1440): theirs, or the service's. */
+                staff?: {
+                    profile_id: number;
+                    duration_minutes: number;
+                    price_minor: number | null;
+                }[];
                 /** @description Booking it sends a request the business accepts first. */
                 sends_request?: boolean;
             }[];
             staff: {
                 profile_id: number;
                 display_name: string;
+                /** @description The zone of their branch (WHIT-1440); null is the workspace's, `settings.time_zone`. */
+                time_zone?: string | null;
             }[];
             bot_check: {
                 provider?: string;
@@ -42416,6 +42524,229 @@ export interface operations {
             };
         };
     };
+    get_api_v1_calendar_branches: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Branches */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarBranchList"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    patch_api_v1_calendar_branches_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarBranchRequest"];
+            };
+        };
+        responses: {
+            /** @description The branch */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBranch"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such branch */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a time zone Whity knows */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_busy_checks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Failed checks */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBusyCheck"][];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_calendar_commission_closes: {
         parameters: {
             query?: never;
@@ -45455,15 +45786,13 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The exception */
+            /** @description The exception, and the bookings time off covers */
             201: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": {
-                        data: components["schemas"]["CalendarTimeOff"];
-                    };
+                    "application/json": components["schemas"]["CalendarTimeOffCreated"];
                 };
             };
             /** @description Invalid request body */

@@ -132,32 +132,88 @@ final class ServiceRepository
         $stmt->execute();
     }
 
-    /** @param list<int> $profileIds */
-    public function replaceStaff(int $tenantId, int $serviceId, array $profileIds): void
+    /**
+     * Who provides the service. WHIT-1440 (AP.19): each person may have their
+     * own length, buffer after and price; null is the service's own. Without
+     * `$values` (an older client sending only the people), the people who
+     * stay keep the values they had.
+     *
+     * @param list<int> $profileIds
+     * @param array<int, array{duration_minutes: ?int, buffer_after_minutes: ?int, price_minor: ?int}>|null $values by profile id
+     */
+    public function replaceStaff(int $tenantId, int $serviceId, array $profileIds, ?array $values = null): void
     {
+        if ($values === null) {
+            $values = [];
+            foreach ($this->staffByService($tenantId)[$serviceId] ?? [] as $row) {
+                $values[$row['profile_id']] = $row;
+            }
+        }
         $this->db->prepare('DELETE FROM calendar_service_staff WHERE tenant_id = :tenant_id AND service_id = :service_id')
             ->execute([':tenant_id' => $tenantId, ':service_id' => $serviceId]);
         $insert = $this->db->prepare(
-            'INSERT INTO calendar_service_staff (tenant_id, service_id, profile_id) VALUES (:tenant_id, :service_id, :profile_id)'
+            'INSERT INTO calendar_service_staff (tenant_id, service_id, profile_id, duration_minutes, buffer_after_minutes, price_minor)
+             VALUES (:tenant_id, :service_id, :profile_id, :duration, :after, :price)'
         );
         foreach (array_unique($profileIds) as $profileId) {
-            $insert->execute([':tenant_id' => $tenantId, ':service_id' => $serviceId, ':profile_id' => $profileId]);
+            $own = $values[$profileId] ?? [];
+            $insert->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
+            $insert->bindValue(':service_id', $serviceId, PDO::PARAM_INT);
+            $insert->bindValue(':profile_id', $profileId, PDO::PARAM_INT);
+            foreach ([':duration' => 'duration_minutes', ':after' => 'buffer_after_minutes', ':price' => 'price_minor'] as $param => $key) {
+                $value = $own[$key] ?? null;
+                $insert->bindValue($param, $value, $value === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
+            }
+            $insert->execute();
         }
     }
 
-    /** @return array<int, list<int>> service id => staff profile ids */
+    /** @return array<int, list<array{profile_id: int, duration_minutes: ?int, buffer_after_minutes: ?int, price_minor: ?int}>> by service id */
     private function staffByService(int $tenantId): array
     {
         $stmt = $this->db->prepare(
-            'SELECT service_id, profile_id FROM calendar_service_staff WHERE tenant_id = :tenant_id ORDER BY profile_id'
+            'SELECT service_id, profile_id, duration_minutes, buffer_after_minutes, price_minor
+               FROM calendar_service_staff WHERE tenant_id = :tenant_id ORDER BY profile_id'
         );
         $stmt->execute([':tenant_id' => $tenantId]);
         $map = [];
         foreach ($stmt->fetchAll(PDO::FETCH_ASSOC) as $r) {
-            $map[(int) $r['service_id']][] = (int) $r['profile_id'];
+            $map[(int) $r['service_id']][] = [
+                'profile_id' => (int) $r['profile_id'],
+                'duration_minutes' => $r['duration_minutes'] !== null ? (int) $r['duration_minutes'] : null,
+                'buffer_after_minutes' => $r['buffer_after_minutes'] !== null ? (int) $r['buffer_after_minutes'] : null,
+                'price_minor' => $r['price_minor'] !== null ? (int) $r['price_minor'] : null,
+            ];
         }
 
         return $map;
+    }
+
+    /**
+     * The service as one person provides it (WHIT-1440, AP.19): their own
+     * length, buffer after and price where they have one. A service row read
+     * here carries `staff`; anything else comes back unchanged.
+     *
+     * @param array<string, mixed> $service
+     * @return array<string, mixed>
+     */
+    public static function forPerson(array $service, int $profileId): array
+    {
+        // Who it is for: a group's resource is then taken from their branch.
+        $service['for_profile_id'] = $profileId;
+        foreach (is_array($service['staff'] ?? null) ? $service['staff'] : [] as $own) {
+            if (!is_array($own) || ($own['profile_id'] ?? null) !== $profileId) {
+                continue;
+            }
+            foreach (['duration_minutes', 'buffer_after_minutes', 'price_minor'] as $key) {
+                if (is_int($own[$key] ?? null)) {
+                    $service[$key] = $own[$key];
+                }
+            }
+            break;
+        }
+
+        return $service;
     }
 
     /** @param array<string, mixed> $v */
@@ -180,7 +236,7 @@ final class ServiceRepository
 
     /**
      * @param array<string, mixed> $r
-     * @param list<int> $staff
+     * @param list<array{profile_id: int, duration_minutes: ?int, buffer_after_minutes: ?int, price_minor: ?int}> $staff
      * @return array<string, mixed>
      */
     private static function toApi(array $r, array $staff): array
@@ -198,7 +254,9 @@ final class ServiceRepository
             'bookable_online' => DbBool::of($r['bookable_online']),
             'active' => DbBool::of($r['active']),
             'sort_order' => (int) $r['sort_order'],
-            'staff_profile_ids' => $staff,
+            'staff_profile_ids' => array_column($staff, 'profile_id'),
+            // WHIT-1440 (AP.19): each person's own length, buffer after and price; null is the service's.
+            'staff' => $staff,
             // Design 3.3: the room the service needs, and whether a customer's
             // booking is a request staff accept first.
             'room_id' => $r['room_id'] !== null ? (int) $r['room_id'] : null,

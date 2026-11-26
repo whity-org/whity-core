@@ -142,6 +142,7 @@ final class TenantOwnedTables
         'calendar_resources' => '365_create_calendar_resources.php',
         'calendar_service_resources' => '365_create_calendar_resources.php',
         'calendar_booking_resources' => '366_create_calendar_booking_resources.php',
+        'calendar_busy_check_failures' => '367_add_calendar_staff_and_time.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
         'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_event_people' => '284_extend_calendar_events.php',

@@ -58,6 +58,8 @@ import { BookingDetails } from './booking-details';
 import { BookingLinkCard, BookingLinkShare } from './booking-link';
 import { BookingDialog } from './booking-dialog';
 import { BookingSheet } from './booking-sheet';
+import { CalendarChecksCard } from './appointments-side';
+import { TimeOffCovered } from './time-off-covered';
 import { EventDialog } from './event-dialog';
 import { useColourByLabels, useViewLabels } from './calendar-bar';
 import { Check, Group, MiniMonth, useDayLetters, type PanelEntry } from './calendar-panel';
@@ -111,6 +113,8 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
   const [chosenDay, setChosenDay] = useState<CalendarDate | null>(null);
   const [details, setDetails] = useState<CalItem | null>(null);
   const [sheet, setSheet] = useState<{ booking: CalendarBooking; startWith: 'move' | 'cancel' | null } | null>(null);
+  // WHIT-1440 (AP.17): bookings new time off covers, to move or keep.
+  const [covered, setCovered] = useState<CalendarBooking[]>([]);
   const [eventOpen, setEventOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
   const [fullForm, setFullForm] = useState<{ date: CalendarDate; profileId: number | null } | null>(null);
@@ -270,6 +274,7 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
           {t('toolbar.today', 'Today')}
         </Button>
       </div>
+      <CalendarChecksCard className="mx-4" timeZone={timeZone} reloadKey={0} />
       {searching && (
         <div className="px-4">
           <input
@@ -497,9 +502,10 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
               me={access.me}
               onServiceLength={edits.onServiceLength}
               onClose={() => edits.setDraft(null)}
-              onSaved={(message) => {
+              onSaved={(message, coveredNow) => {
                 edits.setDraft(null);
                 addToast(message, 'success');
+                setCovered(coveredNow ?? []);
                 refetch();
               }}
               onMore={(date, profileId) => {
@@ -528,6 +534,14 @@ export function CalendarPhone({ basics }: { basics: CalendarBasics }) {
         onBooked={(made) => {
           setFullForm(null);
           addToast(t('booking.made', 'Booked for {name}', { name: made.customer.name ?? '' }), 'success');
+          refetch();
+        }}
+      />
+      <TimeOffCovered
+        bookings={covered}
+        timeZone={timeZone}
+        onClose={() => {
+          setCovered([]);
           refetch();
         }}
       />

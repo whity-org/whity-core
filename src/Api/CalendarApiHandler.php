@@ -10,6 +10,8 @@ use Whity\Core\Calendar\AttendanceReport;
 use Whity\Core\Calendar\AttendanceRepository;
 use Whity\Core\Calendar\BookingRepository;
 use Whity\Core\Calendar\BookingService;
+use Whity\Core\Calendar\BranchZones;
+use Whity\Core\Calendar\BusyCheckFailures;
 use Whity\Core\Calendar\CalendarItems;
 use Whity\Core\Taskaat\TaskDueDates;
 use Whity\Core\Calendar\CalendarRejectedException;
@@ -312,11 +314,16 @@ final class CalendarApiHandler
             $note = is_string($body['note'] ?? null) ? mb_substr(trim($body['note']), 0, 500) : '';
             $this->calendar->ensureStaff($tenantId, $profileId);
             $id = $this->calendar->addException($tenantId, $profileId, $kind, $when, $note, $actor);
+            // WHIT-1440 (AP.17): the bookings the time off covers, so the
+            // desk can move them (each asks the customer first) or keep them.
+            $covered = $kind === 'off'
+                ? array_map([BookingRepository::class, 'toApi'], $this->bookings->list($tenantId, [$profileId], $when->start, $when->end, BookingRepository::LIVE))
+                : [];
 
             return Response::json(['data' => [
                 'id' => $id, 'profile_id' => $profileId, 'kind' => $kind,
                 'starts_at' => Interval::toApi($when->start), 'ends_at' => Interval::toApi($when->end), 'note' => $note,
-            ]], 201);
+            ], 'covered_bookings' => $covered], 201);
         });
     }
 
@@ -337,6 +344,61 @@ final class CalendarApiHandler
     public function listRooms(Request $request): Response
     {
         return $this->run($request, 'rooms', fn (int $tenantId): Response => Response::json(['data' => $this->roomRepo()->list($tenantId)]));
+    }
+
+    /** WHIT-1440 (AP.16): every branch with its own time zone, the ones in use first. */
+    public function listBranches(Request $request): Response
+    {
+        return $this->run($request, 'branches', fn (int $tenantId): Response => Response::json([
+            'data' => (new BranchZones($this->calendar->db()))->list($tenantId),
+            'workspace_time_zone' => $this->booking->settingsFor($tenantId)->zone->getName(),
+        ]));
+    }
+
+    /**
+     * WHIT-1440 (AP.16): set or clear a branch's time zone. A booking keeps its
+     * instant; staff hours in that branch are read in the new zone from now on.
+     *
+     * @param array<string, string> $params
+     */
+    public function updateBranch(Request $request, array $params): Response
+    {
+        return $this->run($request, 'branches', function (int $tenantId) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            if (!array_key_exists('time_zone', $body)) {
+                return Response::error('time_zone is required (an IANA name such as Asia/Amman, or null)', 422);
+            }
+            $zone = $body['time_zone'];
+            if ($zone !== null && BranchZones::valid($zone) === null) {
+                return Response::error('That time zone is not one Whity knows. Use a name such as Asia/Amman.', 422);
+            }
+            $branches = new BranchZones($this->calendar->db());
+            if (!$branches->set($tenantId, (int) $params['id'], is_string($zone) ? $zone : null)) {
+                throw CalendarRejectedException::notFound('Branch');
+            }
+            foreach ($branches->list($tenantId) as $branch) {
+                if ($branch['id'] === (int) $params['id']) {
+                    return Response::json(['data' => $branch]);
+                }
+            }
+
+            throw CalendarRejectedException::notFound('Branch');
+        });
+    }
+
+    /**
+     * WHIT-1440 (AP.17): external calendars that could not be read in the
+     * last day, newest first, one row per person and source. Those who manage
+     * the calendar see everyone's; anyone else sees only their own.
+     */
+    public function busyChecks(Request $request): Response
+    {
+        return $this->run($request, 'busy checks', function (int $tenantId, int $actor): Response {
+            $manages = $actor > 0 && $this->roleChecker->hasPermissionForProfile($actor, CorePermissions::CALENDAR_MANAGE, $tenantId);
+            $since = (new DateTimeImmutable('now', new \DateTimeZone('UTC')))->modify('-1 day');
+
+            return Response::json(['data' => (new BusyCheckFailures($this->calendar->db()))->recent($tenantId, $since, $manages ? null : $actor)]);
+        });
     }
 
     public function createRoom(Request $request): Response
@@ -386,7 +448,7 @@ final class CalendarApiHandler
             $values = $this->serviceValues($tenantId, $body, null);
             $needs = $this->serviceNeeds($tenantId, $body);
             $id = $this->services->insert($tenantId, $values);
-            $this->services->replaceStaff($tenantId, $id, $values['staff_profile_ids']);
+            $this->services->replaceStaff($tenantId, $id, $values['staff_profile_ids'], $values['staff_values']);
             if ($needs !== null) {
                 $this->roomRepo()->replaceRequirements($tenantId, $id, $needs);
             }
@@ -408,7 +470,7 @@ final class CalendarApiHandler
             $values = $this->serviceValues($tenantId, $body, $existing);
             $needs = $this->serviceNeeds($tenantId, $body);
             $this->services->update($tenantId, $existing['id'], $values);
-            $this->services->replaceStaff($tenantId, $existing['id'], $values['staff_profile_ids']);
+            $this->services->replaceStaff($tenantId, $existing['id'], $values['staff_profile_ids'], $values['staff_values']);
             if ($needs !== null) {
                 $this->roomRepo()->replaceRequirements($tenantId, $existing['id'], $needs);
             }
@@ -1438,6 +1500,36 @@ final class CalendarApiHandler
         if (!is_array($staff) || count($staff) > 200) {
             throw new CalendarRejectedException('staff_profile_ids must be a list of staff', 422);
         }
+        // WHIT-1440 (AP.19): `staff` names the people with their own length,
+        // buffer after and price (null is the service's). It replaces
+        // `staff_profile_ids` when sent; without it each person keeps theirs.
+        $own = null;
+        if (array_key_exists('staff', $body)) {
+            if (!is_array($body['staff']) || count($body['staff']) > 200) {
+                throw new CalendarRejectedException('staff must be a list of people', 422);
+            }
+            $own = [];
+            $staff = [];
+            foreach ($body['staff'] as $row) {
+                if (!is_array($row) || !is_int($row['profile_id'] ?? null)) {
+                    throw new CalendarRejectedException('Each person in staff needs a profile_id', 422);
+                }
+                $values = ['duration_minutes' => null, 'buffer_after_minutes' => null, 'price_minor' => null];
+                foreach (['duration_minutes' => [5, 1440], 'buffer_after_minutes' => [0, 240]] as $key => [$min, $max]) {
+                    $v = $row[$key] ?? null;
+                    if ($v !== null) {
+                        $values[$key] = $int($key, $v, $min, $max);
+                    }
+                }
+                $v = $row['price_minor'] ?? null;
+                if ($v !== null && (!is_int($v) || $v < 0)) {
+                    throw new CalendarRejectedException('price_minor must be a whole number of minor units, or null', 422);
+                }
+                $values['price_minor'] = $v;
+                $own[$row['profile_id']] = $values;
+                $staff[] = $row['profile_id'];
+            }
+        }
         $staffIds = [];
         foreach ($staff as $id) {
             if (!is_int($id) || !$this->calendar->isStaff($tenantId, $id)) {
@@ -1465,6 +1557,7 @@ final class CalendarApiHandler
             'active' => $pick('active', $existing['active'] ?? true) === true,
             'sort_order' => $int('sort_order', $pick('sort_order', $existing['sort_order'] ?? 0), 0, 100000),
             'staff_profile_ids' => array_values(array_unique($staffIds)),
+            'staff_values' => $own,
         ];
     }
 }

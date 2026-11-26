@@ -166,6 +166,9 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
         }
         $effective = $this->settings->effective($tenantId);
         $calendar = CalendarSettings::fromSettings($effective);
+        // WHIT-1440 (AP.16): times in the zone of the person's branch.
+        $zoneName = BranchZones::valid($booking['time_zone'] ?? null);
+        $zone = $zoneName !== null ? new \DateTimeZone($zoneName) : $calendar->zone;
         $arabic = str_starts_with((string) ($effective[SettingsRegistry::LOCALE] ?? 'en'), 'ar');
         $t = $arabic ? self::AR : self::EN;
         $workspace = $this->sender->branding($tenantId)->siteName;
@@ -178,9 +181,9 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
         $place = $room !== '' ? $room : $workspace;
         $name = is_string($customer['name'] ?? null) ? trim($customer['name']) : '';
         $start = Interval::fromApi($booking['starts_at'] ?? null) ?? new DateTimeImmutable();
-        $when = self::when($start->setTimezone($calendar->zone), $arabic);
+        $when = self::when($start->setTimezone($zone), $arabic);
         $previous = Interval::fromApi($booking['previous_starts_at'] ?? null);
-        $was = $previous !== null ? self::when($previous->setTimezone($calendar->zone), $arabic) : null;
+        $was = $previous !== null ? self::when($previous->setTimezone($zone), $arabic) : null;
         $price = is_int($booking['price_minor'] ?? null) && is_string($booking['currency'] ?? null)
             ? self::money($booking['price_minor'], $booking['currency'])
             : null;
@@ -263,7 +266,7 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
                 break;
 
             case 'reminder':
-                $day = $this->day($start, $calendar);
+                $day = $this->day($start, $zone);
                 $subject = sprintf($t['reminder.subject.' . $day], $serviceName, $place);
                 $directions = $address !== null ? 'https://www.google.com/maps/search/?api=1&query=' . rawurlencode($address) : null;
                 if ($manage !== null) {
@@ -309,7 +312,7 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
                 if ($kind === 'held' && is_string($booking['hold_expires_at'] ?? null)) {
                     $until = Interval::fromApi($booking['hold_expires_at']);
                     if ($until !== null) {
-                        $paragraphs[] = sprintf($t['held.until'], $until->setTimezone($calendar->zone)->format('H:i'));
+                        $paragraphs[] = sprintf($t['held.until'], $until->setTimezone($zone)->format('H:i'));
                     }
                 }
                 $content = new EmailContent(
@@ -405,11 +408,11 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
         return null;
     }
 
-    /** 'today', 'tomorrow' or 'soon', in the workspace's zone. */
-    private function day(DateTimeImmutable $start, CalendarSettings $calendar): string
+    /** 'today', 'tomorrow' or 'soon', in the booking's zone. */
+    private function day(DateTimeImmutable $start, \DateTimeZone $zone): string
     {
-        $now = ($this->clock !== null ? ($this->clock)() : new DateTimeImmutable())->setTimezone($calendar->zone);
-        $date = $start->setTimezone($calendar->zone)->format('Y-m-d');
+        $now = ($this->clock !== null ? ($this->clock)() : new DateTimeImmutable())->setTimezone($zone);
+        $date = $start->setTimezone($zone)->format('Y-m-d');
 
         return match ($date) {
             $now->format('Y-m-d') => 'today',

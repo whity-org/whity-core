@@ -41,7 +41,10 @@ final class BookingRepository
         b.hold_expires_at, b.source, b.price_minor, b.currency, b.payment_ref, b.reminder_due_at, b.reminder_sent_at,
         b.created_by_profile_id, b.cancelled_by, b.cancel_reason, b.cancelled_at, b.created_at, b.tenant_id,
         b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence, b.confirmed_by_customer_at,
-        b.contact_id, b.attendance, b.attendance_at, b.attendance_by_profile_id, b.attendance_auto, b.cancel_kind';
+        b.contact_id, b.attendance, b.attendance_at, b.attendance_by_profile_id, b.attendance_auto, b.cancel_kind,
+        (SELECT ou.time_zone FROM calendar_staff cs
+           JOIN organizational_units ou ON ou.id = cs.unit_id AND ou.tenant_id = cs.tenant_id
+          WHERE cs.tenant_id = b.tenant_id AND cs.profile_id = b.profile_id) AS branch_time_zone';
 
     /** WHIT-1427 (AP.3): what happened to a booking. */
     public const ATTENDED = 'attended';
@@ -696,6 +699,8 @@ final class BookingRepository
             'cancel_kind' => isset($r['cancel_kind']) && is_string($r['cancel_kind']) ? $r['cancel_kind'] : null,
             // The calendar file's revision (E2): raised by every move and the cancel.
             'ics_sequence' => (int) ($r['ics_sequence'] ?? 0),
+            // WHIT-1440 (AP.16): the zone of the person's branch; null is the workspace's.
+            'time_zone' => BranchZones::valid($r['branch_time_zone'] ?? null),
         ];
         // WHIT-1173: the services of a booking of several, in order; empty
         // for a booking of one service (its service_id and profile_id say it).

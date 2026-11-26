@@ -264,6 +264,13 @@ final class CoreJobs
                 new \Whity\Core\Calendar\AttendanceAutoMarkJob($attendanceBookings),
                 false
             );
+            // WHIT-1440 (AP.17): once a day, external-calendar failures older
+            // than a week are deleted. Internal: only schedule:run queues it.
+            $registry->register(
+                \Whity\Core\Calendar\BusyCheckPruneJob::NAME,
+                new \Whity\Core\Calendar\BusyCheckPruneJob(new \Whity\Core\Calendar\BusyCheckFailures($pdo)),
+                false
+            );
             // WHIT-1417 (AP.14): every 5 minutes, any due reminder the queue
             // lost is queued again. Internal: only schedule:run queues it.
             $registry->register(

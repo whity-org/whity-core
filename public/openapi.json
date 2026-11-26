@@ -18246,6 +18246,293 @@
                 ]
             }
         },
+        "/api/v1/calendar/branches": {
+            "get": {
+                "operationId": "get_api_v1_calendar_branches",
+                "summary": "List branches with their time zones, the ones staff or rooms are in first",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Branches",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/CalendarBranchList"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/branches/{id}": {
+            "patch": {
+                "operationId": "patch_api_v1_calendar_branches_id",
+                "summary": "Set or clear a branch's time zone; its staff's hours are read in it from then on",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarBranchRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The branch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBranch"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such branch",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a time zone Whity knows",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/busy-checks": {
+            "get": {
+                "operationId": "get_api_v1_calendar_busy_checks",
+                "summary": "External calendars that could not be read in the last day; everyone's with calendar:manage, otherwise your own",
+                "tags": [
+                    "calendar"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Failed checks",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarBusyCheck"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/commission/closes": {
             "get": {
                 "operationId": "get_api_v1_calendar_commission_closes",
@@ -22400,19 +22687,11 @@
                 },
                 "responses": {
                     "201": {
-                        "description": "The exception",
+                        "description": "The exception, and the bookings time off covers",
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "$ref": "#/components/schemas/CalendarTimeOff"
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
+                                    "$ref": "#/components/schemas/CalendarTimeOffCreated"
                                 }
                             }
                         }
@@ -113569,6 +113848,11 @@
                         ],
                         "description": "A cancelled booking (AP.5): early or late by the customer or for them, business when the workspace cancelled."
                     },
+                    "time_zone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The zone of the person's branch (WHIT-1440); null is the workspace's."
+                    },
                     "customer_flag": {
                         "$ref": "#/components/schemas/CalendarCustomerFlag"
                     },
@@ -113891,6 +114175,90 @@
                 },
                 "required": [
                     "starts_at"
+                ]
+            },
+            "CalendarBranch": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string"
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Its own IANA zone; null uses the workspace's."
+                    },
+                    "in_use": {
+                        "type": "boolean",
+                        "description": "Staff or rooms are in it."
+                    }
+                },
+                "required": [
+                    "id",
+                    "name",
+                    "time_zone",
+                    "in_use"
+                ]
+            },
+            "CalendarBranchList": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBranch"
+                        }
+                    },
+                    "workspace_time_zone": {
+                        "type": "string",
+                        "description": "The zone a branch without its own uses."
+                    }
+                },
+                "required": [
+                    "data",
+                    "workspace_time_zone"
+                ]
+            },
+            "CalendarBranchRequest": {
+                "type": "object",
+                "properties": {
+                    "time_zone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "An IANA zone such as Asia/Amman, or null to use the workspace's."
+                    }
+                },
+                "required": [
+                    "time_zone"
+                ]
+            },
+            "CalendarBusyCheck": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "The person whose calendar could not be read."
+                    },
+                    "source": {
+                        "type": "string",
+                        "description": "The calendar, such as the Google Calendar plugin's name; `external` when unnamed."
+                    },
+                    "failed_at": {
+                        "type": "string",
+                        "description": "The latest failure."
+                    }
+                },
+                "required": [
+                    "profile_id",
+                    "name",
+                    "source",
+                    "failed_at"
                 ]
             },
             "CalendarCommissionClose": {
@@ -114698,6 +115066,13 @@
                             "type": "integer"
                         }
                     },
+                    "staff": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarServicePerson"
+                        },
+                        "description": "Who provides it, each with their own length, buffer after and price (WHIT-1440); null is the service's."
+                    },
                     "room_id": {
                         "type": "integer",
                         "nullable": true,
@@ -114751,6 +115126,38 @@
                 "required": [
                     "resource_id",
                     "group_key"
+                ]
+            },
+            "CalendarServicePerson": {
+                "type": "object",
+                "properties": {
+                    "profile_id": {
+                        "type": "integer",
+                        "description": "The member of staff."
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 5,
+                        "maximum": 1440,
+                        "description": "Their own length; null is the service's."
+                    },
+                    "buffer_after_minutes": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "maximum": 240,
+                        "description": "Their own time kept free after; null is the service's."
+                    },
+                    "price_minor": {
+                        "type": "integer",
+                        "nullable": true,
+                        "minimum": 0,
+                        "description": "Their own price in minor units; null is the service's."
+                    }
+                },
+                "required": [
+                    "profile_id"
                 ]
             },
             "CalendarServiceRequest": {
@@ -114826,7 +115233,15 @@
                         "items": {
                             "type": "integer"
                         },
-                        "description": "The staff who provide it; the list replaces what is there."
+                        "description": "The staff who provide it; the list replaces what is there. Each keeps their own values."
+                    },
+                    "staff": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarServicePerson"
+                        },
+                        "description": "The staff who provide it, each with their own length, buffer after and price (null is the service's). Replaces `staff_profile_ids` when sent (WHIT-1440)."
                     },
                     "room_id": {
                         "type": "integer",
@@ -115142,6 +115557,11 @@
                         "type": "integer",
                         "nullable": true,
                         "description": "The branch (organisational unit) they work in."
+                    },
+                    "time_zone": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Their branch's time zone (WHIT-1440); null is the workspace's."
                     }
                 },
                 "required": [
@@ -115203,6 +115623,25 @@
                     "starts_at",
                     "ends_at",
                     "note"
+                ]
+            },
+            "CalendarTimeOffCreated": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "$ref": "#/components/schemas/CalendarTimeOff"
+                    },
+                    "covered_bookings": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/CalendarBooking"
+                        },
+                        "description": "Time off only: the bookings it covers, to move (each asks the customer first) or keep (WHIT-1440)."
+                    }
+                },
+                "required": [
+                    "data",
+                    "covered_bookings"
                 ]
             },
             "CalendarTimeOffRequest": {
@@ -140129,6 +140568,30 @@
                                         "type": "integer"
                                     }
                                 },
+                                "staff": {
+                                    "type": "array",
+                                    "description": "Each person's own length and price (WHIT-1440): theirs, or the service's.",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "profile_id": {
+                                                "type": "integer"
+                                            },
+                                            "duration_minutes": {
+                                                "type": "integer"
+                                            },
+                                            "price_minor": {
+                                                "type": "integer",
+                                                "nullable": true
+                                            }
+                                        },
+                                        "required": [
+                                            "profile_id",
+                                            "duration_minutes",
+                                            "price_minor"
+                                        ]
+                                    }
+                                },
                                 "sends_request": {
                                     "type": "boolean",
                                     "description": "Booking it sends a request the business accepts first."
@@ -140154,6 +140617,11 @@
                                 },
                                 "display_name": {
                                     "type": "string"
+                                },
+                                "time_zone": {
+                                    "type": "string",
+                                    "nullable": true,
+                                    "description": "The zone of their branch (WHIT-1440); null is the workspace's, `settings.time_zone`."
                                 }
                             },
                             "required": [

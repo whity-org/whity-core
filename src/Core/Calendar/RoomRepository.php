@@ -106,7 +106,7 @@ final class RoomRepository
      *
      * @return list<list<int>>
      */
-    public function needsFor(int $tenantId, int $serviceId, ?int $legacyRoomId): array
+    public function needsFor(int $tenantId, int $serviceId, ?int $legacyRoomId, ?int $branchId = null): array
     {
         $rows = $this->requirements($tenantId, $serviceId);
         if ($rows === []) {
@@ -118,11 +118,17 @@ final class RoomRepository
                 $needs[] = [$row['resource_id']];
                 continue;
             }
+            // WHIT-1440 (AP.16): any one from a group means one in the
+            // person's branch, or one that belongs to no branch.
             $stmt = $this->db->prepare(
                 'SELECT id FROM calendar_resources
-                  WHERE tenant_id = :tenant_id AND group_key = :group_key AND active = :active
-                  ORDER BY sort_order, id'
+                  WHERE tenant_id = :tenant_id AND group_key = :group_key AND active = :active'
+                . ($branchId !== null ? ' AND (unit_id IS NULL OR unit_id = :unit_id)' : '')
+                . ' ORDER BY sort_order, id'
             );
+            if ($branchId !== null) {
+                $stmt->bindValue(':unit_id', $branchId, PDO::PARAM_INT);
+            }
             $stmt->bindValue(':tenant_id', $tenantId, PDO::PARAM_INT);
             $stmt->bindValue(':group_key', (string) $row['group_key']);
             $stmt->bindValue(':active', true, PDO::PARAM_BOOL);

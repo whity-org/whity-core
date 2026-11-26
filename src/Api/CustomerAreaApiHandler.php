@@ -245,7 +245,8 @@ final class CustomerAreaApiHandler
                 'room_name' => is_string($booking['room_name'] ?? null) ? $booking['room_name'] : null,
                 'can_change' => in_array($booking['status'], \Whity\Core\Calendar\BookingRepository::LIVE, true)
                     && (string) $booking['starts_at'] > Interval::toApi($this->booking->now()),
-                'time_zone' => $this->booking->settingsFor($tenantId)->zone->getName(),
+                // WHIT-1440 (AP.16): the zone of the person's branch, or the workspace's.
+                'time_zone' => $booking['time_zone'] ?? $this->booking->settingsFor($tenantId)->zone->getName(),
             ]]);
         });
     }

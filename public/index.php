@@ -5656,6 +5656,10 @@ $router->register('POST',   '/api/calendar/bookings/{id:\d+}/cancel',       [$ca
 $router->register('GET',    '/api/calendar/rooms',                          [$calendarHandler, 'listRooms'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/rooms',                          [$calendarHandler, 'createRoom'],      null, null, CorePermissions::CALENDAR_MANAGE);
 $router->register('PATCH',  '/api/calendar/rooms/{id:\d+}',                 [$calendarHandler, 'updateRoom'],      null, null, CorePermissions::CALENDAR_MANAGE);
+// WHIT-1440 (AP.16, AP.17): each branch's time zone, and external calendars that could not be read.
+$router->register('GET',    '/api/calendar/branches',                       [$calendarHandler, 'listBranches'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('PATCH',  '/api/calendar/branches/{id:\d+}',              [$calendarHandler, 'updateBranch'],    null, null, CorePermissions::CALENDAR_MANAGE);
+$router->register('GET',    '/api/calendar/busy-checks',                    [$calendarHandler, 'busyChecks'],      null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/accept',       [$calendarHandler, 'acceptBooking'],   null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/suggest',      [$calendarHandler, 'suggestBooking'],  null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/check-in',     [$calendarHandler, 'checkIn'],         null, null, CorePermissions::CALENDAR_WRITE);

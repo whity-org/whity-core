@@ -35,6 +35,10 @@ export type CalendarBookingItem = Schemas['CalendarBookingItem'];
 export type CalendarEvent = Schemas['CalendarEvent'];
 export type CalendarEventRequest = Schemas['CalendarEventRequest'];
 export type CalendarRoom = Schemas['CalendarRoom'];
+export type CalendarBranch = Schemas['CalendarBranch'];
+export type CalendarBusyCheck = Schemas['CalendarBusyCheck'];
+export type CalendarServicePerson = Schemas['CalendarServicePerson'];
+export type CalendarTimeOffCreated = Schemas['CalendarTimeOffCreated'];
 export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
 export type CalendarToday = Schemas['CalendarToday'];
 /** WHIT-1427: did they come. */
@@ -183,8 +187,9 @@ export const calendarApi = {
       await api.GET('/api/v1/calendar/time-off', { params: { query: query({ from, to, profile_id: profileId }) } }),
       'Time off could not be loaded'
     ),
+  /** WHIT-1440 (AP.17): time off comes back with the bookings it covers. */
   addTimeOff: async (body: Schemas['CalendarTimeOffRequest']) =>
-    send<CalendarTimeOff>(await api.POST('/api/v1/calendar/time-off', { body }), 'The time off could not be added'),
+    sendBody<CalendarTimeOffCreated>(await api.POST('/api/v1/calendar/time-off', { body }), 'The time off could not be added'),
   removeTimeOff: async (id: number) =>
     send<{ id: number; deleted: boolean }>(
       await api.DELETE('/api/v1/calendar/time-off/{id}', { params: { path: { id } } }),
@@ -360,6 +365,20 @@ export const calendarApi = {
       await api.GET('/api/v1/calendar/today', { params: { query: query({ date, unit_id: unitId }) } }),
       'Today could not be loaded'
     ),
+
+  /** WHIT-1440 (AP.16): branches with their own time zones. */
+  branches: async () => {
+    const result = await api.GET('/api/v1/calendar/branches');
+    if (result.response.status === 403) throw new ForbiddenError();
+    return sendBody<Schemas['CalendarBranchList']>(result, 'The branches could not be loaded');
+  },
+  setBranchZone: async (id: number, timeZone: string | null) =>
+    send<CalendarBranch>(
+      await api.PATCH('/api/v1/calendar/branches/{id}', { params: { path: { id } }, body: { time_zone: timeZone } }),
+      'The time zone could not be saved'
+    ),
+  /** WHIT-1440 (AP.17): calendars that could not be checked in the last day. */
+  busyChecks: async () => read<CalendarBusyCheck[]>(await api.GET('/api/v1/calendar/busy-checks'), 'The calendar checks could not be loaded'),
 
   rooms: async () => read<CalendarRoom[]>(await api.GET('/api/v1/calendar/rooms'), 'The rooms could not be loaded'),
   createRoom: async (body: CalendarRoomRequest) =>
