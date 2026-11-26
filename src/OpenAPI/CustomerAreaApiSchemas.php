@@ -189,6 +189,25 @@ final class CustomerAreaApiSchemas
                     'responses' => [200 => self::json('The settings', self::data(SchemaBuilder::ref('CustomerAreaSettings')))] + [422 => self::error('A value that doesn\'t look right')] + self::auth(),
                 ],
             ],
+            [
+                'method' => 'POST', 'path' => '/api/settings/customer-area/screens/{screen:[a-z][a-z0-9-]{0,63}}/grant', 'requiredRole' => null, 'requiredPermission' => 'roles:write',
+                'schema' => [
+                    'summary' => 'Give customers a plugin screen',
+                    'description' => 'After the admin confirms (WHIT-1438, Q8): adds the screen\'s permission to the customer sign-up role and the roles of existing customers, '
+                        . 'only the workspace\'s own roles that no staff hold (the others are listed as skipped), and turns the screen on. '
+                        . 'Only what the caller holds can be given (403 otherwise).',
+                    'tags' => ['settings'], 'mcp' => ['expose' => false],
+                    'parameters' => [['name' => 'screen', 'in' => 'path', 'required' => true, 'description' => 'The plugin screen\'s id.', 'schema' => ['type' => 'string']]],
+                    'request' => 'CustomerAreaScreenGrantRequest',
+                    'responses' => [
+                        200 => self::json('Given, with the settings', self::data(SchemaBuilder::ref('CustomerAreaSettings'))),
+                        403 => self::error('The caller does not hold the permission'),
+                        404 => self::error('No enabled plugin offers the screen'),
+                        409 => self::error('The screen\'s permission cannot be given to customers'),
+                        422 => self::error('Not confirmed'),
+                    ] + self::auth(),
+                ],
+            ],
         ];
     }
 
@@ -310,14 +329,34 @@ final class CustomerAreaApiSchemas
                 'how_to_pay_en' => self::str(), 'how_to_pay_ar' => self::str(),
                 'handle' => self::str(true),
                 'tabs' => ['type' => 'array', 'items' => self::str()],
-            ], ['enabled', 'hidden_tabs', 'tab_order', 'welcome_en', 'welcome_ar', 'how_to_pay_en', 'how_to_pay_ar', 'handle', 'tabs']),
+                'hidden_screens' => ['type' => 'array', 'items' => self::str()],
+                'screens' => ['type' => 'array', 'items' => self::object([
+                    'id' => self::str(),
+                    'label' => ['description' => 'A string, or a name in each language.'],
+                    'plugin' => self::str(),
+                    'placement' => self::str() + ['enum' => ['tab', 'home', 'page']],
+                    'permission' => self::str(),
+                    'on' => self::bool(),
+                    'customers_have' => self::bool() + ['description' => 'Every customer role holds the permission.'],
+                    'roles' => ['type' => 'array', 'items' => self::object([
+                        'id' => self::int(), 'name' => self::str(), 'signup' => self::bool(), 'customers' => self::int(), 'has' => self::bool(),
+                        'skipped' => self::str(true) + ['description' => 'Why it cannot be given here: global or staff.'],
+                    ], ['id', 'name', 'signup', 'customers', 'has', 'skipped'])],
+                ], ['id', 'label', 'plugin', 'placement', 'permission', 'on', 'customers_have', 'roles'])],
+                'grant' => self::object([
+                    'granted' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str()], ['id', 'name'])],
+                    'skipped' => ['type' => 'array', 'items' => self::object(['id' => self::int(), 'name' => self::str(), 'reason' => self::str()], ['id', 'name', 'reason'])],
+                ], ['granted', 'skipped']) + ['description' => 'Only after a grant: what changed.'],
+            ], ['enabled', 'hidden_tabs', 'tab_order', 'welcome_en', 'welcome_ar', 'how_to_pay_en', 'how_to_pay_ar', 'handle', 'tabs', 'hidden_screens', 'screens']),
             'CustomerAreaSettingsRequest' => self::object([
                 'enabled' => self::bool(),
                 'hidden_tabs' => ['type' => 'array', 'items' => self::str() + ['enum' => ['bookings', 'bills', 'messages']]],
                 'tab_order' => ['type' => 'array', 'items' => self::str() + ['enum' => ['bookings', 'bills', 'messages']]],
                 'welcome_en' => self::str() + ['maxLength' => 300], 'welcome_ar' => self::str() + ['maxLength' => 300],
                 'how_to_pay_en' => self::str() + ['maxLength' => 2000], 'how_to_pay_ar' => self::str() + ['maxLength' => 2000],
+                'hidden_screens' => ['type' => 'array', 'maxItems' => 200, 'items' => self::str() + ['pattern' => '^[a-z][a-z0-9-]{0,63}$'], 'description' => 'Plugin screens turned off, by id.'],
             ], []),
+            'CustomerAreaScreenGrantRequest' => self::object(['confirm' => self::bool() + ['description' => 'Must be true: the admin confirmed.']], ['confirm']),
         ];
     }
 

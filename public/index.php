@@ -6841,9 +6841,14 @@ $router->register('POST', '/api/contacts/{id:\d+}/invite', [$contactInviteHandle
 $customerAreaSettingsHandler = new \Whity\Api\CustomerAreaSettingsApiHandler(
     $settingsService,
     static fn (int $tenantId): ?string => $brandingHostRepo->findSlugById($tenantId),
+    // WHIT-1438 (Q8): plugin screens' switches, and giving customers a screen.
+    static fn (): array => $pluginLoader->getCustomerScreens(),
+    new \Whity\Core\CustomerArea\CustomerScreenAccess($db->getPdo(), $roleChecker, $signupSettings, $hookManager),
+    $roleGrantGuard,
 );
 $router->register('GET', '/api/settings/customer-area', [$customerAreaSettingsHandler, 'show'],   null, null, CorePermissions::SETTINGS_READ);
 $router->register('PUT', '/api/settings/customer-area', [$customerAreaSettingsHandler, 'update'], null, null, CorePermissions::SETTINGS_WRITE);
+$router->register('POST', '/api/settings/customer-area/screens/{screen:[a-z][a-z0-9-]{0,63}}/grant', [$customerAreaSettingsHandler, 'grant'], null, null, CorePermissions::ROLES_WRITE);
 
 // Public: web chat for visitors, and the providers' inbound webhook. Both find the
 // workspace from its slug; each path is listed in EnforceTenantIsolation one by one.

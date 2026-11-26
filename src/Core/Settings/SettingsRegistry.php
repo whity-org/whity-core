@@ -1065,6 +1065,10 @@ final class SettingsRegistry
     public const CUSTOMER_AREA_WELCOME_AR = 'customer_area.welcome_ar';
     public const CUSTOMER_AREA_HOW_TO_PAY_EN = 'customer_area.how_to_pay_en';
     public const CUSTOMER_AREA_HOW_TO_PAY_AR = 'customer_area.how_to_pay_ar';
+    // WHIT-1438 (Q8): plugin customer screens the workspace turned off, by
+    // screen id. A screen not listed is on (it still shows only to customers
+    // who hold its permission).
+    public const CUSTOMER_AREA_HIDDEN_SCREENS = 'customer_area.hidden_screens';
     /** The core tabs a workspace may hide or order (CA.13). */
     public const CUSTOMER_AREA_TABS = ['bookings', 'bills', 'messages'];
 
@@ -1112,6 +1116,7 @@ final class SettingsRegistry
         self::CUSTOMER_AREA_WELCOME_AR,
         self::CUSTOMER_AREA_HOW_TO_PAY_EN,
         self::CUSTOMER_AREA_HOW_TO_PAY_AR,
+        self::CUSTOMER_AREA_HIDDEN_SCREENS,
     ];
 
     /**
@@ -1689,6 +1694,7 @@ final class SettingsRegistry
         self::CUSTOMER_AREA_WELCOME_AR => '',
         self::CUSTOMER_AREA_HOW_TO_PAY_EN => '',
         self::CUSTOMER_AREA_HOW_TO_PAY_AR => '',
+        self::CUSTOMER_AREA_HIDDEN_SCREENS => '[]',
     ];
 
     /**
@@ -2239,8 +2245,28 @@ final class SettingsRegistry
             self::CUSTOMER_AREA_HOW_TO_PAY_EN, self::CUSTOMER_AREA_HOW_TO_PAY_AR => mb_strlen($value) <= 2000
                 ? null
                 : $key . ' must be at most 2000 characters.',
+            self::CUSTOMER_AREA_HIDDEN_SCREENS => self::validateScreenIds($value, $key),
             default => "Unknown setting key: {$key}",
         };
+    }
+
+    /**
+     * A JSON list of distinct plugin screen ids (WHIT-1438). Ids of screens no
+     * longer installed are kept: turning the plugin back on keeps the choice.
+     */
+    private static function validateScreenIds(string $value, string $key): ?string
+    {
+        $list = json_decode($value, true);
+        if (!is_array($list) || !array_is_list($list) || count($list) > 200) {
+            return $key . ' must be a JSON list of at most 200 screen ids.';
+        }
+        foreach ($list as $id) {
+            if (!is_string($id) || preg_match('/^[a-z][a-z0-9-]{0,63}$/', $id) !== 1) {
+                return $key . ' may list only screen ids.';
+            }
+        }
+
+        return count(array_unique($list)) === count($list) ? null : $key . ' must not list a screen twice.';
     }
 
     /** A JSON list of distinct core tab ids from {@see CUSTOMER_AREA_TABS}. */

@@ -171,7 +171,9 @@ final class SettingsRegistryTest extends TestCase
              'accounting.invoice_route_template_id', 'accounting.invoice_payment_terms_days', 'accounting.prices_include_tax',
              'accounting.bill_route_template_id',
              // WHIT-1416: the customer area.
-             'customer_area.enabled', 'customer_area.hidden_tabs', 'customer_area.tab_order', 'customer_area.welcome_en', 'customer_area.welcome_ar', 'customer_area.how_to_pay_en', 'customer_area.how_to_pay_ar'],
+             'customer_area.enabled', 'customer_area.hidden_tabs', 'customer_area.tab_order', 'customer_area.welcome_en', 'customer_area.welcome_ar', 'customer_area.how_to_pay_en', 'customer_area.how_to_pay_ar',
+             // WHIT-1438: plugin customer screens turned off.
+             'customer_area.hidden_screens'],
             SettingsRegistry::keys()
         );
     }
@@ -536,7 +538,8 @@ final class SettingsRegistryTest extends TestCase
         // 166 since WHIT-1417: calendar.reminders.
         // 173 since WHIT-1416: the customer area's seven keys.
         // 179 since WHIT-1427: six calendar.* keys for did they come.
-        self::assertCount(179, $describe);
+        // 180 since WHIT-1438: customer_area.hidden_screens.
+        self::assertCount(180, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

@@ -91567,6 +91567,150 @@
                 ]
             }
         },
+        "/api/v1/settings/customer-area/screens/{screen}/grant": {
+            "post": {
+                "operationId": "post_api_v1_settings_customer_area_screens_screen_grant",
+                "summary": "Give customers a plugin screen",
+                "tags": [
+                    "settings"
+                ],
+                "description": "After the admin confirms (WHIT-1438, Q8): adds the screen's permission to the customer sign-up role and the roles of existing customers, only the workspace's own roles that no staff hold (the others are listed as skipped), and turns the screen on. Only what the caller holds can be given (403 otherwise).",
+                "parameters": [
+                    {
+                        "name": "screen",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "screen",
+                        "in": "path",
+                        "required": true,
+                        "description": "The plugin screen's id.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CustomerAreaScreenGrantRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Given, with the settings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CustomerAreaSettings"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "The caller does not hold the permission",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No enabled plugin offers the screen",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The screen's permission cannot be given to customers",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not confirmed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/settings/global": {
             "get": {
                 "operationId": "get_api_v1_settings_global",
@@ -120104,6 +120248,18 @@
                     "screen"
                 ]
             },
+            "CustomerAreaScreenGrantRequest": {
+                "type": "object",
+                "properties": {
+                    "confirm": {
+                        "type": "boolean",
+                        "description": "Must be true: the admin confirmed."
+                    }
+                },
+                "required": [
+                    "confirm"
+                ]
+            },
             "CustomerAreaSettings": {
                 "type": "object",
                 "properties": {
@@ -120143,6 +120299,143 @@
                         "items": {
                             "type": "string"
                         }
+                    },
+                    "hidden_screens": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "screens": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "id": {
+                                    "type": "string"
+                                },
+                                "label": {
+                                    "description": "A string, or a name in each language."
+                                },
+                                "plugin": {
+                                    "type": "string"
+                                },
+                                "placement": {
+                                    "type": "string",
+                                    "enum": [
+                                        "tab",
+                                        "home",
+                                        "page"
+                                    ]
+                                },
+                                "permission": {
+                                    "type": "string"
+                                },
+                                "on": {
+                                    "type": "boolean"
+                                },
+                                "customers_have": {
+                                    "type": "boolean",
+                                    "description": "Every customer role holds the permission."
+                                },
+                                "roles": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "id": {
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "signup": {
+                                                "type": "boolean"
+                                            },
+                                            "customers": {
+                                                "type": "integer"
+                                            },
+                                            "has": {
+                                                "type": "boolean"
+                                            },
+                                            "skipped": {
+                                                "type": "string",
+                                                "nullable": true,
+                                                "description": "Why it cannot be given here: global or staff."
+                                            }
+                                        },
+                                        "required": [
+                                            "id",
+                                            "name",
+                                            "signup",
+                                            "customers",
+                                            "has",
+                                            "skipped"
+                                        ]
+                                    }
+                                }
+                            },
+                            "required": [
+                                "id",
+                                "label",
+                                "plugin",
+                                "placement",
+                                "permission",
+                                "on",
+                                "customers_have",
+                                "roles"
+                            ]
+                        }
+                    },
+                    "grant": {
+                        "type": "object",
+                        "properties": {
+                            "granted": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name"
+                                    ]
+                                }
+                            },
+                            "skipped": {
+                                "type": "array",
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "id": {
+                                            "type": "integer"
+                                        },
+                                        "name": {
+                                            "type": "string"
+                                        },
+                                        "reason": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "id",
+                                        "name",
+                                        "reason"
+                                    ]
+                                }
+                            }
+                        },
+                        "required": [
+                            "granted",
+                            "skipped"
+                        ],
+                        "description": "Only after a grant: what changed."
                     }
                 },
                 "required": [
@@ -120154,7 +120447,9 @@
                     "how_to_pay_en",
                     "how_to_pay_ar",
                     "handle",
-                    "tabs"
+                    "tabs",
+                    "hidden_screens",
+                    "screens"
                 ]
             },
             "CustomerAreaSettingsRequest": {
@@ -120200,6 +120495,15 @@
                     "how_to_pay_ar": {
                         "type": "string",
                         "maxLength": 2000
+                    },
+                    "hidden_screens": {
+                        "type": "array",
+                        "maxItems": 200,
+                        "items": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9-]{0,63}$"
+                        },
+                        "description": "Plugin screens turned off, by id."
                     }
                 }
             },

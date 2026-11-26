@@ -13353,6 +13353,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/settings/customer-area/screens/{screen}/grant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Give customers a plugin screen
+         * @description After the admin confirms (WHIT-1438, Q8): adds the screen's permission to the customer sign-up role and the roles of existing customers, only the workspace's own roles that no staff hold (the others are listed as skipped), and turns the screen on. Only what the caller holds can be given (403 otherwise).
+         */
+        post: operations["post_api_v1_settings_customer_area_screens_screen_grant"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/settings/global": {
         parameters: {
             query?: never;
@@ -19332,6 +19352,10 @@ export interface components {
                 apiPath: string;
             };
         };
+        CustomerAreaScreenGrantRequest: {
+            /** @description Must be true: the admin confirmed. */
+            confirm: boolean;
+        };
         CustomerAreaSettings: {
             enabled: boolean;
             hidden_tabs: string[];
@@ -19342,6 +19366,40 @@ export interface components {
             how_to_pay_ar: string;
             handle: string | null;
             tabs: string[];
+            hidden_screens: string[];
+            screens: {
+                id: string;
+                /** @description A string, or a name in each language. */
+                label: unknown;
+                plugin: string;
+                /** @enum {string} */
+                placement: "tab" | "home" | "page";
+                permission: string;
+                on: boolean;
+                /** @description Every customer role holds the permission. */
+                customers_have: boolean;
+                roles: {
+                    id: number;
+                    name: string;
+                    signup: boolean;
+                    customers: number;
+                    has: boolean;
+                    /** @description Why it cannot be given here: global or staff. */
+                    skipped: string | null;
+                }[];
+            }[];
+            /** @description Only after a grant: what changed. */
+            grant?: {
+                granted: {
+                    id: number;
+                    name: string;
+                }[];
+                skipped: {
+                    id: number;
+                    name: string;
+                    reason: string;
+                }[];
+            };
         };
         CustomerAreaSettingsRequest: {
             enabled?: boolean;
@@ -19351,6 +19409,8 @@ export interface components {
             welcome_ar?: string;
             how_to_pay_en?: string;
             how_to_pay_ar?: string;
+            /** @description Plugin screens turned off, by id. */
+            hidden_screens?: string[];
         };
         CustomerAreaText: {
             en: string;
@@ -98652,6 +98712,107 @@ export interface operations {
                 };
             };
             /** @description A value that doesn't look right */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_settings_customer_area_screens_screen_grant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The plugin screen's id. */
+                screen: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CustomerAreaScreenGrantRequest"];
+            };
+        };
+        responses: {
+            /** @description Given, with the settings */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CustomerAreaSettings"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The caller does not hold the permission */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No enabled plugin offers the screen */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The screen's permission cannot be given to customers */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not confirmed */
             422: {
                 headers: {
                     [name: string]: unknown;
