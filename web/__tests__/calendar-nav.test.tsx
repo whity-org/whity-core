@@ -26,12 +26,13 @@ it('opens the pages as a sheet from the page name', async () => {
   const links = within(sheet).getAllByRole('link');
   expect(links.map((a) => a.getAttribute('href'))).toEqual([
     '/calendar',
+    '/calendar/waitlist',
     '/calendar/services',
     '/calendar/rooms',
     '/calendar/hours',
     '/calendar/reports',
     '/calendar/settings',
   ]);
-  expect(links[1]).toHaveAttribute('aria-current', 'page');
+  expect(links[2]).toHaveAttribute('aria-current', 'page');
   expect(within(sheet).getByText('Who works when')).toBeInTheDocument();
 });

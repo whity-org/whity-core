@@ -3401,6 +3401,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/waitlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The waitlist, oldest first, and how many are on it (WHIT-1442) */
+        get: operations["get_api_v1_calendar_waitlist"];
+        put?: never;
+        /** Add someone to the waitlist (WHIT-1442) */
+        post: operations["post_api_v1_calendar_waitlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/waitlist/{id}/offer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Offer a free time to someone on the waitlist; they are sent a link to take it (WHIT-1442); an agent's call is a proposal */
+        post: operations["post_api_v1_calendar_waitlist_id_offer"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/calendar/waitlist/{id}/remove": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take someone off the waitlist; their open offers close (WHIT-1442) */
+        post: operations["post_api_v1_calendar_waitlist_id_remove"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/walkins": {
         parameters: {
             query?: never;
@@ -12235,6 +12287,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/booking/{workspace}/waitlist": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Join the waitlist on the public page (public, WHIT-1442)
+         * @description The same protection as booking: per-IP limits, a hidden field, a minimum time on the page and the bot check. When a time that matches frees up, the customer is emailed a link to take it.
+         */
+        post: operations["post_api_v1_public_booking_workspace_waitlist"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/bookings/{token}": {
         parameters: {
             query?: never;
@@ -12685,6 +12757,40 @@ export interface paths {
          * @description Answers the same 202 for every address it accepts and never looks up whether the address has an account or already belongs to the workspace, so it cannot be used to learn either. Never creates a workspace. Protected by the instance's bot check (Turnstile) and per-IP, per-address and per-workspace limits.
          */
         post: operations["post_api_v1_public_signup_workspaces_workspace"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/waitlist-offers/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** An offered time, by the link in the offer (public, WHIT-1442) */
+        get: operations["get_api_v1_public_waitlist_offers_token"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/waitlist-offers/{token}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Take the offered time (public, WHIT-1442): the first booking the database accepts wins */
+        post: operations["post_api_v1_public_waitlist_offers_token_accept"];
         delete?: never;
         options?: never;
         head?: never;
@@ -17836,6 +17942,8 @@ export interface components {
             full: boolean;
             /** @description With `since`, cancelled and expired ones too, so they can be dropped. */
             bookings: components["schemas"]["CalendarBooking"][];
+            /** @description How many are on the waitlist (WHIT-1442). */
+            waitlist_count: number;
         };
         CalendarDeskStatusRequest: {
             /**
@@ -18261,6 +18369,82 @@ export interface components {
             also_show?: ("team_events" | "time_off" | "cancelled" | "meetings" | "tasks_due")[];
             /** @description The person opened the app's sidebar on the calendar, so it stays open there. */
             sidebar_open?: boolean;
+        };
+        CalendarWaitlistEntry: {
+            id: number;
+            contact_id?: number | null;
+            customer: {
+                name: string;
+                email: string;
+                phone: string;
+            };
+            service_id: number;
+            /** @description Language code => text. */
+            service_name?: {
+                [key: string]: string;
+            };
+            /** @description The person they want; null for anyone. */
+            profile_id?: number | null;
+            staff_name?: string | null;
+            /** @description Y-m-d. */
+            date_from: string;
+            /** @description Y-m-d. */
+            date_to: string;
+            /** @description Empty for any time of day. */
+            times: ("morning" | "afternoon" | "evening")[];
+            note?: string;
+            /** @description `en`, `ar`, or empty for the workspace's. */
+            language?: string;
+            /** @enum {string} */
+            source?: "staff" | "public";
+            /** @enum {string} */
+            status: "waiting" | "offered" | "booked" | "removed";
+            booking_id?: number | null;
+            created_at?: string;
+        };
+        CalendarWaitlistList: {
+            data: components["schemas"]["CalendarWaitlistEntry"][];
+            /** @description Still waiting or with an offer open. */
+            count: number;
+        };
+        CalendarWaitlistOffer: {
+            id: number;
+            waitlist_id: number;
+            profile_id: number;
+            starts_at: string;
+            /** @description The start minus the minimum notice. */
+            expires_at: string;
+        };
+        CalendarWaitlistOfferRequest: {
+            /** @description Who the time is with. */
+            profile_id: number;
+            /** @description The time to offer, with an offset or Z; it must be free. */
+            starts_at: string;
+        };
+        CalendarWaitlistRequest: {
+            /** @description The service they want. */
+            service_id: number;
+            /** @description The person they want; null or left out for anyone. */
+            profile_id?: number | null;
+            /** @description Their name. */
+            name: string;
+            /** @description Where the offer goes; email or phone is required. */
+            email?: string;
+            /** @description For WhatsApp or SMS when connected. */
+            phone?: string;
+            /** @description First day, Y-m-d; default today. */
+            date_from?: string;
+            /** @description Last day, Y-m-d, within a year; default the first. */
+            date_to?: string;
+            /** @description Times of day; left out or empty for any. */
+            times?: ("morning" | "afternoon" | "evening")[];
+            /** @description Anything the desk should know. */
+            note?: string;
+            /**
+             * @description The language of their messages; default the workspace's.
+             * @enum {string}
+             */
+            language?: "en" | "ar";
         };
         CalendarWalkin: {
             id: number;
@@ -25865,6 +26049,67 @@ export interface components {
         PublicSignupRequest: {
             email: string;
             display_name: string;
+            bot_token?: string;
+        };
+        PublicWaitlistJoined: {
+            id: number;
+            date_from: string;
+            date_to: string;
+            times: string[];
+        };
+        PublicWaitlistOffer: {
+            /**
+             * @description `taken`: someone took it first.
+             * @enum {string}
+             */
+            state: "open" | "booked" | "taken" | "expired" | "closed";
+            starts_at: string;
+            ends_at: string;
+            expires_at: string;
+            service: {
+                name: components["schemas"]["LocalizedLabel"];
+                duration_minutes: number;
+            };
+            staff_name: string;
+            customer_name?: string;
+            /** @description The zone of the person's branch. */
+            time_zone?: string | null;
+            booking_id?: number | null;
+            workspace: {
+                name: string;
+            };
+            brand?: components["schemas"]["PublicWorkspaceBrand"] | null;
+            workspace_time_zone?: string;
+        };
+        PublicWaitlistRequest: {
+            /** @description The service they want. */
+            service_id: number;
+            /** @description The person; null for anyone. */
+            profile_id?: number | null;
+            /** @description Their name. */
+            name: string;
+            /** @description Where the offer goes. */
+            email: string;
+            /** @description Optional. */
+            phone?: string;
+            /** @description First day, Y-m-d. */
+            date_from?: string;
+            /** @description Last day, Y-m-d. */
+            date_to?: string;
+            /** @description Times of day; empty for any. */
+            times?: ("morning" | "afternoon" | "evening")[];
+            /** @description Optional. */
+            note?: string;
+            /**
+             * @description The page's language.
+             * @enum {string}
+             */
+            language?: "en" | "ar";
+            /** @description Time on the page, as for booking. */
+            elapsed_ms: number;
+            /** @description Hidden; must be empty. */
+            website?: string;
+            /** @description The bot check's answer, when set up. */
             bot_token?: string;
         };
         PublicWorkspaceBrand: {
@@ -46596,6 +46841,332 @@ export interface operations {
                 content: {
                     "application/json": {
                         data: components["schemas"]["CalendarToday"];
+                    };
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_calendar_waitlist: {
+        parameters: {
+            query?: {
+                /** @description Comma-separated: waiting, offered, booked, removed. Default: waiting,offered. */
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The waitlist */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CalendarWaitlistList"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_waitlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarWaitlistRequest"];
+            };
+        };
+        responses: {
+            /** @description The entry */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarWaitlistEntry"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description No such service */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing name, email or phone, or days in the wrong order */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_waitlist_id_offer: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarWaitlistOfferRequest"];
+            };
+        };
+        responses: {
+            /** @description The offer */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarWaitlistOffer"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Insufficient permissions */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description That time is taken, or was already offered to them */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too soon, or they are no longer on the waitlist */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_waitlist_id_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The entry */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarWaitlistEntry"];
                     };
                 };
             };
@@ -93060,6 +93631,98 @@ export interface operations {
             };
         };
     };
+    post_api_v1_public_booking_workspace_waitlist: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace slug. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicWaitlistRequest"];
+            };
+        };
+        responses: {
+            /** @description Joined */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicWaitlistJoined"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description This booking page or service is not available */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing details, days in the wrong order, or refused as spam */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The bot check could not be reached */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     get_api_v1_public_bookings_token: {
         parameters: {
             query?: never;
@@ -95059,6 +95722,137 @@ export interface operations {
             };
             /** @description The bot check provider could not be reached; try again later */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_waitlist_offers_token: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's email. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The offer */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicWaitlistOffer"];
+                    };
+                };
+            };
+            /** @description This link is invalid */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_public_waitlist_offers_token_accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The 64-character token from the customer's email. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Booked; `manage_token` opens the booking */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["PublicBooking"];
+                    };
+                };
+            };
+            /** @description This link is invalid */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `taken_first`: someone took this time first; `expired`; or `closed`. They stay on the waitlist. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

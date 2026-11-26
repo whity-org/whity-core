@@ -499,6 +499,121 @@ final class PublicBookingApiHandler
     }
 
     /**
+     * "No time that suits you? Join the waitlist" (WHIT-1442, AP.23): the
+     * same checks as booking (the hidden field, time taken, the bot check and
+     * the rate limit), then an entry the customer is told about when a time
+     * frees up.
+     *
+     * @param array<string, string> $params
+     */
+    public function joinWaitlist(Request $request, array $params): Response
+    {
+        return $this->guard($request, 'cal:book:', RateLimits::publicBookingBookPerAddress(), function () use ($request, $params): Response {
+            $workspace = $this->workspace($request, $params) ?? throw CalendarRejectedException::notFound('Booking page');
+            $tenantId = $workspace['id'];
+            $body = JsonBody::parsed($request);
+            $elapsed = $body['elapsed_ms'] ?? null;
+            if (($body['website'] ?? '') !== '' || !is_int($elapsed) || $elapsed < self::MIN_FILL_MS) {
+                return Response::error('We could not add you. Please try again.', 422);
+            }
+            $checked = FieldValidator::check($body, [
+                'name' => Field::text()->required()->max(200),
+                'email' => Field::email()->required()->max(320),
+                'phone' => Field::phone('/^\+?[0-9 ()-]{6,40}$/'),
+                'note' => Field::text()->truncate(500),
+            ]);
+            $sentence = ['name' => 'Your name is required', 'email' => 'Your email address does not look right', 'phone' => 'Your phone number does not look right'];
+            if (($first = $checked->first()) !== null) {
+                return $checked->refusal($sentence[$first] ?? 'Please check the form.', ['field' => $first]);
+            }
+            if (!$this->bot->isReady()) {
+                return Response::error('The waitlist is unavailable right now. Try again later.', 503);
+            }
+            if ($this->bot->isRequired()) {
+                $verdict = $this->bot->verify(is_string($body['bot_token'] ?? null) ? $body['bot_token'] : '', ClientIp::fromRequest($request));
+                if ($verdict === BotCheck::UNREACHABLE) {
+                    return Response::error('The waitlist is unavailable right now. Try again later.', 503);
+                }
+                if ($verdict !== BotCheck::PASSED) {
+                    return Response::error('We couldn\'t confirm you are a person. Try again.', 422, ['bot_token' => 'failed']);
+                }
+            }
+            self::enter($tenantId);
+            $entry = $this->booking->waitlist()->add($tenantId, [
+                'service_id' => $body['service_id'] ?? null,
+                'profile_id' => $body['profile_id'] ?? null,
+                'name' => $checked->value('name'),
+                'email' => $checked->value('email'),
+                'phone' => $checked->value('phone'),
+                'note' => $checked->value('note'),
+                'date_from' => $body['date_from'] ?? null,
+                'date_to' => $body['date_to'] ?? null,
+                'times' => $body['times'] ?? null,
+                'language' => $body['language'] ?? null,
+            ], null, 'public');
+
+            return Response::json(['data' => [
+                'id' => $entry['id'],
+                'date_from' => $entry['date_from'],
+                'date_to' => $entry['date_to'],
+                'times' => $entry['times'],
+            ]], 201);
+        });
+    }
+
+    /**
+     * The page of one offered time (WHIT-1442, AP.23), from the link in the
+     * offer. Whether it can still be taken, and the workspace's brand.
+     *
+     * @param array<string, string> $params
+     */
+    public function showOffer(Request $request, array $params): Response
+    {
+        return $this->guard($request, 'cal:manage:', RateLimits::publicBookingManagePerAddress(), function () use ($params): Response {
+            $offer = $this->booking->waitlist()->offerFor((string) ($params['token'] ?? '')) ?? throw CalendarRejectedException::notFound('Offer');
+            $tenantId = (int) $offer['tenant_id'];
+            unset($offer['tenant_id']);
+            $name = $this->tenants->findNameById($tenantId) ?? '';
+
+            return Response::json(['data' => $offer + [
+                'workspace' => ['name' => $name],
+                'brand' => $this->brandFor($tenantId, $name),
+                'workspace_time_zone' => $this->booking->settingsFor($tenantId)->zone->getName(),
+            ]]);
+        });
+    }
+
+    /**
+     * Take the offered time (WHIT-1442, AP.23). The first booking the
+     * database accepts wins; anyone after gets `taken_first` and stays on the
+     * waitlist. A booked offer returns the booking with its manage link.
+     *
+     * @param array<string, string> $params
+     */
+    public function acceptOffer(Request $request, array $params): Response
+    {
+        return $this->guard($request, 'cal:manage:', RateLimits::publicBookingManagePerAddress(), function () use ($params): Response {
+            $token = (string) ($params['token'] ?? '');
+            $offer = $this->booking->waitlist()->offerFor($token) ?? throw CalendarRejectedException::notFound('Offer');
+            self::enter((int) $offer['tenant_id']);
+            $result = $this->booking->waitlist()->accept($token);
+            if ($result['outcome'] !== 'booked' || $result['booking'] === null) {
+                $message = match ($result['outcome']) {
+                    'taken_first' => 'Someone took this time first. You\'re still on the waitlist.',
+                    'expired' => 'This time can no longer be booked. You\'re still on the waitlist.',
+                    default => 'This offer has closed.',
+                };
+
+                return Response::error($message, 409, ['code' => $result['outcome']]);
+            }
+
+            return Response::json(['data' => self::forCustomer($result['booking']) + [
+                'manage_token' => $result['booking']['manage_token'] ?? null,
+            ]], 201);
+        });
+    }
+
+    /**
      * @param array<string, string> $params
      * @param callable(int, int): Response $work
      */

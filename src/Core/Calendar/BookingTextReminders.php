@@ -96,6 +96,39 @@ final class BookingTextReminders
         return $sent;
     }
 
+    /**
+     * Send a text on every text channel that is on (WHIT-1442: a waitlist
+     * offer). Returns each channel's outcome, as {@see self::remind()} does.
+     *
+     * @return array<string, string>
+     */
+    public function sendText(int $tenantId, string $phone, string $name, string $text, string $source): array
+    {
+        $messaging = ($this->messaging)();
+        if ($messaging === null) {
+            return [];
+        }
+        $sent = [];
+        foreach ($messaging->channels()->keys() as $key) {
+            if (in_array($key, self::NOT_TEXT, true) || !$this->isOn($messaging, $tenantId, $key)) {
+                continue;
+            }
+            if (trim($phone) === '') {
+                $sent[$key] = BookingRepository::REMINDER_NO_ADDRESS;
+                continue;
+            }
+            try {
+                $messaging->send($tenantId, Recipient::address(trim($phone), $name !== '' ? $name : null), $text, new SendOptions(channel: $key, source: $source));
+                $sent[$key] = BookingRepository::REMINDER_SENT;
+            } catch (Throwable $e) {
+                $this->logger?->info('[calendar] no text on ' . $key . ': ' . $e->getMessage());
+                $sent[$key] = BookingRepository::REMINDER_FAILED;
+            }
+        }
+
+        return $sent;
+    }
+
     /** Whether a channel is on for the workspace; one that is off is not a failed reminder. */
     private function isOn(MessagingService $messaging, int $tenantId, string $key): bool
     {

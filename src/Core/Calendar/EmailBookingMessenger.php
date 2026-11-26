@@ -34,7 +34,7 @@ use Whity\Core\Settings\SettingsService;
  * A booking with no email address gets nothing. Delivery failures are logged
  * and never thrown.
  */
-final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDelivery
+final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDelivery, WaitlistMessenger
 {
     private const AR_MONTHS = ['كانون الثاني', 'شباط', 'آذار', 'نيسان', 'أيار', 'حزيران', 'تموز', 'آب', 'أيلول', 'تشرين الأول', 'تشرين الثاني', 'كانون الأول'];
     private const AR_DAYS = ['الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت', 'الأحد'];
@@ -121,6 +121,67 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
             'ics' => $message['ics'],
             'method' => $message['method'],
         ];
+    }
+
+    /**
+     * A freed time for someone on the waitlist (WHIT-1442, AP.23): what, when
+     * and with whom, and one button to the page where they take it. In their
+     * own language when they gave one, else the workspace's. No ICS: it isn't
+     * booked yet.
+     *
+     * @param array{to: string, name: string, language: string, service: array<string, string>, staff_name: string, starts_at: string, time_zone: ?string, offer_url: string, expires_at: string} $offer
+     */
+    public function waitlistOffer(int $tenantId, array $offer): string
+    {
+        try {
+            $checked = \Whity\Http\Validation\FieldValidator::check(['to' => $offer['to']], ['to' => \Whity\Http\Validation\Field::email()->required()]);
+            if ($checked->first() !== null) {
+                return BookingRepository::REMINDER_NO_ADDRESS;
+            }
+            $email = $checked->value('to');
+            $effective = $this->settings->effective($tenantId);
+            $calendar = CalendarSettings::fromSettings($effective);
+            $arabic = $offer['language'] !== ''
+                ? $offer['language'] === 'ar'
+                : str_starts_with((string) ($effective[SettingsRegistry::LOCALE] ?? 'en'), 'ar');
+            $t = $arabic ? self::AR : self::EN;
+            $zoneName = BranchZones::valid($offer['time_zone']);
+            $zone = $zoneName !== null ? new \DateTimeZone($zoneName) : $calendar->zone;
+            $start = Interval::fromApi($offer['starts_at']) ?? new DateTimeImmutable();
+            $until = Interval::fromApi($offer['expires_at']) ?? $start;
+            $when = self::when($start->setTimezone($zone), $arabic);
+            $serviceName = self::label($offer['service'], $arabic);
+            $workspace = $this->sender->branding($tenantId)->siteName;
+            ['address' => $address, 'replyTo' => $replyTo] = $this->sender->workspaceContact($tenantId, $arabic ? 'ar' : 'en');
+            $rows = [[$t['row.what'], $serviceName], [$t['row.when'], $when]];
+            if (trim($offer['staff_name']) !== '') {
+                $rows[] = [$t['row.with'], trim($offer['staff_name'])];
+            }
+            $footer = implode(' · ', array_filter([$workspace, $address, $replyTo !== null ? $t['foot.reply'] : null], static fn (?string $v): bool => $v !== null && $v !== ''));
+            $subject = sprintf($t['offer.subject'], $serviceName, $when);
+            $content = new EmailContent(
+                heading: $t['offer.heading'],
+                paragraphs: [
+                    trim($offer['name']) !== '' ? sprintf($t['offer.hello'], trim($offer['name'])) : $t['offer.lead'],
+                    $t['offer.first'],
+                    sprintf($t['offer.until'], self::when($until->setTimezone($zone), $arabic)),
+                ],
+                ctaLabel: $t['offer.cta'],
+                ctaUrl: $offer['offer_url'],
+                footnote: $t['offer.footnote'],
+                rows: $rows,
+                notice: $footer,
+                language: $arabic ? 'ar' : 'en',
+                rowStyles: [0 => 'strong'],
+            );
+            $this->sender->deliver($tenantId, $email, $subject, $content, new EmailOptions(replyTo: $replyTo));
+
+            return BookingRepository::REMINDER_SENT;
+        } catch (\Throwable $e) {
+            $this->logger?->warning('[calendar] could not send a waitlist offer', ['error' => $e->getMessage()]);
+
+            return BookingRepository::REMINDER_FAILED;
+        }
     }
 
     /**
@@ -475,6 +536,15 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
     private const EN = [
         'row.what' => 'What',
         'row.when' => 'When',
+        // WHIT-1442 (AP.23): a freed time for someone on the waitlist.
+        'offer.subject' => 'A time is free: %s, %s',
+        'offer.heading' => 'A time you wanted is free',
+        'offer.hello' => 'Hello %s, a time you asked for on our waitlist has just become free.',
+        'offer.lead' => 'A time you asked for on our waitlist has just become free.',
+        'offer.first' => 'Others on the waitlist were told too: the first to take it gets it.',
+        'offer.until' => 'You can take it until %s.',
+        'offer.cta' => 'Take this time',
+        'offer.footnote' => 'If someone takes it first, you stay on the waitlist.',
         'row.where' => 'Where',
         'row.with' => 'With',
         'row.price' => 'Price',
@@ -533,6 +603,15 @@ final class EmailBookingMessenger implements BookingMessenger, ReportsReminderDe
     private const AR = [
         'row.what' => 'ماذا',
         'row.when' => 'متى',
+        // WHIT-1442 (AP.23).
+        'offer.subject' => 'موعد متاح: %s، %s',
+        'offer.heading' => 'موعد كنت تريده أصبح متاحًا',
+        'offer.hello' => 'مرحبًا %s، أصبح موعد طلبته في قائمة الانتظار متاحًا الآن.',
+        'offer.lead' => 'أصبح موعد طلبته في قائمة الانتظار متاحًا الآن.',
+        'offer.first' => 'أُبلغ آخرون في قائمة الانتظار أيضًا: من يحجزه أولًا يحصل عليه.',
+        'offer.until' => 'يمكنك حجزه حتى %s.',
+        'offer.cta' => 'احجز هذا الموعد',
+        'offer.footnote' => 'إن حجزه أحد قبلك، تبقى في قائمة الانتظار.',
         'row.where' => 'أين',
         'row.with' => 'مع',
         'row.price' => 'السعر',

@@ -80,6 +80,7 @@ final class BookingService
 
     private ?RoomRepository $rooms = null;
     private ?BranchZones $zones = null;
+    private ?Waitlist $waitlist = null;
 
     /** WHIT-1427: every attendance mark is audited (AP.3). */
     private ?\Whity\Core\Audit\AuditLoggerInterface $audit = null;
@@ -117,6 +118,7 @@ final class BookingService
     public function setMessenger(BookingMessenger $messenger): void
     {
         $this->messenger = $messenger;
+        $this->waitlist = null;
     }
 
     /** Customer manage links (WHIT-942): issued on create and move, revoked on cancel. */
@@ -130,6 +132,7 @@ final class BookingService
     public function setTextReminders(BookingTextReminders $textReminders): void
     {
         $this->textReminders = $textReminders;
+        $this->waitlist = null;
     }
 
     public function setPlugins(CalendarPlugins $plugins): void
@@ -152,6 +155,7 @@ final class BookingService
     public function setManageUrlBase(string $base): void
     {
         $this->manageUrlBase = $base;
+        $this->waitlist = null;
     }
 
     /** Reminders are queued here when set ({@see BookingReminderJob}). */
@@ -631,6 +635,7 @@ final class BookingService
             $booking['suggested_at'] = null;
             $this->announceBooking(CalendarEventNames::BOOKING_RESCHEDULED, $tenantId, $booking);
             $this->tell('requested', $tenantId, $booking);
+            $this->offerFreed($tenantId, $before);
 
             return $booking;
         }
@@ -638,8 +643,46 @@ final class BookingService
         if ($notify) {
             $this->tell('rescheduled', $tenantId, $booking);
         }
+        // WHIT-1442 (AP.23): the time it left is offered to the waitlist.
+        $this->offerFreed($tenantId, $before);
 
         return $booking;
+    }
+
+    /** The waitlist (WHIT-1442, AP.23). */
+    public function waitlist(): Waitlist
+    {
+        return $this->waitlist ??= new Waitlist(
+            $this->db,
+            $this,
+            $this->messenger instanceof WaitlistMessenger ? $this->messenger : null,
+            $this->textReminders ??= BookingTextReminders::fromApp($this->settings),
+            $this->manageUrlBase !== '' ? rtrim($this->manageUrlBase, '/') . '/offer' : '/booking/offer',
+        );
+    }
+
+    /**
+     * After a booking's time was freed (it was cancelled, or moved away from
+     * it), offer that time to the waitlist (WHIT-1442, AP.23). Outside the
+     * locks and after the write; never fails the cancel or the move.
+     *
+     * @param array<string, mixed>|null $before the booking as it was
+     */
+    private function offerFreed(int $tenantId, ?array $before): void
+    {
+        if ($before === null || (is_array($before['items'] ?? null) && $before['items'] !== []) || !is_string($before['starts_at'] ?? null)) {
+            return;
+        }
+        $still = $this->bookings->find($tenantId, (int) $before['id']);
+        if ($still !== null && in_array($still['status'], BookingRepository::LIVE, true)
+            && $still['starts_at'] === $before['starts_at'] && (int) $still['profile_id'] === (int) $before['profile_id']) {
+            return;
+        }
+        try {
+            $this->waitlist()->offerFreed($tenantId, (int) $before['profile_id'], (int) $before['service_id'], Interval::fromDb($before['starts_at']));
+        } catch (Throwable $e) {
+            ScrubbedErrorLog::failure('[calendar] could not offer a freed time to the waitlist', $e);
+        }
     }
 
     /**
@@ -799,7 +842,7 @@ final class BookingService
      * walk-ins waiting. With `$since`, only the bookings changed since then,
      * cancelled ones included so the desk can drop them.
      *
-     * @return array{date: string, time_zone: string, now: string, full: bool, bookings: list<array<string, mixed>>}
+     * @return array{date: string, time_zone: string, now: string, full: bool, bookings: list<array<string, mixed>>, waitlist_count: int}
      */
     public function deskDay(int $tenantId, ?string $date, ?int $unitId, ?DateTimeImmutable $since): array
     {
@@ -824,6 +867,8 @@ final class BookingService
             'now' => Interval::toApi($now),
             'full' => $since === null,
             'bookings' => $this->withCustomerFlags($tenantId, $rows),
+            // WHIT-1442 (AP.23): how many are on the waitlist.
+            'waitlist_count' => $this->waitlist()->count($tenantId),
         ];
     }
 
@@ -1356,6 +1401,8 @@ final class BookingService
         $booking = $this->bookingOrFail($tenantId, $bookingId);
         $this->announceBooking(CalendarEventNames::BOOKING_CANCELLED, $tenantId, $booking);
         $this->tell('cancelled', $tenantId, $booking);
+        // WHIT-1442 (AP.23): a cancel, or "I can't come", frees the time for the waitlist.
+        $this->offerFreed($tenantId, $row);
 
         return $booking;
     }

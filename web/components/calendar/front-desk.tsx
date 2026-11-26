@@ -23,6 +23,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import Link from 'next/link';
 import { AdminHeader } from '@/components/admin/admin-header';
 import { Input } from '@/components/ui/input';
 import { LoadProblem } from '@/components/load-problem';
@@ -156,6 +157,8 @@ export function FrontDesk() {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState<{ forbidden: boolean } | null>(null);
   const [walkins, setWalkins] = useState<CalendarWalkin[]>([]);
+  // WHIT-1442 (AP.23): how many are on the waitlist.
+  const [waitlistCount, setWaitlistCount] = useState(0);
   const [view, setView] = useState<'columns' | 'list' | null>(null);
   const [by, setBy] = useState<'people' | 'rooms'>('people');
   const [selected, setSelected] = useState<number | null>(null);
@@ -191,6 +194,7 @@ export function FrontDesk() {
         const day = await calendarApi.desk({ since: full ? null : since.current });
         since.current = day.now;
         merge(day.bookings, day.full);
+        setWaitlistCount(day.waitlist_count);
         setLoaded(true);
         setFailed(null);
         if (walkinsOn) setWalkins(await calendarApi.walkins().catch(() => []));
@@ -389,6 +393,23 @@ export function FrontDesk() {
               )}
               <WaitingNow bookings={list} walkins={walkins} timeZone={timeZone} nowMs={nowMs} onSelect={setSelected} />
               <DidTheyComeCard unitId={null} reloadKey={reloadKey} timeZone={timeZone} canChange={access.canWrite} onChanged={() => void load(false)} />
+              <Card data-testid="desk-waitlist">
+                <CardHeader>
+                  <CardTitle>{t('nav.waitlist', 'Waitlist')}</CardTitle>
+                  <CardDescription>
+                    {waitlistCount === 0
+                      ? t('desk.waitlistNone', 'Nobody is waiting for a time.')
+                      : waitlistCount === 1
+                        ? t('desk.waitlistOne', 'One person is waiting for a time.')
+                        : t('desk.waitlistCount', '{count} people are waiting for a time.', { count: waitlistCount })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Link href="/calendar/waitlist" className="text-sm font-medium text-primary hover:underline">
+                    {t('desk.openWaitlist', 'Open the waitlist')}
+                  </Link>
+                </CardContent>
+              </Card>
             </aside>
           </div>
 

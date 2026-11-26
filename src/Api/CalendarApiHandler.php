@@ -671,6 +671,61 @@ final class CalendarApiHandler
     }
 
     /**
+     * The waitlist, oldest first (WHIT-1442, AP.23), and how many are on it.
+     */
+    public function listWaitlist(Request $request): Response
+    {
+        return $this->run($request, 'waitlist', function (int $tenantId) use ($request): Response {
+            $status = $this->query($request)['status'] ?? null;
+            $statuses = is_string($status) && $status !== '' ? array_values(array_filter(explode(',', $status), static fn (string $s): bool => in_array($s, [...\Whity\Core\Calendar\Waitlist::OPEN, \Whity\Core\Calendar\Waitlist::BOOKED, \Whity\Core\Calendar\Waitlist::REMOVED], true))) : [];
+            $waitlist = $this->booking->waitlist();
+
+            return Response::json(['data' => $waitlist->list($tenantId, $statuses), 'count' => $waitlist->count($tenantId)]);
+        });
+    }
+
+    /** Staff add someone to the waitlist (WHIT-1442, AP.23). */
+    public function addWaitlist(Request $request): Response
+    {
+        return $this->run($request, 'waitlist', fn (int $tenantId, int $actor): Response => Response::json([
+            'data' => $this->booking->waitlist()->add($tenantId, JsonBody::parsed($request), $actor, 'staff'),
+        ], 201));
+    }
+
+    /**
+     * Take someone off the waitlist; their open offers close.
+     *
+     * @param array<string, string> $params
+     */
+    public function removeWaitlist(Request $request, array $params): Response
+    {
+        return $this->run($request, 'waitlist', function (int $tenantId) use ($params): Response {
+            $this->booking->waitlist()->remove($tenantId, (int) $params['id']);
+
+            return Response::json(['data' => $this->booking->waitlist()->find($tenantId, (int) $params['id'])]);
+        });
+    }
+
+    /**
+     * Offer a time by hand (WHIT-1442, AP.23): the customer is sent a link to
+     * take it. An agent's call is a proposal: no undo window.
+     *
+     * @param array<string, string> $params
+     */
+    public function offerWaitlist(Request $request, array $params): Response
+    {
+        return $this->run($request, 'waitlist', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $body = JsonBody::parsed($request);
+            $start = Interval::fromApi($body['starts_at'] ?? null) ?? throw new CalendarRejectedException('starts_at is a time with an offset or Z', 422);
+            $profileId = is_int($body['profile_id'] ?? null) ? $this->staffOr404($tenantId, $body['profile_id']) : throw new CalendarRejectedException('profile_id is required', 422);
+            $offer = $this->booking->waitlist()->offerByHand($tenantId, (int) $params['id'], $profileId, $start, $actor);
+            unset($offer['token']);
+
+            return Response::json(['data' => $offer], 201);
+        });
+    }
+
+    /**
      * The front desk's day in one read (WHIT-1441, AP.27, AP.28). `since`
      * (from the last answer's `now`) returns only the bookings changed since.
      */

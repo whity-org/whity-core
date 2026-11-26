@@ -5662,6 +5662,11 @@ $router->register('PATCH',  '/api/calendar/branches/{id:\d+}',              [$ca
 $router->register('GET',    '/api/calendar/busy-checks',                    [$calendarHandler, 'busyChecks'],      null, null, CorePermissions::CALENDAR_READ);
 // WHIT-1441 (AP.27-AP.29): the front desk: its day, the visit's steps, and running late.
 $router->register('GET',    '/api/calendar/desk',                           [$calendarHandler, 'desk'],            null, null, CorePermissions::CALENDAR_FRONT_DESK);
+// WHIT-1442 (AP.23): the waitlist.
+$router->register('GET',    '/api/calendar/waitlist',                       [$calendarHandler, 'listWaitlist'],    null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/waitlist',                       [$calendarHandler, 'addWaitlist'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/waitlist/{id:\d+}/remove',       [$calendarHandler, 'removeWaitlist'],  null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/waitlist/{id:\d+}/offer',        [$calendarHandler, 'offerWaitlist'],   null, null, CorePermissions::CALENDAR_WRITE);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/desk-status',  [$calendarHandler, 'deskStatus'],      null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/late',         [$calendarHandler, 'bookingLate'],     null, null, CorePermissions::CALENDAR_FRONT_DESK);
 $router->register('GET',    '/api/calendar/staff/{profileId:\d+}/late',     [$calendarHandler, 'staffLatePlan'],   null, null, CorePermissions::CALENDAR_FRONT_DESK);
@@ -6536,6 +6541,10 @@ $router->register('GET',  '/api/public/booking/{workspace}',                    
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
 $router->register('GET',  '/api/public/booking/{workspace}/me',                    [$publicBookingHandler, 'visitor'],     null);
 $router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
+// WHIT-1442 (AP.23): join the waitlist, and an offered time's page.
+$router->register('POST', '/api/public/booking/{workspace}/waitlist',              [$publicBookingHandler, 'joinWaitlist'], null);
+$router->register('GET',  '/api/public/waitlist-offers/{token:[a-f0-9]{64}}',      [$publicBookingHandler, 'showOffer'],   null);
+$router->register('POST', '/api/public/waitlist-offers/{token:[a-f0-9]{64}}/accept', [$publicBookingHandler, 'acceptOffer'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}',             [$publicBookingHandler, 'showBooking'], null);
 $router->register('GET',  '/api/public/bookings/{token:[a-f0-9]{64}}/slots',       [$publicBookingHandler, 'manageSlots'], null);
 $router->register('POST', '/api/public/bookings/{token:[a-f0-9]{64}}/move',        [$publicBookingHandler, 'move'],        null);

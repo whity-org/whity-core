@@ -483,6 +483,10 @@
     "en": "See a late staff member's day pushed back",
     "ar": "عرض يوم موظف متأخر بعد تأجيله"
   },
+  "get_api_calendar_waitlist": {
+    "en": "List the waitlist",
+    "ar": "عرض قائمة الانتظار"
+  },
   "get_api_calendar_rooms": {
     "en": "List rooms",
     "ar": "عرض الغرف"
@@ -1797,6 +1801,18 @@
   "post_api_calendar_events_id_answer": {
     "en": "Answer an event invitation",
     "ar": "الرد على دعوة إلى حدث"
+  },
+  "post_api_calendar_waitlist": {
+    "en": "Add someone to the waitlist",
+    "ar": "إضافة شخص إلى قائمة الانتظار"
+  },
+  "post_api_calendar_waitlist_id_remove": {
+    "en": "Take someone off the waitlist",
+    "ar": "إزالة شخص من قائمة الانتظار"
+  },
+  "post_api_calendar_waitlist_id_offer": {
+    "en": "Offer a free time to someone on the waitlist",
+    "ar": "عرض موعد متاح على شخص في قائمة الانتظار"
   },
   "post_api_calendar_rooms": {
     "en": "Add a room",
