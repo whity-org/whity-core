@@ -13535,6 +13535,8 @@ final class CoreApiSchemas
             self::permissionRoute('GET', '/api/desktop-plugins', 'desktop-plugins:read', [
                 'summary' => 'The desktop plugin releases, with attestations',
                 'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
                 'responses' => [
                     200 => self::jsonResponse('Every catalogued release, grouped by plugin, newest first', 'DesktopPluginCatalogueResponse'),
                 ] + self::authErrors(),
@@ -13542,6 +13544,8 @@ final class CoreApiSchemas
             self::permissionRoute('GET', '/api/desktop-plugins/revocations', 'desktop-plugins:read', [
                 'summary' => 'The signed plugin revocation list this instance accepted',
                 'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
                 'responses' => [
                     200 => self::jsonResponse('The accepted list as its signed envelope, or data null when none was accepted yet', 'DesktopPluginRevocationsResponse'),
                 ] + self::authErrors(),
@@ -13549,6 +13553,8 @@ final class CoreApiSchemas
             self::permissionRoute('GET', '/api/desktop-plugins/{name}/versions/{version}/download', 'desktop-plugins:read', [
                 'summary' => 'One release\'s package',
                 'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
                 'responses' => [
                     200 => ['description' => 'The package zip; its SHA-256 is the catalogue\'s', 'content' => ['application/zip' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
                     404 => self::errorResponse('No such release'),

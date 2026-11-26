@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Whity\Api;
 
 use PDO;
+use Whity\Core\Log\ScrubbedErrorLog;
 use Whity\Core\Request;
 use Whity\Core\Response;
 
@@ -147,7 +148,7 @@ class DesktopPluginsApiHandler
                 'envelope' => (string) $row['body'],
             ]], 200);
         } catch (\Throwable $e) {
-            error_log('[DesktopPluginsApiHandler] revocations failed: ' . $e->getMessage());
+            ScrubbedErrorLog::failure('[DesktopPluginsApiHandler] revocations failed', $e);
             return Response::error('Failed to read the revocation list', 500);
         }
     }
