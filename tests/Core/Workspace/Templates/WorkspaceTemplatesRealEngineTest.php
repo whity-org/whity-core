@@ -258,7 +258,9 @@ PHP);
         $plan = json_decode($response->getBody(), true)['data'];
         self::assertSame(2, $plan['version']);
         self::assertNull($plan['appliedVersion']);
-        self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'add'], $plan['items']);
+        self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'add', 'label' => 'Cake order'], $plan['items'], 'Each item comes with its name (WHIT-1429)');
+        self::assertContains(['part' => 'forms', 'key' => 'cake-order', 'action' => 'add', 'label' => 'Cake order'], $plan['items']);
+        self::assertNotContains('examples', array_column($plan['items'], 'part'), 'Examples were left out');
         self::assertSame(0, $this->rows('workspace_template_runs'), 'A preview makes no run');
         self::assertSame(0, $this->rows('workspace_template_parts'));
         self::assertSame([], $this->list('en')['chosen']);
@@ -272,7 +274,7 @@ PHP);
 
         $again = json_decode($this->handler('en')->preview($request, ['key' => 'bakery'])->getBody(), true)['data'];
         self::assertSame(2, $again['appliedVersion']);
-        self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'done'], $again['items'], 'Made by the last run: not made again');
+        self::assertContains(['part' => 'services', 'key' => 'cake-order', 'action' => 'done', 'label' => 'Cake order'], $again['items'], 'Made by the last run: not made again');
     }
 
     public function testANewVersionIsOfferedItemByItemAndNeverAppliedOnItsOwn(): void
@@ -295,7 +297,11 @@ PHP);
         $request = new Request('POST', '/api/v1/workspace/templates/clinic/apply', ['content-type' => 'application/json'], '{}');
         $request->user = (object) ['profile_id' => self::AMRO];
 
-        self::assertSame(200, $handler->apply($request, ['key' => 'clinic'])->getStatusCode());
+        $first = $handler->apply($request, ['key' => 'clinic']);
+        self::assertSame(200, $first->getStatusCode());
+        $items = json_decode($first->getBody(), true)['data']['items'];
+        self::assertContains(['part' => 'examples', 'key' => 'ibrahim', 'action' => 'add', 'label' => 'Ibrahim Mansour'], $items);
+        self::assertContains(['part' => 'examples', 'key' => 'first', 'action' => 'add', 'label' => 'Consultation, Ibrahim Mansour'], $items, 'An example booking is its service and customer');
         $contactsMade = $setup->count('POST /api/contacts');
         self::assertSame(1, $contactsMade, 'Examples come with the first apply');
         $setup->services = [['id' => 10, 'name' => ['en' => 'Consultation', 'ar' => 'استشارة']]];
@@ -311,7 +317,7 @@ PHP);
         ], $card()['update']);
 
         $plan = json_decode($handler->preview($request, ['key' => 'clinic'])->getBody(), true)['data'];
-        self::assertContains(['part' => 'services', 'key' => 'consultation', 'action' => 'changed'], $plan['items']);
+        self::assertContains(['part' => 'services', 'key' => 'consultation', 'action' => 'changed', 'label' => 'Consultation'], $plan['items']);
         self::assertSame(1, $plan['appliedVersion']);
 
         self::assertSame(200, $handler->apply($request, ['key' => 'clinic'])->getStatusCode());

@@ -120,6 +120,14 @@ export function BookingDetails({
           {booking.customer.name ?? t('booking.noName', 'No name given')}
         </Row>
       )}
+      {booking?.customer_flag && (
+        // WHIT-1427 (AP.8): in words, never by colour alone.
+        <Row icon="alert">
+          <span className="text-warning-text" data-testid="calendar-details-flag">
+            {t('flag.missed', 'Missed {misses} of the last {of}', { misses: booking.customer_flag.misses, of: booking.customer_flag.of })}
+          </span>
+        </Row>
+      )}
       {withName !== '' && <Row icon="user">{t('details.with', 'With {name}', { name: withName })}</Row>}
       {booking !== undefined && (booking.items?.length ?? 0) > 1 && (
         <Row icon="list-numbered">

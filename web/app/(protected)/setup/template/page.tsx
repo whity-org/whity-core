@@ -17,6 +17,7 @@ import { iconNames, type IconName } from '@whity/ui/icon-map';
 import { AreaError, LoadingRows } from '@whity/ui/page-states';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@whity/ui/dialog';
 import { useHomePath } from '@/lib/branding-context';
+import { TemplatePlan } from '@/components/workspace-templates/template-plan';
 
 type Template = components['schemas']['WorkspaceTemplateCard'];
 
@@ -26,8 +27,10 @@ type Template = components['schemas']['WorkspaceTemplateCard'];
  * 2026-11-17: adopt mode, it only adds what is missing). Each card says what the template sets up and, when it
  * comes with a paid plugin, that the plugin can be tried free. Choosing one
  * asks once (examples on or off, and its theme when it has one: SDK 1.131,
- * TH.23), applies it as the person, and opens its
- * guided setup. Start blank is always last.
+ * TH.23), shows what it adds from a dry run (WHIT-1429, decision WT.1:
+ * each part with Will be added, Already there, or Can't add and why),
+ * applies it as the person, and opens its guided setup. Start blank is
+ * always last.
  *
  * No card for this screen yet: brand ask brand-ask-workspace-templates.md §1.
  * Built from TplWelcomeWorkspace and PluginCard.
@@ -98,8 +101,7 @@ export default function TemplatePickerPage() {
               <DialogTitle>{chosen.name}</DialogTitle>
               <DialogDescription>{chosen.summary}</DialogDescription>
             </DialogHeader>
-            <div className="space-y-4">
-              <SetsUp lines={chosen.setsUp} />
+            <div className="max-h-[60vh] space-y-4 overflow-y-auto">
               {chosen.hasExamples ? (
                 <label className="flex items-start gap-3 text-sm">
                   <Switch checked={examples} onCheckedChange={setExamples} />
@@ -124,6 +126,15 @@ export default function TemplatePickerPage() {
                   </span>
                 </label>
               ) : null}
+              {chosen.key !== 'blank' ? (
+                <WhatThisAdds
+                  templateKey={chosen.key}
+                  examples={chosen.hasExamples ? examples : false}
+                  theme={chosen.theme ? useTheme : false}
+                />
+              ) : (
+                <SetsUp lines={chosen.setsUp} />
+              )}
               {applyError ? (
                 <Alert variant="destructive">
                   <AlertDescription>{applyError}</AlertDescription>
@@ -171,6 +182,35 @@ function TemplateCard({ template, onChoose }: { template: Template; onChoose: ()
         ) : null}
       </button>
     </Card>
+  );
+}
+
+/**
+ * What choosing it would add here, from the dry run: nothing is saved until
+ * Set it up (WT.1). Asked again when the switches change.
+ */
+function WhatThisAdds({ templateKey, examples, theme }: { templateKey: string; examples: boolean; theme: boolean }) {
+  const t = useTranslation('admin');
+  const { data, loading, error } = useFetch(async () => {
+    const { data: body, error: failed } = await api.POST('/api/v1/workspace/templates/{key}/preview', {
+      params: { path: { key: templateKey } },
+      body: { examples, theme },
+    });
+    if (failed || !body) throw new Error(t('templates.plan.loadError', 'What it adds could not be worked out. You can still set it up.'));
+    return body.data.items ?? [];
+  }, [templateKey, examples, theme]);
+
+  return (
+    <section className="space-y-2" aria-live="polite">
+      <h3 className="text-sm font-semibold text-foreground">{t('templates.plan.title', 'What this adds')}</h3>
+      {loading ? (
+        <p className="text-sm text-muted-foreground">{t('templates.plan.loading', 'Working out what it adds…')}</p>
+      ) : error || !data ? (
+        <p className="text-sm text-muted-foreground">{error}</p>
+      ) : (
+        <TemplatePlan items={data} only={['add', 'keep', 'skip']} />
+      )}
+    </section>
   );
 }
 

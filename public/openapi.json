@@ -16319,6 +16319,272 @@
                 ]
             }
         },
+        "/api/v1/calendar/attendance": {
+            "get": {
+                "operationId": "get_api_v1_calendar_attendance",
+                "summary": "No-show and late-cancel rates for a period (WHIT-1427, AP.6). Needs calendar:reports, except for your own profile_id",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "required": false,
+                        "description": "Start, ISO 8601 with an offset.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "required": false,
+                        "description": "End (not included), up to 13 months after from.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "profile_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "One staff member.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "service_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "One service.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "One customer.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "email",
+                        "in": "query",
+                        "required": false,
+                        "description": "One customer without a contact.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "source",
+                        "in": "query",
+                        "required": false,
+                        "description": "`staff`, `public`, `agent` or `walkin`.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Rates",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarAttendanceRates"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "A period is needed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/attendance/unmarked": {
+            "get": {
+                "operationId": "get_api_v1_calendar_attendance_unmarked",
+                "summary": "Did they come? Today's bookings past their start (plus the grace minutes) that nobody marked",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "date",
+                        "in": "query",
+                        "required": false,
+                        "description": "A local day, `YYYY-MM-DD`. Default: today.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "unit_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "Only this branch.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Bookings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CalendarBooking"
+                                            }
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/availability": {
             "get": {
                 "operationId": "get_api_v1_calendar_availability",
@@ -16920,6 +17186,130 @@
                     },
                     "422": {
                         "description": "Not a request",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/bookings/{id}/attendance": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_attendance",
+                "summary": "Mark whether the customer came, or clear the mark (WHIT-1427); an agent's call is a proposal",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarAttendanceRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Not a confirmed booking, or it has not started",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -18656,6 +19046,234 @@
                     },
                     "405": {
                         "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/customers/attendance": {
+            "get": {
+                "operationId": "get_api_v1_calendar_customers_attendance",
+                "summary": "One customer's line and flag: came, didn't come, late cancels, since when",
+                "tags": [
+                    "calendar"
+                ],
+                "parameters": [
+                    {
+                        "name": "contact_id",
+                        "in": "query",
+                        "required": false,
+                        "description": "The customer's contact.",
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "email",
+                        "in": "query",
+                        "required": false,
+                        "description": "Or their email, for bookings without a contact.",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarCustomerAttendance"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No customer given",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/calendar/customers/attendance/reset": {
+            "post": {
+                "operationId": "post_api_v1_calendar_customers_attendance_reset",
+                "summary": "Start a customer's count again from today (AP.10); recorded",
+                "tags": [
+                    "calendar"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarCustomerAttendanceResetRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The customer",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarCustomerAttendance"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No customer given",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -34409,6 +35027,253 @@
                             "application/json": {
                                 "schema": {
                                     "$ref": "#/components/schemas/DemoCatalogConflictResponse"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/desktop-plugins": {
+            "get": {
+                "operationId": "get_api_v1_desktop_plugins",
+                "summary": "The desktop plugin releases, with attestations",
+                "tags": [
+                    "desktop"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Every catalogued release, grouped by plugin, newest first",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DesktopPluginCatalogueResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/desktop-plugins/revocations": {
+            "get": {
+                "operationId": "get_api_v1_desktop_plugins_revocations",
+                "summary": "The signed plugin revocation list this instance accepted",
+                "tags": [
+                    "desktop"
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The accepted list as its signed envelope, or data null when none was accepted yet",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/DesktopPluginRevocationsResponse"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/desktop-plugins/{name}/versions/{version}/download": {
+            "get": {
+                "operationId": "get_api_v1_desktop_plugins_name_versions_version_download",
+                "summary": "One release's package",
+                "tags": [
+                    "desktop"
+                ],
+                "parameters": [
+                    {
+                        "name": "name",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "version",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The package zip; its SHA-256 is the catalogue's",
+                        "content": {
+                            "application/zip": {
+                                "schema": {
+                                    "type": "string",
+                                    "format": "binary"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Insufficient permissions",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "No such release",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
                                 }
                             }
                         }
@@ -111984,6 +112849,89 @@
                     "pending_migration_count"
                 ]
             },
+            "CalendarAttendanceRates": {
+                "type": "object",
+                "properties": {
+                    "from": {
+                        "type": "string"
+                    },
+                    "to": {
+                        "type": "string"
+                    },
+                    "came": {
+                        "type": "integer"
+                    },
+                    "no_show": {
+                        "type": "integer"
+                    },
+                    "late_cancels": {
+                        "type": "integer"
+                    },
+                    "early_cancels": {
+                        "type": "integer",
+                        "description": "Not counted in any rate."
+                    },
+                    "unmarked": {
+                        "type": "integer",
+                        "description": "Past their start plus the grace minutes, confirmed, and not marked: left out of every rate."
+                    },
+                    "due": {
+                        "type": "integer",
+                        "description": "came + no_show + late_cancels."
+                    },
+                    "no_show_rate": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "no_show / due, 0 to 1; null when nothing is due."
+                    },
+                    "late_cancel_rate": {
+                        "type": "number",
+                        "nullable": true
+                    },
+                    "missed_rate": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "(no_show + late_cancels) / due."
+                    },
+                    "unmarked_share": {
+                        "type": "number",
+                        "nullable": true,
+                        "description": "unmarked / (due + unmarked). Above 0.1, show \"Not all bookings are marked\"."
+                    }
+                },
+                "required": [
+                    "from",
+                    "to",
+                    "came",
+                    "no_show",
+                    "late_cancels",
+                    "early_cancels",
+                    "unmarked",
+                    "due",
+                    "no_show_rate",
+                    "late_cancel_rate",
+                    "missed_rate",
+                    "unmarked_share"
+                ]
+            },
+            "CalendarAttendanceRequest": {
+                "type": "object",
+                "properties": {
+                    "attendance": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "attended",
+                            "no_show",
+                            null
+                        ],
+                        "description": "`attended` (came), `no_show` (didn't come), or null to clear the mark."
+                    }
+                },
+                "required": [
+                    "attendance"
+                ]
+            },
             "CalendarBooking": {
                 "type": "object",
                 "properties": {
@@ -112097,6 +113045,47 @@
                         },
                         "description": "Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14)."
                     },
+                    "contact_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "The customer's contact."
+                    },
+                    "attendance": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "attended",
+                            "no_show",
+                            null
+                        ],
+                        "description": "Did they come (WHIT-1427, AP.3): `attended`, `no_show`, or null while nobody has said."
+                    },
+                    "attendance_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "attendance_by_profile_id": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "Who marked it; null with `attendance_auto` when Whity marked it at the end of the day."
+                    },
+                    "attendance_auto": {
+                        "type": "boolean"
+                    },
+                    "cancel_kind": {
+                        "type": "string",
+                        "nullable": true,
+                        "enum": [
+                            "early",
+                            "late",
+                            "business",
+                            null
+                        ],
+                        "description": "A cancelled booking (AP.5): early or late by the customer or for them, business when the workspace cancelled."
+                    },
+                    "customer_flag": {
+                        "$ref": "#/components/schemas/CalendarCustomerFlag"
+                    },
                     "room_name": {
                         "type": "object",
                         "nullable": true,
@@ -112131,6 +113120,14 @@
                         "type": "string",
                         "maxLength": 500,
                         "description": "Why, in a few words; shown to the customer."
+                    },
+                    "cancelled_for": {
+                        "type": "string",
+                        "enum": [
+                            "customer",
+                            "business"
+                        ],
+                        "description": "Staff only (WHIT-1427, AP.5): `customer` (the customer asked) counts as an early or late cancel by the window; `business` (we cancelled) never counts. Left out, no kind is recorded."
                     }
                 }
             },
@@ -112552,6 +113549,69 @@
                     "bookings",
                     "sales_minor",
                     "commission_minor"
+                ]
+            },
+            "CalendarCustomerAttendance": {
+                "type": "object",
+                "properties": {
+                    "came": {
+                        "type": "integer"
+                    },
+                    "no_show": {
+                        "type": "integer"
+                    },
+                    "late_cancels": {
+                        "type": "integer"
+                    },
+                    "since": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "When they first booked."
+                    },
+                    "flag": {
+                        "$ref": "#/components/schemas/CalendarCustomerFlag"
+                    },
+                    "window_months": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "came",
+                    "no_show",
+                    "late_cancels",
+                    "since",
+                    "flag",
+                    "window_months"
+                ]
+            },
+            "CalendarCustomerAttendanceResetRequest": {
+                "type": "object",
+                "properties": {
+                    "contact_id": {
+                        "type": "integer",
+                        "description": "The customer's contact; or give `email` for a booking without one."
+                    },
+                    "email": {
+                        "type": "string",
+                        "description": "The customer's email, for bookings made without a contact."
+                    }
+                }
+            },
+            "CalendarCustomerFlag": {
+                "type": "object",
+                "nullable": true,
+                "description": "Shown as \"Missed {misses} of the last {of}\" when the policy applies; null otherwise (WHIT-1427, AP.8, AP.10).",
+                "properties": {
+                    "misses": {
+                        "type": "integer"
+                    },
+                    "of": {
+                        "type": "integer"
+                    }
+                },
+                "required": [
+                    "misses",
+                    "of"
                 ]
             },
             "CalendarDayCount": {
@@ -113259,6 +114319,30 @@
                     "walkins_enabled": {
                         "type": "boolean",
                         "description": "On: the walk-in queue at the front desk (WHIT-1334). Default off."
+                    },
+                    "no_show_grace_minutes": {
+                        "type": "integer",
+                        "description": "Minutes after the start before a booking joins Did they come? (WHIT-1427)."
+                    },
+                    "auto_no_show": {
+                        "type": "boolean",
+                        "description": "On: at the end of the day, bookings nobody marked become Didn't come. Default off."
+                    },
+                    "late_cancel_hours": {
+                        "type": "integer",
+                        "description": "A cancel by or for the customer within this many hours of the start is late."
+                    },
+                    "no_show_window_months": {
+                        "type": "integer",
+                        "description": "The customer flag counts misses over this many months."
+                    },
+                    "no_show_flag_after": {
+                        "type": "integer",
+                        "description": "The flag shows from this many misses; 0 shows none."
+                    },
+                    "no_show_count_late_cancels": {
+                        "type": "boolean",
+                        "description": "Late cancels count as misses for the flag."
                     }
                 },
                 "required": [
@@ -113361,6 +114445,38 @@
                     "walkins_enabled": {
                         "type": "boolean",
                         "description": "Turn the walk-in queue at the front desk on or off (WHIT-1334). Default off."
+                    },
+                    "no_show_grace_minutes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 240,
+                        "description": "Minutes after the start before a booking joins Did they come? (WHIT-1427). Default 15."
+                    },
+                    "auto_no_show": {
+                        "type": "boolean",
+                        "description": "At the end of the day, bookings nobody marked become Didn't come. Default off."
+                    },
+                    "late_cancel_hours": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 168,
+                        "description": "A cancel by or for the customer within this many hours of the start is late. Default 24."
+                    },
+                    "no_show_window_months": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 36,
+                        "description": "The customer flag counts misses over this many months. Default 12."
+                    },
+                    "no_show_flag_after": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 20,
+                        "description": "The flag shows from this many misses; 0 shows none. Default 2."
+                    },
+                    "no_show_count_late_cancels": {
+                        "type": "boolean",
+                        "description": "Late cancels count as misses for the flag. Default on."
                     }
                 }
             },
@@ -119256,6 +120372,104 @@
                         "$ref": "#/components/schemas/DemoCatalogItem"
                     }
                 }
+            },
+            "DesktopPluginCatalogueEntry": {
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string"
+                    },
+                    "latestVersion": {
+                        "type": "string"
+                    },
+                    "versions": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DesktopPluginVersion"
+                        }
+                    }
+                },
+                "required": [
+                    "name",
+                    "latestVersion",
+                    "versions"
+                ]
+            },
+            "DesktopPluginCatalogueResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/DesktopPluginCatalogueEntry"
+                        }
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DesktopPluginRevocationsResponse": {
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "object",
+                        "properties": {
+                            "sequence": {
+                                "type": "integer"
+                            },
+                            "issuedAt": {
+                                "type": "integer"
+                            },
+                            "expiresAt": {
+                                "type": "integer"
+                            },
+                            "envelope": {
+                                "type": "string",
+                                "description": "The signed whity.revocations/1 envelope, as accepted."
+                            }
+                        },
+                        "required": [
+                            "sequence",
+                            "issuedAt",
+                            "expiresAt",
+                            "envelope"
+                        ],
+                        "nullable": true
+                    }
+                },
+                "required": [
+                    "data"
+                ]
+            },
+            "DesktopPluginVersion": {
+                "type": "object",
+                "properties": {
+                    "version": {
+                        "type": "string"
+                    },
+                    "sha256": {
+                        "type": "string"
+                    },
+                    "sizeBytes": {
+                        "type": "integer"
+                    },
+                    "releasedAt": {
+                        "type": "string"
+                    },
+                    "attestation": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "Whity's signed whity.attestation/1 envelope for exactly this package, when core holds one that is not revoked. The device verifies it against the keys pinned in the app."
+                    }
+                },
+                "required": [
+                    "version",
+                    "sha256",
+                    "sizeBytes",
+                    "releasedAt",
+                    "attestation"
+                ]
             },
             "DeviceProvisionRequest": {
                 "type": "object",
@@ -150334,11 +151548,15 @@
                 "properties": {
                     "part": {
                         "type": "string",
-                        "description": "settings, theme, calendar, services, roles, forms, documents or examples"
+                        "description": "settings, theme, calendar, services, roles, forms, documents, pipelines or examples"
                     },
                     "key": {
                         "type": "string",
                         "description": "The template's key for the item"
+                    },
+                    "label": {
+                        "type": "string",
+                        "description": "The item's name in the reader's language, as the template writes it, when it has one (WHIT-1429); settings, the theme and the calendar have none"
                     },
                     "action": {
                         "type": "string",

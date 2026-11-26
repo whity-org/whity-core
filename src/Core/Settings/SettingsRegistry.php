@@ -905,6 +905,21 @@ final class SettingsRegistry
      * desk. Off by default; the salon workspace template turns it on.
      */
     public const CALENDAR_WALKINS_ENABLED = 'calendar.walkins_enabled';
+    /**
+     * WHIT-1427 (design section 39 §4, AP.3–AP.5, AP.10): did they come.
+     * A booking joins the desk's Did they come? list this many minutes after
+     * its start; end-of-day marking turns what is still unmarked into Didn't
+     * come (off by default, Q2); a cancel by or for the customer within this
+     * many hours of the start is late. The flag on a customer counts misses
+     * over this many months, from this many misses, late cancels included
+     * unless turned off.
+     */
+    public const CALENDAR_NO_SHOW_GRACE_MINUTES = 'calendar.no_show_grace_minutes';
+    public const CALENDAR_AUTO_NO_SHOW = 'calendar.auto_no_show';
+    public const CALENDAR_LATE_CANCEL_HOURS = 'calendar.late_cancel_hours';
+    public const CALENDAR_NO_SHOW_WINDOW_MONTHS = 'calendar.no_show_window_months';
+    public const CALENDAR_NO_SHOW_FLAG_AFTER = 'calendar.no_show_flag_after';
+    public const CALENDAR_NO_SHOW_COUNT_LATE_CANCELS = 'calendar.no_show_count_late_cancels';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -1261,6 +1276,8 @@ final class SettingsRegistry
         self::CALENDAR_INSTANT_BOOKING,
         self::CALENDAR_MULTI_SERVICE_BOOKING,
         self::CALENDAR_WALKINS_ENABLED,
+        self::CALENDAR_AUTO_NO_SHOW,
+        self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::BILLING_LOCAL_RUNS_ENABLED,
@@ -1616,6 +1633,12 @@ final class SettingsRegistry
         self::CALENDAR_INSTANT_BOOKING => 'true',
         self::CALENDAR_MULTI_SERVICE_BOOKING => 'false',
         self::CALENDAR_WALKINS_ENABLED => 'false',
+        self::CALENDAR_NO_SHOW_GRACE_MINUTES => '15',
+        self::CALENDAR_AUTO_NO_SHOW => 'false',
+        self::CALENDAR_LATE_CANCEL_HOURS => '24',
+        self::CALENDAR_NO_SHOW_WINDOW_MONTHS => '12',
+        self::CALENDAR_NO_SHOW_FLAG_AFTER => '2',
+        self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS => 'true',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: every page is in the menus. See NAVIGATION_HIDDEN_IDS.
@@ -2135,6 +2158,12 @@ final class SettingsRegistry
             self::CALENDAR_INSTANT_BOOKING => self::validateBoolean($value, self::CALENDAR_INSTANT_BOOKING),
             self::CALENDAR_MULTI_SERVICE_BOOKING => self::validateBoolean($value, self::CALENDAR_MULTI_SERVICE_BOOKING),
             self::CALENDAR_WALKINS_ENABLED => self::validateBoolean($value, self::CALENDAR_WALKINS_ENABLED),
+            self::CALENDAR_NO_SHOW_GRACE_MINUTES => self::validateWholeNumberBetween($value, self::CALENDAR_NO_SHOW_GRACE_MINUTES, 0, 240),
+            self::CALENDAR_AUTO_NO_SHOW => self::validateBoolean($value, self::CALENDAR_AUTO_NO_SHOW),
+            self::CALENDAR_LATE_CANCEL_HOURS => self::validateWholeNumberBetween($value, self::CALENDAR_LATE_CANCEL_HOURS, 0, 168),
+            self::CALENDAR_NO_SHOW_WINDOW_MONTHS => self::validateWholeNumberBetween($value, self::CALENDAR_NO_SHOW_WINDOW_MONTHS, 1, 36),
+            self::CALENDAR_NO_SHOW_FLAG_AFTER => self::validateWholeNumberBetween($value, self::CALENDAR_NO_SHOW_FLAG_AFTER, 0, 20),
+            self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS => self::validateBoolean($value, self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             self::NAVIGATION_HIDDEN_IDS => \Whity\Core\Navigation\HiddenNavIds::validate($value),
             self::NAVIGATION_HOME_PATH => \Whity\Core\Navigation\HomeLinks::validateHomePath($value),

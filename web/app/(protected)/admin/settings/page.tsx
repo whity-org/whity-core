@@ -10,6 +10,7 @@ import { useAuth } from '@/lib/auth-context';
 import { useCapabilities } from '@/hooks/useCapabilities';
 import { useFetch } from '@/hooks/useFetch';
 import { AdminHeader } from '@/components/admin/admin-header';
+import { TemplateUpdateNotices } from '@/components/workspace-templates/template-updates';
 import { Button } from '@whity/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whity/ui/card';
 import { IconDeviceFloppy } from '@tabler/icons-react';
@@ -88,6 +89,7 @@ export default function AdminSettingsPage() {
         canRename={!isSystemTenant && hasPermission(TENANTS_WRITE)}
         addToast={addToast}
       />
+      {!isSystemTenant && canWrite && <TemplateUpdateNotices />}
       {!isSystemTenant && typeof user?.tenant_id === 'number' && hasPermission(TENANTS_READ) && (
         <WorkspaceRecordLink tenantId={user.tenant_id} />
       )}

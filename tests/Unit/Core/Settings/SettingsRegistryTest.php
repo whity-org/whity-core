@@ -140,6 +140,12 @@ final class SettingsRegistryTest extends TestCase
              'calendar.instant_booking',
              'calendar.multi_service_booking',
              'calendar.walkins_enabled',
+             'calendar.no_show_grace_minutes',
+             'calendar.auto_no_show',
+             'calendar.late_cancel_hours',
+             'calendar.no_show_window_months',
+             'calendar.no_show_flag_after',
+             'calendar.no_show_count_late_cancels',
              'app.installable',
             'navigation.hidden_ids',
             'navigation.home_path',
@@ -339,7 +345,8 @@ final class SettingsRegistryTest extends TestCase
         // 58 since WHIT-1334: calendar.walkins_enabled.
         // 59 since #1730: documents.qr_public_signer_names.
         // 60 since WHIT-1417: calendar.reminders.
-        self::assertCount(60, SettingsRegistry::tenantTextKeys());
+        // 66 since WHIT-1427: six calendar.* keys for did they come.
+        self::assertCount(66, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -528,7 +535,8 @@ final class SettingsRegistryTest extends TestCase
         // 165 since WHIT-1363: handles.reserved.
         // 166 since WHIT-1417: calendar.reminders.
         // 173 since WHIT-1416: the customer area's seven keys.
-        self::assertCount(173, $describe);
+        // 179 since WHIT-1427: six calendar.* keys for did they come.
+        self::assertCount(179, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

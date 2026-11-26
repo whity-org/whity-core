@@ -16,6 +16,7 @@ import { useCapabilitiesContext } from '@/lib/capabilities-context';
 import { AgentsToday } from './agents-today';
 import { FinishSettingUp } from './finish-setting-up';
 import { TemplateExamples } from './template-examples';
+import { TemplateUpdateNotices } from '@/components/workspace-templates/template-updates';
 import { HomeApps } from './home-apps';
 import { PlatformCards } from './platform-cards';
 import { RecentDocuments } from './recent-documents';
@@ -69,6 +70,7 @@ export default function DashboardPage() {
         <p className="mt-1 text-sm text-muted-foreground">{[date, workspace].filter((part) => part).join(' · ')}</p>
       </header>
 
+      {capabilities.has('settings:write') && <TemplateUpdateNotices />}
       {capabilities.has('settings:write') && <TemplateExamples />}
 
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,22rem)]">

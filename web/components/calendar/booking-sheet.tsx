@@ -17,6 +17,13 @@
  * waiting for the customer. A confirmed booking has Check in, and Undo
  * check-in once the customer has arrived; both undo each other, so neither
  * asks first.
+ *
+ * WHIT-1427 (design section 39 §4, AP.3–AP.5): once a confirmed booking has
+ * started, Didn't come marks it, and Mark as came undoes that; both change
+ * back and forth, so neither asks. The facts say who marked it and when, and
+ * the customer's flag ("Missed 2 of the last 5"), always in words. Cancel asks
+ * whose cancel it is: the customer asked (early or late by the window) or we
+ * cancelled (never counted).
  */
 
 import { useEffect, useState } from 'react';
@@ -42,6 +49,8 @@ import { Alert, AlertDescription } from '@whity/ui/alert';
 import { Badge } from '@whity/ui/badge';
 import { Button } from '@whity/ui/button';
 import { Textarea } from '@whity/ui/textarea';
+import { Icon } from '@whity/ui/icon';
+import { RadioGroup, RadioGroupItem } from '@whity/ui/radio-group';
 import { formatMoney } from '@whity/ui/money/currency';
 import { useTranslation } from '@whity/features/i18n';
 import { toZonedIso, useDateDisplay } from '@whity/features/datetime';
@@ -78,7 +87,7 @@ export function statusVariant(status: CalendarBooking['status']): 'success' | 'w
 }
 
 /** What just happened to a booking, so the screen can say it. */
-export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn';
+export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn' | 'cameMarked' | 'noShowMarked';
 
 export interface BookingSheetProps {
   booking: CalendarBooking | null;
@@ -115,7 +124,7 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
     setProblem(null);
   }
 
-  const act = async (what: 'accepted' | 'checkedIn' | 'notCheckedIn') => {
+  const act = async (what: 'accepted' | 'checkedIn' | 'notCheckedIn' | 'cameMarked' | 'noShowMarked') => {
     if (booking === null) return;
     setActing(true);
     setProblem(null);
@@ -123,7 +132,9 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
       const changed =
         what === 'accepted'
           ? await calendarApi.acceptBooking(booking.id)
-          : await calendarApi.checkIn(booking.id, what === 'checkedIn');
+          : what === 'cameMarked' || what === 'noShowMarked'
+            ? await calendarApi.markAttendance(booking.id, what === 'cameMarked' ? 'attended' : 'no_show')
+            : await calendarApi.checkIn(booking.id, what === 'checkedIn');
       onChanged(changed, what);
     } catch (error) {
       setProblem(words.errorText(error, t('booking.actError', 'That didn’t work. Try again.')));
@@ -140,6 +151,9 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
   const service = booking ? services.find((s) => s.id === booking.service_id) ?? null : null;
   const person = booking ? staff.find((s) => s.profile_id === booking.profile_id) ?? null : null;
   const open = booking !== null && booking.status !== 'cancelled' && booking.status !== 'expired';
+  // WHIT-1427: from its start a confirmed booking can be marked; never in the future.
+  const now = useMinuteClock();
+  const started = booking !== null && booking.status === 'confirmed' && new Date(booking.starts_at).getTime() <= now;
   // WHIT-1173: a booking of several services is named by all of them.
   const servicesName = useServicesName();
   const what = booking && isSeveral(booking) ? servicesName(booking.items ?? []) : words.serviceName(service);
@@ -207,8 +221,17 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
                     <Button variant="outline" onClick={() => setMode('move')} data-testid="booking-move">
                       {t('booking.move.action', 'Move')}
                     </Button>
+                    {started && booking.attendance !== 'no_show' && !booking.checked_in_at && (
+                      <Button variant="outline" onClick={() => void act('noShowMarked')} loading={acting} data-testid="booking-no-show">
+                        {t('booking.noShow', 'Didn’t come')}
+                      </Button>
+                    )}
                     {booking.status === 'confirmed' &&
-                      (booking.checked_in_at ? (
+                      (booking.attendance === 'no_show' ? (
+                        <Button variant="outline" onClick={() => void act('cameMarked')} loading={acting} data-testid="booking-came">
+                          {t('booking.came', 'Mark as came')}
+                        </Button>
+                      ) : booking.checked_in_at ? (
                         <Button variant="outline" onClick={() => void act('notCheckedIn')} loading={acting} data-testid="booking-undo-check-in">
                           {t('booking.undoCheckIn', 'Undo check-in')}
                         </Button>
@@ -238,6 +261,27 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
       </SheetContent>
     </Sheet>
   );
+}
+
+/** "Missed 2 of the last 5", in words, never by colour alone (WHIT-1427, AP.8). */
+export function CustomerFlag({ flag }: { flag: NonNullable<CalendarBooking['customer_flag']> }) {
+  const t = useTranslation('calendar');
+  return (
+    <span className="inline-flex items-center gap-1 text-warning-text" data-testid="customer-flag">
+      <Icon name="alert" size={14} aria-hidden />
+      {t('flag.missed', 'Missed {misses} of the last {of}', { misses: flag.misses, of: flag.of })}
+    </span>
+  );
+}
+
+/** The time now, to the minute, kept current while the sheet is open. */
+function useMinuteClock(): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, []);
+  return now;
 }
 
 type ReminderLog = NonNullable<CalendarBooking['reminders']>;
@@ -320,6 +364,38 @@ function BookingFacts({
       label: t('booking.fact.checkedIn', 'Checked in'),
       value: <span dir="ltr" className="tabular-nums">{dates.time(booking.checked_in_at) ?? '—'}</span>,
       testId: 'booking-checked-in',
+    });
+  }
+  if (booking.customer_flag) {
+    rows.push({
+      label: t('booking.fact.history', 'Before'),
+      value: <CustomerFlag flag={booking.customer_flag} />,
+      testId: 'booking-customer-flag',
+    });
+  }
+  if (booking.status === 'confirmed' && booking.attendance) {
+    const at = dates.time(booking.attendance_at ?? '') ?? '—';
+    rows.push({
+      label: t('booking.fact.attendance', 'Did they come'),
+      value:
+        booking.attendance === 'attended'
+          ? t('booking.attendance.came', 'Came')
+          : booking.attendance_auto
+            ? t('booking.attendance.noShowAuto', 'Didn’t come (marked by Whity at the end of the day)')
+            : t('booking.attendance.noShowAt', 'Didn’t come (marked at {time})', { time: at }),
+      testId: 'booking-attendance',
+    });
+  }
+  if (booking.status === 'cancelled' && booking.cancel_kind) {
+    rows.push({
+      label: t('booking.fact.cancelKind', 'Cancelled'),
+      value:
+        booking.cancel_kind === 'late'
+          ? t('booking.cancelKind.late', 'Late, by or for the customer')
+          : booking.cancel_kind === 'early'
+            ? t('booking.cancelKind.early', 'In good time, by or for the customer')
+            : t('booking.cancelKind.business', 'By us'),
+      testId: 'booking-cancel-kind',
     });
   }
   if (booking.confirmed_by_customer_at) {
@@ -549,14 +625,17 @@ function CancelDialog({
   const t = useTranslation('calendar');
   const words = useCalendarWords();
   const [reason, setReason] = useState('');
+  const [whose, setWhose] = useState<'customer' | 'business'>('customer');
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
+  // WHIT-1427 (AP.5): only a confirmed booking's cancel is counted.
+  const asks = booking.status === 'confirmed';
 
   const confirm = async () => {
     setSaving(true);
     setProblem(null);
     try {
-      onCancelled(await calendarApi.cancelBooking(booking.id, reason.trim()));
+      onCancelled(await calendarApi.cancelBooking(booking.id, reason.trim(), asks ? whose : undefined));
       setReason('');
     } catch (error) {
       setProblem(words.errorText(error, t('booking.cancel.error', 'The booking could not be cancelled. Try again.')));
@@ -578,6 +657,26 @@ function CancelDialog({
             )}
           </DialogDescription>
         </DialogHeader>
+        {asks && (
+          <fieldset className="space-y-2" data-testid="booking-cancel-whose">
+            <legend className="text-sm font-medium text-foreground">{t('booking.cancel.whose', 'Who is cancelling?')}</legend>
+            <RadioGroup value={whose} onValueChange={(next) => setWhose(next === 'business' ? 'business' : 'customer')}>
+              <label className="flex items-center gap-3">
+                <RadioGroupItem value="customer" data-testid="booking-cancel-customer" />
+                <span>{t('booking.cancel.customerAsked', 'The customer asked')}</span>
+              </label>
+              <label className="flex items-center gap-3">
+                <RadioGroupItem value="business" data-testid="booking-cancel-business" />
+                <span>{t('booking.cancel.weCancelled', 'We cancelled')}</span>
+              </label>
+            </RadioGroup>
+            <p className="text-sm text-muted-foreground">
+              {whose === 'customer'
+                ? t('booking.cancel.customerHint', 'Counts as a cancel by the customer: late when it is close to the start.')
+                : t('booking.cancel.businessHint', 'Never counted against the customer.')}
+            </p>
+          </fieldset>
+        )}
         <div className="space-y-1">
           <label htmlFor="cancel-reason" className="text-sm font-medium text-foreground">
             {t('booking.cancel.reason', 'Reason (optional)')}

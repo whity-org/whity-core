@@ -136,6 +136,7 @@ final class CoreApiSchemas
             self::uiPreferenceRoutes(),
             self::themeRoutes(),
             self::identityRoutes(),
+            self::desktopPluginRoutes(),
             self::meEmailsRoutes(),
             self::tenantEmailDomainRoutes(),
             self::tenantEntitlementRoutes(),
@@ -5497,6 +5498,30 @@ final class CoreApiSchemas
             ], ['provider_key', 'display_name']),
             // WHIT-1168: `password_sign_in` false = the server signs people in
             // only through these providers; pages then drop the password form.
+            // WHIT-1420: what a Whity Desktop device reads to reconcile its plugins.
+            'DesktopPluginVersion' => self::object([
+                'version' => self::str(),
+                'sha256' => self::str(),
+                'sizeBytes' => self::int(),
+                'releasedAt' => self::str(),
+                'attestation' => ['type' => 'string', 'nullable' => true, 'description' => "Whity's signed whity.attestation/1 envelope for exactly this package, when core holds one that is not revoked. The device verifies it against the keys pinned in the app."],
+            ], ['version', 'sha256', 'sizeBytes', 'releasedAt', 'attestation']),
+            'DesktopPluginCatalogueEntry' => self::object([
+                'name' => self::str(),
+                'latestVersion' => self::str(),
+                'versions' => ['type' => 'array', 'items' => SchemaBuilder::ref('DesktopPluginVersion')],
+            ], ['name', 'latestVersion', 'versions']),
+            'DesktopPluginCatalogueResponse' => self::object([
+                'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('DesktopPluginCatalogueEntry')],
+            ], ['data']),
+            'DesktopPluginRevocationsResponse' => self::object([
+                'data' => array_merge(self::object([
+                    'sequence' => self::int(),
+                    'issuedAt' => self::int(),
+                    'expiresAt' => self::int(),
+                    'envelope' => ['type' => 'string', 'description' => 'The signed whity.revocations/1 envelope, as accepted.'],
+                ], ['sequence', 'issuedAt', 'expiresAt', 'envelope']), ['nullable' => true]),
+            ], ['data']),
             'SsoProviderListResponse' => self::object([
                 'data' => ['type' => 'array', 'items' => SchemaBuilder::ref('SsoProvider')],
                 'password_sign_in' => self::bool(),
@@ -11238,6 +11263,12 @@ final class CoreApiSchemas
                 'instant_booking' => self::bool() + ['description' => 'Off: every booking from the booking page is a request.'],
                 'multi_service_booking' => self::bool() + ['description' => 'On: one booking may hold several services back to back (WHIT-1173). Default off.'],
                 'walkins_enabled' => self::bool() + ['description' => 'On: the walk-in queue at the front desk (WHIT-1334). Default off.'],
+                'no_show_grace_minutes' => self::int() + ['description' => 'Minutes after the start before a booking joins Did they come? (WHIT-1427).'],
+                'auto_no_show' => self::bool() + ['description' => 'On: at the end of the day, bookings nobody marked become Didn\'t come. Default off.'],
+                'late_cancel_hours' => self::int() + ['description' => 'A cancel by or for the customer within this many hours of the start is late.'],
+                'no_show_window_months' => self::int() + ['description' => 'The customer flag counts misses over this many months.'],
+                'no_show_flag_after' => self::int() + ['description' => 'The flag shows from this many misses; 0 shows none.'],
+                'no_show_count_late_cancels' => self::bool() + ['description' => 'Late cancels count as misses for the flag.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -11252,6 +11283,12 @@ final class CoreApiSchemas
                 'instant_booking' => self::bool() + ['description' => 'Off turns every booking from the booking page into a request staff accept.'],
                 'multi_service_booking' => self::bool() + ['description' => 'On lets one booking hold several services back to back, on the booking page and at the desk (WHIT-1173). Default off.'],
                 'walkins_enabled' => self::bool() + ['description' => 'Turn the walk-in queue at the front desk on or off (WHIT-1334). Default off.'],
+                'no_show_grace_minutes' => self::int() + ['minimum' => 0, 'maximum' => 240, 'description' => 'Minutes after the start before a booking joins Did they come? (WHIT-1427). Default 15.'],
+                'auto_no_show' => self::bool() + ['description' => 'At the end of the day, bookings nobody marked become Didn\'t come. Default off.'],
+                'late_cancel_hours' => self::int() + ['minimum' => 0, 'maximum' => 168, 'description' => 'A cancel by or for the customer within this many hours of the start is late. Default 24.'],
+                'no_show_window_months' => self::int() + ['minimum' => 1, 'maximum' => 36, 'description' => 'The customer flag counts misses over this many months. Default 12.'],
+                'no_show_flag_after' => self::int() + ['minimum' => 0, 'maximum' => 20, 'description' => 'The flag shows from this many misses; 0 shows none. Default 2.'],
+                'no_show_count_late_cancels' => self::bool() + ['description' => 'Late cancels count as misses for the flag. Default on.'],
             ], []),
             'CalendarWalkin' => self::object([
                 'id' => self::int(),
@@ -11477,6 +11514,13 @@ final class CoreApiSchemas
                 'reminder_sent_at' => self::str(true) + ['description' => 'When the last reminder went.'],
                 'confirmed_by_customer_at' => self::str(true) + ['description' => 'When the customer pressed I\'m coming (WHIT-1417).'],
                 'reminders' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingReminder'), 'description' => 'Only on one booking: every reminder sent, oldest first, one row per channel (WHIT-1417, AP.14).'],
+                'contact_id' => self::int(true) + ['description' => 'The customer\'s contact.'],
+                'attendance' => self::str(true) + ['enum' => ['attended', 'no_show', null], 'description' => 'Did they come (WHIT-1427, AP.3): `attended`, `no_show`, or null while nobody has said.'],
+                'attendance_at' => self::str(true),
+                'attendance_by_profile_id' => self::int(true) + ['description' => 'Who marked it; null with `attendance_auto` when Whity marked it at the end of the day.'],
+                'attendance_auto' => self::bool(),
+                'cancel_kind' => self::str(true) + ['enum' => ['early', 'late', 'business', null], 'description' => 'A cancelled booking (AP.5): early or late by the customer or for them, business when the workspace cancelled.'],
+                'customer_flag' => SchemaBuilder::ref('CalendarCustomerFlag'),
                 'room_name' => ['type' => 'object', 'nullable' => true, 'additionalProperties' => self::str(), 'description' => 'In lists: the room\'s name, language code => text.'],
                 'items' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingItem'), 'description' => 'A booking of several services (WHIT-1173): each, in order, with who does it and when. Empty for one service. `service_id`, `profile_id` and `room_id` are then the first service\'s, the times span them all and `price_minor` is the total.'],
             ], ['id', 'service_id', 'profile_id', 'customer', 'starts_at', 'ends_at', 'status', 'source']),
@@ -11525,6 +11569,40 @@ final class CoreApiSchemas
             ], []),
             'CalendarBookingCancelRequest' => self::object([
                 'reason' => self::str() + ['maxLength' => 500, 'description' => 'Why, in a few words; shown to the customer.'],
+                'cancelled_for' => self::str() + ['enum' => ['customer', 'business'], 'description' => 'Staff only (WHIT-1427, AP.5): `customer` (the customer asked) counts as an early or late cancel by the window; `business` (we cancelled) never counts. Left out, no kind is recorded.'],
+            ], []),
+            'CalendarAttendanceRequest' => self::object([
+                'attendance' => self::str(true) + ['enum' => ['attended', 'no_show', null], 'description' => '`attended` (came), `no_show` (didn\'t come), or null to clear the mark.'],
+            ], ['attendance']),
+            'CalendarCustomerFlag' => ['type' => 'object', 'nullable' => true, 'description' => 'Shown as "Missed {misses} of the last {of}" when the policy applies; null otherwise (WHIT-1427, AP.8, AP.10).', 'properties' => [
+                'misses' => self::int(),
+                'of' => self::int(),
+            ], 'required' => ['misses', 'of']],
+            'CalendarAttendanceRates' => self::object([
+                'from' => self::str(),
+                'to' => self::str(),
+                'came' => self::int(),
+                'no_show' => self::int(),
+                'late_cancels' => self::int(),
+                'early_cancels' => self::int() + ['description' => 'Not counted in any rate.'],
+                'unmarked' => self::int() + ['description' => 'Past their start plus the grace minutes, confirmed, and not marked: left out of every rate.'],
+                'due' => self::int() + ['description' => 'came + no_show + late_cancels.'],
+                'no_show_rate' => ['type' => 'number', 'nullable' => true, 'description' => 'no_show / due, 0 to 1; null when nothing is due.'],
+                'late_cancel_rate' => ['type' => 'number', 'nullable' => true],
+                'missed_rate' => ['type' => 'number', 'nullable' => true, 'description' => '(no_show + late_cancels) / due.'],
+                'unmarked_share' => ['type' => 'number', 'nullable' => true, 'description' => 'unmarked / (due + unmarked). Above 0.1, show "Not all bookings are marked".'],
+            ], ['from', 'to', 'came', 'no_show', 'late_cancels', 'early_cancels', 'unmarked', 'due', 'no_show_rate', 'late_cancel_rate', 'missed_rate', 'unmarked_share']),
+            'CalendarCustomerAttendance' => self::object([
+                'came' => self::int(),
+                'no_show' => self::int(),
+                'late_cancels' => self::int(),
+                'since' => self::str(true) + ['description' => 'When they first booked.'],
+                'flag' => SchemaBuilder::ref('CalendarCustomerFlag'),
+                'window_months' => self::int(),
+            ], ['came', 'no_show', 'late_cancels', 'since', 'flag', 'window_months']),
+            'CalendarCustomerAttendanceResetRequest' => self::object([
+                'contact_id' => self::int() + ['description' => 'The customer\'s contact; or give `email` for a booking without one.'],
+                'email' => self::str() + ['description' => 'The customer\'s email, for bookings made without a contact.'],
             ], []),
             'CalendarEvent' => self::object([
                 'id' => self::int(),
@@ -13496,6 +13574,49 @@ final class CoreApiSchemas
                     ] + $recordErrors,
                 ],
             ],
+        ];
+    }
+
+    /**
+     * What a Whity Desktop device reads to reconcile the plugins it runs
+     * (WC-desktop-plugins, WHIT-1420): the catalogue of packaged releases with
+     * Whity's attestation per package, the package bytes, and the signed
+     * revocation list this instance accepted. All under `desktop-plugins:read`
+     * with the device's bearer token.
+     *
+     * @return list<array{method: string, path: string, requiredRole: ?string, requiredPermission: ?string, schema: array<string, mixed>}>
+     */
+    private static function desktopPluginRoutes(): array
+    {
+        return [
+            self::permissionRoute('GET', '/api/desktop-plugins', 'desktop-plugins:read', [
+                'summary' => 'The desktop plugin releases, with attestations',
+                'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('Every catalogued release, grouped by plugin, newest first', 'DesktopPluginCatalogueResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/desktop-plugins/revocations', 'desktop-plugins:read', [
+                'summary' => 'The signed plugin revocation list this instance accepted',
+                'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => self::jsonResponse('The accepted list as its signed envelope, or data null when none was accepted yet', 'DesktopPluginRevocationsResponse'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/desktop-plugins/{name}/versions/{version}/download', 'desktop-plugins:read', [
+                'summary' => 'One release\'s package',
+                'tags' => ['desktop'],
+                // A device's routes, not an agent's: the app reads them with its own token.
+                'mcp' => ['expose' => false],
+                'responses' => [
+                    200 => ['description' => 'The package zip; its SHA-256 is the catalogue\'s', 'content' => ['application/zip' => ['schema' => ['type' => 'string', 'format' => 'binary']]]],
+                    404 => self::errorResponse('No such release'),
+                ] + self::authErrors(),
+            ]),
         ];
     }
 
@@ -20675,6 +20796,63 @@ final class CoreApiSchemas
                     422 => self::errorResponse('Not a confirmed booking'),
                 ] + self::authErrors(),
             ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/attendance', 'calendar:write', [
+                'summary' => 'Mark whether the customer came, or clear the mark (WHIT-1427); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarAttendanceRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not a confirmed booking, or it has not started'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/attendance/unmarked', 'calendar:read', [
+                'summary' => 'Did they come? Today\'s bookings past their start (plus the grace minutes) that nobody marked',
+                'tags' => ['calendar'],
+                'parameters' => [
+                    self::queryParam('date', 'string', 'A local day, `YYYY-MM-DD`. Default: today.'),
+                    self::queryParam('unit_id', 'integer', 'Only this branch.'),
+                ],
+                'responses' => [200 => self::jsonResponse('Bookings', self::listEnvelope('CalendarBooking'))] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/attendance', 'calendar:read', [
+                'summary' => 'No-show and late-cancel rates for a period (WHIT-1427, AP.6). Needs calendar:reports, except for your own profile_id',
+                'tags' => ['calendar'],
+                'parameters' => [
+                    self::queryParam('from', 'string', 'Start, ISO 8601 with an offset.'),
+                    self::queryParam('to', 'string', 'End (not included), up to 13 months after from.'),
+                    self::queryParam('profile_id', 'integer', 'One staff member.'),
+                    self::queryParam('service_id', 'integer', 'One service.'),
+                    self::queryParam('contact_id', 'integer', 'One customer.'),
+                    self::queryParam('email', 'string', 'One customer without a contact.'),
+                    self::queryParam('source', 'string', '`staff`, `public`, `agent` or `walkin`.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('Rates', self::dataEnvelope(SchemaBuilder::ref('CalendarAttendanceRates'))),
+                    422 => self::errorResponse('A period is needed'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/customers/attendance', 'calendar:read', [
+                'summary' => 'One customer\'s line and flag: came, didn\'t come, late cancels, since when',
+                'tags' => ['calendar'],
+                'parameters' => [
+                    self::queryParam('contact_id', 'integer', 'The customer\'s contact.'),
+                    self::queryParam('email', 'string', 'Or their email, for bookings without a contact.'),
+                ],
+                'responses' => [
+                    200 => self::jsonResponse('The customer', self::dataEnvelope(SchemaBuilder::ref('CalendarCustomerAttendance'))),
+                    422 => self::errorResponse('No customer given'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/customers/attendance/reset', 'calendar:manage', [
+                'summary' => 'Start a customer\'s count again from today (AP.10); recorded',
+                'tags' => ['calendar'],
+                'request' => 'CalendarCustomerAttendanceResetRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The customer', self::dataEnvelope(SchemaBuilder::ref('CalendarCustomerAttendance'))),
+                    422 => self::errorResponse('No customer given'),
+                ] + self::authErrors(),
+            ]),
             self::permissionRoute('GET', '/api/calendar/today', 'calendar:read', [
                 'summary' => 'Today at a glance: booked, checked in, open requests and reminders sent',
                 'tags' => ['calendar'],
@@ -21393,8 +21571,9 @@ final class CoreApiSchemas
                 'changes' => ['type' => 'array', 'items' => self::object(['version' => self::int(), 'summary' => self::str() + ['nullable' => true]], ['version', 'summary'])],
             ], ['from', 'to', 'parts', 'changes']),
             'WorkspaceTemplateItem' => self::object([
-                'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents or examples'],
+                'part' => self::str() + ['description' => 'settings, theme, calendar, services, roles, forms, documents, pipelines or examples'],
                 'key' => self::str() + ['description' => 'The template\'s key for the item'],
+                'label' => self::str() + ['description' => 'The item\'s name in the reader\'s language, as the template writes it, when it has one (WHIT-1429); settings, the theme and the calendar have none'],
                 'action' => self::str() + ['enum' => ['add', 'keep', 'done', 'changed', 'left', 'skip'], 'description' => 'add: made; keep: already in the workspace, left as it is; done: an earlier run made it, not made again; changed: an earlier run made it and the template has changed it since, left as it is (offer Use the template\'s version, SDK 1.170); left: not ticked; skip: not done, see reason'],
                 'reason' => self::str(),
             ], ['part', 'key', 'action']),
