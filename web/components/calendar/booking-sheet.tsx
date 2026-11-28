@@ -68,6 +68,7 @@ import { SlotPicker } from './slot-picker';
 import { ServiceList, isSeveral, useServicesName } from './booking-services';
 import { useCalendarWords } from './use-calendar-words';
 import { IntakeSection, VisitRecordSection } from './visit-record';
+import { BookingPlanSection } from './treatment-plans';
 
 const ANYONE = 'anyone';
 /** Moving a booking of several services: each keeps its own person. */
@@ -190,6 +191,8 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
                   onResourcesChanged={(changed) => onChanged(changed, 'resourcesChanged')}
                 />
                 {/* WHIT-1443 (AP.20, AP.21): the forms to fill, and the visit record. */}
+                {/* WHIT-1444 (AP.22): the treatment plan this visit is part of. */}
+                <BookingPlanSection key={`plan-${booking.id}`} booking={booking} canChange={canChange && open} />
                 <IntakeSection booking={booking} canChange={canChange && open} />
                 <VisitRecordSection key={booking.id} booking={booking} timeZone={timeZone} />
               </>

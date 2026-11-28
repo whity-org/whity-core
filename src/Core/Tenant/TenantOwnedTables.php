@@ -150,6 +150,9 @@ final class TenantOwnedTables
         'calendar_visit_notes' => '371_create_calendar_visit_records.php',
         'calendar_visit_corrections' => '371_create_calendar_visit_records.php',
         'calendar_visit_files' => '371_create_calendar_visit_records.php',
+        'calendar_plans' => '372_create_calendar_plans.php',
+        'calendar_plan_steps' => '372_create_calendar_plans.php',
+        'calendar_plan_templates' => '372_create_calendar_plans.php',
         // Design 3.5: each person's own calendar view choices (CV.2, CV.4).
         'calendar_view_preferences' => '278_create_calendar_view_preferences.php',
         'calendar_event_people' => '284_extend_calendar_events.php',
