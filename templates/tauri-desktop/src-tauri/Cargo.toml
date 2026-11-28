@@ -31,7 +31,7 @@ serde_json = "1"
 # Local persistence for the DemoCatalog pilot feature — "bundled" links a
 # vendored SQLite (no system libsqlite3-dev needed), matching the "just
 # works out of the box" bar this boilerplate is for.
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 
 # Stable client-side identity for offline-first sync (WC-desktop-sync): each row
 # gets a UUID at creation so an offline-created record has a durable id that can
