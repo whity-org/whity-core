@@ -54,6 +54,7 @@ import { FreeTimePicker } from './free-time-picker';
 import { BookingFacts, InYourZone, ZoneNote, useWhenAt } from './booking-parts';
 import { moneyText, useBookingWords } from './use-booking-words';
 import { cn } from '@/lib/utils';
+import { publicFrameAncestors, tellEmbedder } from '@/lib/booking/embed-message';
 
 const ANYONE = 'anyone';
 
@@ -232,8 +233,14 @@ export function PublicBookingScreen({ workspace, embedded = false }: { workspace
             setResult(booked);
             setPhase('booked');
             window.scrollTo?.({ top: 0 });
-            // WHIT-1445 (AP.24): tell the widget on the website, saying only that it's booked.
-            if (embedded && window.parent !== window) window.parent.postMessage({ type: 'whity-booking', event: 'booked' }, '*');
+            // WHIT-1445 (AP.24): tell the widget on the website, and only that website when it is on the workspace's list.
+            if (embedded) {
+              void tellEmbedder(workspace, 'booked', {
+                search: window.location.search,
+                parent: window.parent !== window ? window.parent : null,
+                frameAncestors: publicFrameAncestors,
+              });
+            }
           }}
           onClosed={() => setPhase('closed')}
         />

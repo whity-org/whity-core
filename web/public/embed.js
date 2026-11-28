@@ -9,6 +9,10 @@
  * page in an overlay. The page shows only on the sites the workspace listed
  * under Settings > Calendar > Your website. Nothing is read from your page.
  *
+ * Every element is built with createElement and textContent, never HTML. The
+ * frame's address is built with URL from a checked handle on the script's own
+ * origin, and the only messages acted on come from that origin and that frame.
+ *
  * window.WhityBooking.open() and .close() are there for your own buttons.
  */
 (function () {
@@ -17,10 +21,22 @@
   if (!script || window.WhityBooking) return;
   var handle = (script.getAttribute('data-workspace') || '').replace(/^@/, '').toLowerCase();
   if (!/^[a-z0-9][a-z0-9-]{0,254}$/.test(handle)) return;
-  var base;
+  var origin;
   try {
-    base = new URL(script.src).origin;
-  } catch (e) {
+    var source = new URL(script.src);
+    if (source.protocol !== 'https:' && source.protocol !== 'http:') return;
+    origin = source.origin;
+  } catch {
+    return;
+  }
+  var address;
+  try {
+    var url = new URL('/book/' + encodeURIComponent(handle) + '/embed', origin);
+    // The page sends what happened only to this website, if the workspace listed it.
+    url.searchParams.set('parent', window.location.origin);
+    if (url.origin !== origin) return;
+    address = url.href;
+  } catch {
     return;
   }
   var lang = (script.getAttribute('data-lang') || document.documentElement.lang || '').slice(0, 2).toLowerCase() === 'ar' ? 'ar' : 'en';
@@ -29,12 +45,14 @@
     ar: { book: 'احجز موعدًا', close: 'إغلاق', title: 'احجز موعدًا' }
   }[lang];
   var overlay = null;
+  var frame = null;
   var opener = null;
 
   function close() {
     if (!overlay) return;
     overlay.parentNode.removeChild(overlay);
     overlay = null;
+    frame = null;
     document.removeEventListener('keydown', onKey, true);
     if (opener && opener.focus) opener.focus();
   }
@@ -51,9 +69,9 @@
     overlay.setAttribute('aria-modal', 'true');
     overlay.setAttribute('aria-label', words.title);
     overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.5);padding:16px;';
-    var frame = document.createElement('iframe');
-    frame.src = base + '/book/' + handle + '/embed';
-    frame.title = words.title;
+    frame = document.createElement('iframe');
+    frame.setAttribute('src', address);
+    frame.setAttribute('title', words.title);
     frame.setAttribute('allow', 'payment');
     frame.style.cssText = 'width:100%;max-width:720px;height:100%;max-height:900px;border:0;border-radius:12px;background:Canvas;';
     var shut = document.createElement('button');
@@ -73,8 +91,11 @@
   }
 
   window.addEventListener('message', function (e) {
-    if (e.origin !== base || !e.data || e.data.type !== 'whity-booking') return;
-    if (e.data.event === 'close') close();
+    // Only the booking page this widget opened, on its own origin.
+    if (e.origin !== origin || frame === null || e.source !== frame.contentWindow) return;
+    var data = e.data;
+    if (!data || typeof data !== 'object' || data.type !== 'whity-booking') return;
+    if (data.event === 'close') close();
   });
 
   document.addEventListener('click', function (e) {
