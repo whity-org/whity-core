@@ -2959,5 +2959,9 @@
   "put_api_calendar_services_id_plan_templates": {
     "en": "Change a service's ready-made treatment plans",
     "ar": "تغيير خطط العلاج الجاهزة للخدمة"
+  },
+  "post_api_calendar_bookings_id_deposit_refund": {
+    "en": "Refund a booking's deposit",
+    "ar": "استرداد عربون الحجز"
   }
 }

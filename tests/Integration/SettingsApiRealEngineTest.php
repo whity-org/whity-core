@@ -160,7 +160,8 @@ final class SettingsApiRealEngineTest extends TestCase
         // 59 since #1730: documents.qr_public_signer_names.
         // 60 since WHIT-1417: calendar.reminders.
         // 66 since WHIT-1427: six calendar.* keys for did they come.
-        self::assertCount(66, $data['registry']);
+        // 69 since WHIT-1445: the deposit policy, its threshold and Your website.
+        self::assertCount(69, $data['registry']);
         self::assertArrayNotHasKey('auth.self_registration_enabled', $data['effective']);
         self::assertSame([], $data['overridden']);
     }

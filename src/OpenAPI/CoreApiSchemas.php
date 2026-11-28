@@ -11172,6 +11172,7 @@ final class CoreApiSchemas
                     'week_start' => self::str(),
                     'weekend_days' => ['type' => 'array', 'items' => self::str()],
                     'multi_service_booking' => self::bool() + ['description' => 'The customer may book several services back to back as one booking (WHIT-1173).'],
+                    'late_cancel_hours' => self::int() + ['description' => 'Free to cancel or move until this many hours before the start (WHIT-1445, AP.25).'],
                 ], ['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days']),
                 'services' => ['type' => 'array', 'items' => self::object([
                     'id' => self::int(),
@@ -11185,8 +11186,10 @@ final class CoreApiSchemas
                         'profile_id' => self::int(),
                         'duration_minutes' => self::int(),
                         'price_minor' => self::int(true),
+                        'deposit_minor' => self::int(true) + ['description' => 'The deposit with this person, in minor units, from their price; null for none (WHIT-1445).'],
                     ], ['profile_id', 'duration_minutes', 'price_minor'])],
-                    'sends_request' => self::bool() + ['description' => 'Booking it sends a request the business accepts first.'],
+                    'deposit' => SchemaBuilder::ref('CalendarServiceDeposit'),
+                    'sends_request' => self::bool() + ['description' => 'Booking it sends a request the business accepts first; also when it has a deposit and no payment provider takes it.'],
                 ], ['id', 'name', 'duration_minutes', 'price_minor', 'currency', 'staff_profile_ids'])],
                 'staff' => ['type' => 'array', 'items' => self::object([
                     'profile_id' => self::int(),
@@ -11264,7 +11267,35 @@ final class CoreApiSchemas
                     'duration_minutes' => self::int(),
                     'price_minor' => self::int(true),
                 ], ['name', 'staff_name', 'starts_at', 'ends_at', 'duration_minutes', 'price_minor'])],
+                'deposit' => ['type' => 'object', 'nullable' => true, 'description' => 'The deposit and what happened to it (WHIT-1445); null for none.', 'properties' => [
+                    'amount_minor' => self::int(),
+                    'currency' => self::str(),
+                    'state' => SchemaBuilder::ref('CalendarDepositState'),
+                ], 'required' => ['amount_minor', 'currency', 'state']],
+                'policy' => ['type' => 'object', 'description' => 'Only on the manage link (WHIT-1445, AP.25): free to cancel or move until `free_until`; after it a cancel is late and the deposit is kept, and a move is allowed once online.', 'properties' => [
+                    'free_until' => self::str(true),
+                    'late_cancel_hours' => self::int(),
+                    'can_move_online' => self::bool() + ['description' => 'False after the one move inside the window: a second needs the business.'],
+                ], 'required' => ['free_until', 'late_cancel_hours', 'can_move_online']],
             ], ['id', 'status', 'starts_at', 'ends_at', 'service', 'staff_name', 'price_minor', 'currency', 'customer']),
+            'CalendarDepositState' => self::str() + ['enum' => ['due', 'paid', 'kept', 'to_refund', 'refunded', 'applied', 'not_paid'], 'description' => 'Worked out from the booking (WHIT-1445, AP.26): `due` waits for payment; `paid` the visit is to come; `kept` a late cancel or didn\'t come; `to_refund` an early cancel or we cancelled, waiting for someone to press Refund; `refunded`; `applied` they came, so it counts toward the bill; `not_paid` it was never paid.'],
+            'CalendarServiceDeposit' => self::object([
+                'kind' => self::str() + ['enum' => ['none', 'fixed', 'percent']],
+                'amount_minor' => self::int(true) + ['description' => 'A fixed deposit in minor units (JOD 5.000 is 5000), never more than the price.'],
+                'percent' => self::int(true) + ['description' => 'A percentage of the person\'s price, 1 to 100.'],
+            ], ['kind']),
+            'CalendarBookingDeposit' => ['type' => 'object', 'nullable' => true, 'description' => 'The deposit and what happened to it (WHIT-1445); null for none.', 'properties' => [
+                'amount_minor' => self::int(),
+                'currency' => self::str(),
+                'state' => SchemaBuilder::ref('CalendarDepositState'),
+                'paid_at' => self::str(true),
+                'refunded_at' => self::str(true),
+                'refunded_by' => ['type' => 'object', 'nullable' => true, 'properties' => ['profile_id' => self::int(), 'name' => self::str()], 'required' => ['profile_id', 'name']],
+                'refund_ref' => self::str(true) + ['description' => 'The provider\'s reference, or `outside` when it was refunded in the provider\'s own dashboard.'],
+            ], 'required' => ['amount_minor', 'currency', 'state']],
+            'CalendarDepositRefundRequest' => self::object([
+                'outside' => self::bool() + ['description' => 'True: it was refunded in the payment provider\'s own dashboard; only record it. Default false: refund it through the provider.'],
+            ], []),
             'CalendarSettings' => self::object([
                 'booking_page_url' => self::str(true) + ['description' => 'The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only.'],
                 'time_zone' => self::str() + ['description' => 'The workspace time zone (IANA).'],
@@ -11287,6 +11318,12 @@ final class CoreApiSchemas
                 'no_show_window_months' => self::int() + ['description' => 'The customer flag counts misses over this many months.'],
                 'no_show_flag_after' => self::int() + ['description' => 'The flag shows from this many misses; 0 shows none.'],
                 'no_show_count_late_cancels' => self::bool() + ['description' => 'Late cancels count as misses for the flag.'],
+                'deposit_policy' => self::bool() + ['description' => 'Ask for a deposit of a customer who missed often (WHIT-1445).'],
+                'deposit_after_no_shows' => self::int() + ['description' => 'From this many misses over the window.'],
+                'embed_origins' => ['type' => 'array', 'items' => self::str(), 'description' => 'Your website: the https sites that may show the booking page in their own pages (WHIT-1445).'],
+                'embed_script' => self::str(true) + ['description' => 'The script tag to paste into the website.'],
+                'deposits_connected' => self::bool() + ['description' => 'A payment provider takes deposits; without one, a booking with a deposit is a request.'],
+                'refunds_connected' => self::bool() + ['description' => 'The provider can also refund a deposit from Whity.'],
             ], ['time_zone', 'booking_page_enabled', 'min_notice_minutes', 'max_advance_days', 'slot_step_minutes', 'reminder_hours_before', 'payment_hold_minutes', 'week_start', 'weekend_days', 'currency']),
             'CalendarSettingsRequest' => self::object([
                 'booking_page_enabled' => self::bool() + ['description' => 'Turn the public booking page on or off.'],
@@ -11307,6 +11344,9 @@ final class CoreApiSchemas
                 'no_show_window_months' => self::int() + ['minimum' => 1, 'maximum' => 36, 'description' => 'The customer flag counts misses over this many months. Default 12.'],
                 'no_show_flag_after' => self::int() + ['minimum' => 0, 'maximum' => 20, 'description' => 'The flag shows from this many misses; 0 shows none. Default 2.'],
                 'no_show_count_late_cancels' => self::bool() + ['description' => 'Late cancels count as misses for the flag. Default on.'],
+                'deposit_policy' => self::bool() + ['description' => 'Ask for a deposit of a customer who missed often: their online bookings pay the service\'s deposit, or are requests when it has none (WHIT-1445). Default off.'],
+                'deposit_after_no_shows' => self::int() + ['minimum' => 1, 'maximum' => 20, 'description' => 'From this many misses over the window. Default 2.'],
+                'embed_origins' => ['type' => 'array', 'maxItems' => 10, 'items' => self::str(), 'description' => 'Your website: up to 10 https origins such as https://example-bakery.com, no wildcards and nothing after the name. The list replaces what is there; empty frames nowhere (WHIT-1445).'],
             ], []),
             'CalendarWalkin' => self::object([
                 'id' => self::int(),
@@ -11481,6 +11521,7 @@ final class CoreApiSchemas
                 'resources' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarServiceNeed'), 'description' => 'What it needs, in order: specific rooms and equipment, or any one from a group (WHIT-1439).'],
                 'needs_approval' => self::bool() + ['description' => 'A customer\'s booking is a request staff accept first.'],
                 'item_id' => self::int(true) + ['description' => 'The inventory service item that holds its name and price (WHIT-1334).'],
+                'deposit' => SchemaBuilder::ref('CalendarServiceDeposit'),
             ], ['id', 'name', 'duration_minutes', 'buffer_before_minutes', 'buffer_after_minutes', 'price_minor', 'currency', 'bookable_online', 'active', 'sort_order', 'staff_profile_ids']),
             'CalendarServicePerson' => self::object([
                 'profile_id' => self::int() + ['description' => 'The member of staff.'],
@@ -11504,6 +11545,7 @@ final class CoreApiSchemas
                 'room_id' => self::int(true) + ['description' => 'Older clients: the one room it needs; null for none. Left out when `resources` is sent.'],
                 'resources' => ['type' => 'array', 'maxItems' => 8, 'items' => SchemaBuilder::ref('CalendarServiceNeed'), 'description' => 'What it needs, in order: each a `resource_id`, or a `group_key` for any free one from that group (WHIT-1439).'],
                 'needs_approval' => self::bool() + ['description' => 'Customers send a request instead of booking.'],
+                'deposit' => ['allOf' => [SchemaBuilder::ref('CalendarServiceDeposit')], 'description' => 'What online bookings pay first: none, a fixed amount, or a percentage of the price (WHIT-1445).'],
             ], []),
             'CalendarSlot' => self::object([
                 'starts_at' => self::str(),
@@ -11579,6 +11621,8 @@ final class CoreApiSchemas
                 'late_marked_at' => self::str(true),
                 'updated_at' => self::str(true),
                 'desk_status' => self::str() + ['description' => '`expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441).'],
+                'deposit' => SchemaBuilder::ref('CalendarBookingDeposit'),
+                'late_moved_at' => self::str(true) + ['description' => 'The customer moved it inside the cancellation window, which they may do once online (WHIT-1445).'],
                 'intake' => SchemaBuilder::ref('CalendarIntakeStatus'),
                 'customer_flag' => SchemaBuilder::ref('CalendarCustomerFlag'),
                 'resources' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarBookingResource'), 'description' => 'Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first.'],
@@ -20528,6 +20572,14 @@ final class CoreApiSchemas
                     422 => self::errorResponse('A missing or unreadable range'),
                 ] + $limits,
             ]),
+            $route('GET', '/api/public/booking/{workspace}/embed', [
+                'summary' => 'The sites that may show the booking page in their own pages, as `frame-ancestors` (public, WHIT-1445)',
+                'description' => 'Asked by the web app for `/book/{workspace}/embed`. `\'none\'` for an unknown workspace, one whose page is off, or one that listed no website.',
+                'parameters' => [$workspace],
+                'responses' => [
+                    200 => self::jsonResponse('The policy', self::dataEnvelope(self::object(['frame_ancestors' => self::str()], ['frame_ancestors']))),
+                ] + $limits,
+            ]),
             $route('GET', '/api/public/booking/{workspace}/me', [
                 'summary' => 'The name and email of the signed-in visitor, to fill the booking form (public)',
                 'description' => 'Reads only the session and profile of the visitor, never the contacts of this workspace or the data of another. `data` is null when nobody is signed in. Sent `Cache-Control: private, no-store`.',
@@ -21291,6 +21343,20 @@ final class CoreApiSchemas
                     200 => ['description' => 'The file\'s bytes, with its type'],
                     403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
                     404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/bookings/{id:\d+}/deposit/refund', 'calendar:manage', [
+                'summary' => 'Refund the deposit: a person\'s click, never automatic and never an agent; audited (WHIT-1445)',
+                'description' => 'Only a paid deposit that is to refund (an early cancel, or we cancelled) or kept (a late cancel or didn\'t come). Through the payment provider when it can refund; `outside: true` records a refund made in its own dashboard.',
+                'tags' => ['calendar'],
+                'request' => 'CalendarDepositRefundRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The booking', self::dataEnvelope(SchemaBuilder::ref('CalendarBooking'))),
+                    403 => self::errorResponse('Not a person with calendar:manage'),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('The provider can\'t refund from here (`refund_outside`), or it was just refunded'),
+                    422 => self::errorResponse('Nothing to refund: not paid, already refunded, applied, or the visit is still to come'),
+                    502 => self::errorResponse('The provider refused the refund; nothing was refunded'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/plans', 'calendar:read', [

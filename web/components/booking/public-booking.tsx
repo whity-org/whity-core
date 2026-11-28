@@ -54,6 +54,7 @@ import { FreeTimePicker } from './free-time-picker';
 import { BookingFacts, InYourZone, ZoneNote, useWhenAt } from './booking-parts';
 import { moneyText, useBookingWords } from './use-booking-words';
 import { cn } from '@/lib/utils';
+import { publicFrameAncestors, tellEmbedder } from '@/lib/booking/embed-message';
 
 const ANYONE = 'anyone';
 
@@ -89,7 +90,7 @@ type Field = 'name' | 'email' | 'phone';
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE = /^\+?[0-9 ()-]{6,40}$/;
 
-export function PublicBookingScreen({ workspace }: { workspace: string }) {
+export function PublicBookingScreen({ workspace, embedded = false }: { workspace: string; embedded?: boolean }) {
   const t = useTranslation('booking');
   const [phase, setPhase] = useState<Phase>('loading');
   const [page, setPage] = useState<PublicBookingPage | null>(null);
@@ -232,11 +233,77 @@ export function PublicBookingScreen({ workspace }: { workspace: string }) {
             setResult(booked);
             setPhase('booked');
             window.scrollTo?.({ top: 0 });
+            // WHIT-1445 (AP.24): tell the widget on the website, and only that website when it is on the workspace's list.
+            if (embedded) {
+              void tellEmbedder(workspace, 'booked', {
+                search: window.location.search,
+                parent: window.parent !== window ? window.parent : null,
+                frameAncestors: publicFrameAncestors,
+              });
+            }
           }}
           onClosed={() => setPhase('closed')}
         />
       )}
     </PublicShell>
+  );
+}
+
+/**
+ * WHIT-1445 (AP.25, AP.26): before Book, in one or two plain sentences, the
+ * deposit paid now and until when cancelling or moving is free. The deposit
+ * is the chosen person's, from their own price.
+ */
+function BookingPolicy({
+  page,
+  chosen,
+  profileId,
+  startsAt,
+  sendsRequest,
+  whenAt,
+}: {
+  page: PublicBookingPage;
+  chosen: PublicService[];
+  profileId: number | null;
+  startsAt: string;
+  sendsRequest: boolean;
+  whenAt: (value: string) => string;
+}) {
+  const t = useTranslation('booking');
+  const [now] = useState(() => Date.now());
+  const hours = page.settings.late_cancel_hours;
+  const deposits = chosen.map((s) => {
+    const row = s.staff?.find((p) => p.profile_id === profileId) ?? (profileId === null ? s.staff?.[0] : undefined);
+    return row?.deposit_minor ?? null;
+  });
+  const deposit = deposits.some((d) => d !== null) ? deposits.reduce<number>((sum, d) => sum + (d ?? 0), 0) : null;
+  const currency = chosen[0]?.currency ?? '';
+  const freeUntil = typeof hours === 'number' ? new Date(new Date(startsAt).getTime() - hours * 3_600_000).toISOString() : null;
+  // A time already inside the window: a cancel would count as late from the start.
+  const inside = freeUntil !== null && new Date(freeUntil).getTime() <= now;
+  const hoursText = hours ?? 0;
+  if (freeUntil === null && deposit === null) return null;
+  const keeps = deposit !== null && !sendsRequest;
+
+  return (
+    <div className="space-y-1 text-sm text-foreground" data-testid="book-policy">
+      {deposit !== null && !sendsRequest && (
+        <p className="m-0" data-testid="book-deposit">
+          {t('policy.deposit', 'A deposit of {amount} is paid when you book. It counts toward your bill.', { amount: moneyText(deposit, currency) })}
+        </p>
+      )}
+      {freeUntil !== null && (
+        <p className="m-0 text-muted-foreground" data-testid="book-free-until">
+          {inside
+            ? keeps
+              ? t('policy.insideDeposit', 'This time is less than {hours} hours away, so cancelling it would count as late and the deposit would be kept. You can move it once.', { hours: hoursText })
+              : t('policy.inside', 'This time is less than {hours} hours away, so cancelling it would count as late. You can move it once.', { hours: hoursText })
+            : keeps
+            ? t('policy.freeUntilDeposit', 'Free to cancel or move until {when}. After that, a cancel counts as late and the deposit is kept.', { when: whenAt(freeUntil) })
+            : t('policy.freeUntil', 'Free to cancel or move until {when}. After that, a cancel counts as late.', { when: whenAt(freeUntil) })}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -834,6 +901,9 @@ function BookingForm({
                 )}
               </p>
               <InYourZone item={slot} timeZone={timeZone} />
+              {/* WHIT-1445 (AP.25, AP.26): the deposit, and the cancellation policy, before Book. */}
+              {/* @date-display-ignore: passed on, not rendered here; BookingPolicy shows it through useWhenAt in the workspace's zone */}
+              <BookingPolicy page={page} chosen={chosen} profileId={profileId} startsAt={slot.starts_at} sendsRequest={sendsRequest} whenAt={whenAt} />
 
               {page.bot_check?.site_key && (
                 <div className="space-y-1.5">

@@ -43,6 +43,8 @@ final class BookingRepository
         b.room_id, b.checked_in_at, b.suggested_at, b.ics_sequence, b.confirmed_by_customer_at,
         b.contact_id, b.attendance, b.attendance_at, b.attendance_by_profile_id, b.attendance_auto, b.cancel_kind,
         b.started_at, b.finished_at, b.late_minutes, b.late_marked_at, b.updated_at,
+        b.deposit_minor, b.deposit_paid_at, b.deposit_refunded_at, b.deposit_refunded_by_profile_id, b.deposit_refund_ref, b.late_moved_at,
+        (SELECT dp.display_name FROM profiles dp WHERE dp.id = b.deposit_refunded_by_profile_id) AS deposit_refunded_by_name,
         (SELECT ou.time_zone FROM calendar_staff cs
            JOIN organizational_units ou ON ou.id = cs.unit_id AND ou.tenant_id = cs.tenant_id
           WHERE cs.tenant_id = b.tenant_id AND cs.profile_id = b.profile_id) AS branch_time_zone';
@@ -78,10 +80,10 @@ final class BookingRepository
             'INSERT INTO calendar_bookings (tenant_id, service_id, profile_id, customer_profile_id, customer_name,
                     customer_email, customer_phone, customer_note, starts_at, ends_at, blocks_from, blocks_until,
                     status, hold_expires_at, source, price_minor, currency, reminder_due_at, created_by_profile_id,
-                    room_id, contact_id, overlap_ok, created_at, updated_at)
+                    room_id, contact_id, deposit_minor, overlap_ok, created_at, updated_at)
              VALUES (:tenant_id, :service_id, :profile_id, :customer_profile_id, :customer_name, :customer_email,
                     :customer_phone, :customer_note, :starts_at, :ends_at, :blocks_from, :blocks_until, :status,
-                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :contact_id, ' . $overlapOk . ', :now, :now)
+                    :hold_expires_at, :source, :price_minor, :currency, :reminder_due_at, :created_by, :room_id, :contact_id, :deposit_minor, ' . $overlapOk . ', :now, :now)
              RETURNING id'
         );
         $stmt->execute([
@@ -105,6 +107,8 @@ final class BookingRepository
             ':reminder_due_at' => $v['reminder_due_at'] !== null ? Interval::toDb($v['reminder_due_at']) : null,
             ':created_by' => $v['created_by_profile_id'],
             ':room_id' => $v['room_id'] ?? null,
+            // WHIT-1445 (AP.26): the deposit asked for, when there is one.
+            ':deposit_minor' => $v['deposit_minor'] ?? null,
             // Contacts is the one customer record: the booking points at it.
             ':contact_id' => (new \Whity\Core\Contacts\CustomerContacts($this->db))->forCustomer(
                 $tenantId,
@@ -117,6 +121,32 @@ final class BookingRepository
         ]);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    /**
+     * WHIT-1445 (AP.26): a person pressed Refund. Only a paid deposit not
+     * refunded yet; false when it was not (pressed twice, or not paid).
+     */
+    public function markDepositRefunded(int $tenantId, int $id, int $by, string $ref): bool
+    {
+        $stmt = $this->db->prepare(
+            'UPDATE calendar_bookings
+                SET deposit_refunded_at = :now, deposit_refunded_by_profile_id = :by, deposit_refund_ref = :ref, updated_at = :now2
+              WHERE tenant_id = :tenant_id AND id = :id AND deposit_minor IS NOT NULL
+                AND deposit_paid_at IS NOT NULL AND deposit_refunded_at IS NULL'
+        );
+        $now = Interval::toDb(new DateTimeImmutable());
+        $stmt->execute([':now' => $now, ':now2' => $now, ':by' => $by, ':ref' => mb_substr($ref, 0, 200), ':tenant_id' => $tenantId, ':id' => $id]);
+
+        return $stmt->rowCount() === 1;
+    }
+
+    /** WHIT-1445 (§9.2): the customer moved it inside the window, which they may do once online. */
+    public function markLateMoved(int $tenantId, int $id): void
+    {
+        $now = Interval::toDb(new DateTimeImmutable());
+        $this->db->prepare('UPDATE calendar_bookings SET late_moved_at = :now WHERE tenant_id = :tenant_id AND id = :id')
+            ->execute([':now' => $now, ':tenant_id' => $tenantId, ':id' => $id]);
     }
 
     /** @return array<string, mixed>|null */
@@ -369,6 +399,10 @@ final class BookingRepository
         }
         if ($to === self::STATUS_CONFIRMED) {
             $set[] = 'hold_expires_at = NULL';
+            // WHIT-1445 (AP.26): the payment confirmed is the deposit, when there is one.
+            if (array_key_exists('payment_ref', $extra)) {
+                $set[] = 'deposit_paid_at = CASE WHEN deposit_minor IS NOT NULL THEN :now ELSE deposit_paid_at END';
+            }
         }
         $in = [];
         foreach ($from as $i => $status) {
@@ -767,6 +801,17 @@ final class BookingRepository
             'late_minutes' => isset($r['late_minutes']) ? (int) $r['late_minutes'] : null,
             'late_marked_at' => $at($r['late_marked_at'] ?? null),
             'updated_at' => $at($r['updated_at'] ?? null),
+            // WHIT-1445 (AP.26, §9.2): the deposit and what happened to it, and a move inside the window.
+            'deposit' => isset($r['deposit_minor']) && (int) $r['deposit_minor'] > 0 ? [
+                'amount_minor' => (int) $r['deposit_minor'],
+                'currency' => trim((string) $r['currency']),
+                'state' => Deposits::state($r),
+                'paid_at' => $at($r['deposit_paid_at'] ?? null),
+                'refunded_at' => $at($r['deposit_refunded_at'] ?? null),
+                'refunded_by' => isset($r['deposit_refunded_by_profile_id']) ? ['profile_id' => (int) $r['deposit_refunded_by_profile_id'], 'name' => (string) ($r['deposit_refunded_by_name'] ?? '')] : null,
+                'refund_ref' => isset($r['deposit_refund_ref']) ? (string) $r['deposit_refund_ref'] : null,
+            ] : null,
+            'late_moved_at' => $at($r['late_moved_at'] ?? null),
         ];
         $out['desk_status'] = self::deskStatus($out);
         // WHIT-1173: the services of a booking of several, in order; empty

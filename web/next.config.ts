@@ -89,12 +89,8 @@ function resolveCoreVersion(): string | null {
   }
 }
 
-const securityHeaders = [
+const baseHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "X-Frame-Options", value: "DENY" },
-  // Frontend CSP: clickjacking control only (see file docblock for why the
-  // resource directives are deliberately omitted for the Next app).
-  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
   { key: "Referrer-Policy", value: "no-referrer" },
   // HSTS only outside development, matching the backend's gating.
   ...(isDevelopment
@@ -105,6 +101,14 @@ const securityHeaders = [
           value: "max-age=31536000; includeSubDomains",
         },
       ]),
+];
+
+const securityHeaders = [
+  ...baseHeaders,
+  { key: "X-Frame-Options", value: "DENY" },
+  // Frontend CSP: clickjacking control only (see file docblock for why the
+  // resource directives are deliberately omitted for the Next app).
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
 ];
 
 const nextConfig: NextConfig = {
@@ -176,9 +180,17 @@ const nextConfig: NextConfig = {
       {
         // Apply to every route EXCEPT the /api/* proxy, which is hardened by
         // the backend and forwarded verbatim — the negative lookahead prevents
-        // duplicating/conflicting headers on those responses.
-        source: "/((?!api/).*)",
+        // duplicating/conflicting headers on those responses — and the
+        // booking widget's page, below.
+        source: "/((?!api/|book/[^/]+/embed).*)",
         headers: securityHeaders,
+      },
+      {
+        // WHIT-1445 (AP.24): the booking widget's page. Its frame-ancestors is
+        // the workspace's own list (none by default), set per request in
+        // proxy.ts; X-Frame-Options would forbid every site, so it has none.
+        source: "/book/:workspace/embed",
+        headers: baseHeaders,
       },
     ];
   },

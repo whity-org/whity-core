@@ -194,6 +194,8 @@ final class AuditSentences
         'calendar.visit.corrected' => '{actor} added a correction to a visit',
         'calendar.visit.file_added' => '{actor} added a file to a visit',
         'calendar.visit.file_read' => '{actor} opened a file on a visit',
+        // WHIT-1445 (AP.26): money moves only on a person's click.
+        'calendar.deposit.refunded' => '{actor} refunded the deposit on a booking',
         'auth.2fa.enabled' => '{actor} turned on two-step sign-in',
         'auth.2fa.verify_failure' => '{actor} entered a wrong two-step code',
         'auth.2fa.verify_success' => '{actor} confirmed a two-step code',

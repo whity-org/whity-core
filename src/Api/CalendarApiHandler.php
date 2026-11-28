@@ -181,6 +181,10 @@ final class CalendarApiHandler
                 'no_show_window_months' => SettingsRegistry::CALENDAR_NO_SHOW_WINDOW_MONTHS,
                 'no_show_flag_after' => SettingsRegistry::CALENDAR_NO_SHOW_FLAG_AFTER,
                 'no_show_count_late_cancels' => SettingsRegistry::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS,
+                // WHIT-1445: Ask for a deposit, and Your website.
+                'deposit_policy' => SettingsRegistry::CALENDAR_DEPOSIT_POLICY,
+                'deposit_after_no_shows' => SettingsRegistry::CALENDAR_DEPOSIT_AFTER_NO_SHOWS,
+                'embed_origins' => SettingsRegistry::CALENDAR_EMBED_ORIGINS,
             ];
             $writes = [];
             foreach ($map as $field => $key) {
@@ -967,6 +971,26 @@ final class CalendarApiHandler
         });
     }
 
+    /**
+     * WHIT-1445 (AP.26, Q13): Refund the deposit, pressed by a person with
+     * calendar:manage. Money moves only on a person's click, so an agent is
+     * refused. `outside: true` records a refund made in the provider's own
+     * dashboard. Audited.
+     *
+     * @param array<string, string> $params
+     */
+    public function refundDeposit(Request $request, array $params): Response
+    {
+        return $this->run($request, 'deposit', function (int $tenantId, int $actor) use ($request, $params): Response {
+            if (self::isAgent($request) || $actor <= 0) {
+                throw new CalendarRejectedException('Only a person can refund a deposit.', 403);
+            }
+            $outside = (JsonBody::parsed($request)['outside'] ?? false) === true;
+
+            return Response::json(['data' => $this->booking->refundDeposit($tenantId, (int) $params['id'], $actor, $outside)]);
+        });
+    }
+
     /** WHIT-1444 (AP.22): a customer's treatment plans (`contact_id`). */
     public function listPlans(Request $request): Response
     {
@@ -1654,6 +1678,10 @@ final class CalendarApiHandler
         $slug = (new \Whity\Core\Branding\TenantHostRepository($this->calendar->db()))->findSlugById($tenantId);
         $base = rtrim($this->feedUrlBase, '/');
         $out['booking_page_url'] = $slug !== null && $slug !== '' && $base !== '' ? $base . '/book/' . rawurlencode($slug) : null;
+        // WHIT-1445 (AP.24, AP.26): the widget's script tag, and whether a payment provider takes and refunds deposits.
+        $out['embed_script'] = $slug !== null && $slug !== '' && $base !== '' ? '<script src="' . $base . '/embed.js" data-workspace="' . htmlspecialchars($slug, ENT_QUOTES) . '" async></script>' : null;
+        $out['deposits_connected'] = $this->booking->depositsConnected();
+        $out['refunds_connected'] = $this->booking->refundsConnected();
 
         return $out;
     }
@@ -2005,6 +2033,8 @@ final class CalendarApiHandler
         if ($room !== null && (!is_int($room) || $this->roomRepo()->find($tenantId, $room) === null)) {
             throw CalendarRejectedException::notFound('Room');
         }
+        // WHIT-1445 (AP.26): none, a fixed amount, or a percentage of the price.
+        $deposit = \Whity\Core\Calendar\Deposits::validate($pick('deposit', $existing['deposit'] ?? null), $price);
 
         return [
             'name' => $name,
@@ -2021,6 +2051,7 @@ final class CalendarApiHandler
             'sort_order' => $int('sort_order', $pick('sort_order', $existing['sort_order'] ?? 0), 0, 100000),
             'staff_profile_ids' => array_values(array_unique($staffIds)),
             'staff_values' => $own,
+            'deposit' => $deposit,
         ];
     }
 }

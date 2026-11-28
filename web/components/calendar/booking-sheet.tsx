@@ -69,6 +69,7 @@ import { ServiceList, isSeveral, useServicesName } from './booking-services';
 import { useCalendarWords } from './use-calendar-words';
 import { IntakeSection, VisitRecordSection } from './visit-record';
 import { BookingPlanSection } from './treatment-plans';
+import { DepositSection } from './booking-deposit';
 
 const ANYONE = 'anyone';
 /** Moving a booking of several services: each keeps its own person. */
@@ -90,7 +91,7 @@ export function statusVariant(status: CalendarBooking['status']): 'success' | 'w
 }
 
 /** What just happened to a booking, so the screen can say it. */
-export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn' | 'cameMarked' | 'noShowMarked' | 'resourcesChanged';
+export type BookingChange = 'moved' | 'cancelled' | 'accepted' | 'suggested' | 'checkedIn' | 'notCheckedIn' | 'cameMarked' | 'noShowMarked' | 'resourcesChanged' | 'depositRefunded';
 
 export interface BookingSheetProps {
   booking: CalendarBooking | null;
@@ -191,6 +192,8 @@ export function BookingSheet({ booking, suggest = false, startWith = null, onClo
                   onResourcesChanged={(changed) => onChanged(changed, 'resourcesChanged')}
                 />
                 {/* WHIT-1443 (AP.20, AP.21): the forms to fill, and the visit record. */}
+                {/* WHIT-1445 (AP.26): the deposit and Refund. */}
+                {booking.deposit && <DepositSection booking={booking} timeZone={timeZone} onChanged={(changed) => onChanged(changed, 'depositRefunded')} />}
                 {/* WHIT-1444 (AP.22): the treatment plan this visit is part of. */}
                 <BookingPlanSection key={`plan-${booking.id}`} booking={booking} canChange={canChange && open} />
                 <IntakeSection booking={booking} canChange={canChange && open} />

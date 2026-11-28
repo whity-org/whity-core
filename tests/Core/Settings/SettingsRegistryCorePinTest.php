@@ -220,6 +220,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.no_show_window_months',
             'calendar.no_show_flag_after',
             'calendar.no_show_count_late_cancels',
+            // WHIT-1445: Ask for a deposit, from how many misses, and Your website (AP.10, AP.24).
+            'calendar.deposit_policy',
+            'calendar.deposit_after_no_shows',
+            'calendar.embed_origins',
             // #1733. Whether the web app can be installed (instance-wide).
             'app.installable',
             // #2386: menu items and Settings pages hidden on this instance.
@@ -512,6 +516,10 @@ final class SettingsRegistryCorePinTest extends TestCase
             'calendar.no_show_window_months' => '12',
             'calendar.no_show_flag_after' => '2',
             'calendar.no_show_count_late_cancels' => 'true',
+            // WHIT-1445: off, 2, and no website.
+            'calendar.deposit_policy' => 'false',
+            'calendar.deposit_after_no_shows' => '2',
+            'calendar.embed_origins' => '',
             // #1733: on, which is what app.whity.dev wants; an operator turns
             // it off here or with PWA_ENABLED.
             'app.installable' => 'true',

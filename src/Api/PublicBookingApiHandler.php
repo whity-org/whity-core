@@ -14,6 +14,7 @@ use Whity\Core\Calendar\BookingVisitor;
 use Whity\Core\Calendar\CalendarFeed;
 use Whity\Core\Calendar\CalendarRejectedException;
 use Whity\Core\Calendar\CalendarRepository;
+use Whity\Core\Calendar\Deposits;
 use Whity\Core\Calendar\Ics;
 use Whity\Core\Calendar\Interval;
 use Whity\Core\Calendar\ManageLinks;
@@ -101,6 +102,8 @@ final class PublicBookingApiHandler
             $staff = array_values(array_filter($this->calendar->listStaff($tenantId), static fn (array $s): bool => $s['bookable']));
             $bookable = array_map(static fn (array $s): int => $s['profile_id'], $staff);
             $services = [];
+            // WHIT-1445 (AP.26): a deposit needs a payment provider; without one the booking is a request.
+            $depositsConnected = $this->booking->depositsConnected();
             foreach ($this->services->list($tenantId, true, true) as $service) {
                 $offered = array_values(array_intersect($service['staff_profile_ids'], $bookable));
                 if ($offered === []) {
@@ -119,10 +122,18 @@ final class PublicBookingApiHandler
                     'staff' => array_map(static function (int $profileId) use ($service): array {
                         $own = ServiceRepository::forPerson($service, $profileId);
 
-                        return ['profile_id' => $profileId, 'duration_minutes' => (int) $own['duration_minutes'], 'price_minor' => $own['price_minor']];
+                        return [
+                            'profile_id' => $profileId,
+                            'duration_minutes' => (int) $own['duration_minutes'],
+                            'price_minor' => $own['price_minor'],
+                            // WHIT-1445 (AP.26): the deposit with this person, from their price.
+                            'deposit_minor' => Deposits::amountFor(Deposits::clean($service['deposit'] ?? null), $own['price_minor']),
+                        ];
                     }, $offered),
+                    'deposit' => $service['deposit'] ?? null,
                     // Design 3.3: the page says "Send request" instead of "Book it".
-                    'sends_request' => $service['needs_approval'] || !$settings->instantBooking,
+                    'sends_request' => $service['needs_approval'] || !$settings->instantBooking
+                        || (!$depositsConnected && ($service['deposit']['kind'] ?? Deposits::NONE) !== Deposits::NONE),
                 ];
             }
 
@@ -132,7 +143,8 @@ final class PublicBookingApiHandler
                 // instance's, so the workspace's brand comes with the page.
                 'brand' => $this->brandFor($tenantId, $workspace['name']),
                 // WHIT-1173: `multi_service_booking` lets the customer add more services.
-                'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking'])),
+                // WHIT-1445 (AP.25): `late_cancel_hours` for the policy sentence before Book.
+                'settings' => array_intersect_key($settings->toApi(), array_flip(['time_zone', 'min_notice_minutes', 'max_advance_days', 'week_start', 'weekend_days', 'multi_service_booking', 'late_cancel_hours'])),
                 'services' => $services,
                 // WHIT-1440 (AP.16): each person's branch zone; null is the workspace's (`settings.time_zone`).
                 'staff' => array_map(static fn (array $s): array => ['profile_id' => $s['profile_id'], 'display_name' => $s['display_name'], 'time_zone' => $s['time_zone']], $staff),
@@ -332,6 +344,8 @@ final class PublicBookingApiHandler
             $name = $this->tenants->findNameById($tenantId) ?? '';
 
             return Response::json(['data' => self::forCustomer($booking) + [
+                // WHIT-1445 (AP.25, §9.2): free to cancel or move until when, and whether it can still move online.
+                'policy' => $this->policyFor($tenantId, $booking),
                 'workspace' => ['name' => $name],
                 'brand' => $this->brandFor($tenantId, $name),
                 // WHIT-1440 (AP.16): the zone of the person's branch, or the workspace's.
@@ -367,9 +381,10 @@ final class PublicBookingApiHandler
     {
         return $this->withLink($request, $params, function (int $tenantId, int $bookingId) use ($request): Response {
             $start = Interval::fromApi(JsonBody::parsed($request)['starts_at'] ?? null) ?? throw new CalendarRejectedException('Choose a time', 422);
-            $booking = $this->booking->move($tenantId, $bookingId, $start, null, true);
+            // WHIT-1445 (§9.2): once online inside the window.
+            $booking = $this->booking->moveByCustomer($tenantId, $bookingId, $start);
 
-            return Response::json(['data' => self::forCustomer($booking) + ['manage_token' => $booking['manage_token'] ?? null]]);
+            return Response::json(['data' => self::forCustomer($booking) + ['policy' => $this->policyFor($tenantId, $booking), 'manage_token' => $booking['manage_token'] ?? null]]);
         });
     }
 
@@ -497,7 +512,53 @@ final class PublicBookingApiHandler
                 'duration_minutes' => $i['duration_minutes'],
                 'price_minor' => $i['price_minor'],
             ], $booking['items']) : [],
+            // WHIT-1445 (AP.26): the deposit and what happened to it; never who refunded it.
+            'deposit' => is_array($booking['deposit'] ?? null) ? [
+                'amount_minor' => $booking['deposit']['amount_minor'],
+                'currency' => $booking['deposit']['currency'],
+                'state' => $booking['deposit']['state'],
+            ] : null,
         ];
+    }
+
+    /**
+     * WHIT-1445 (AP.25, §9.2): the cancellation policy as the manage page says
+     * it: free to cancel or move until `free_until`; after it a cancel is late
+     * and the deposit is kept, and a move is allowed once online.
+     *
+     * @param array<string, mixed> $booking
+     * @return array{free_until: ?string, late_cancel_hours: int, can_move_online: bool}
+     */
+    private function policyFor(int $tenantId, array $booking): array
+    {
+        $freeUntil = $this->booking->freeUntil($tenantId, $booking);
+        $late = $freeUntil !== null && $this->booking->now() >= $freeUntil;
+
+        return [
+            'free_until' => $freeUntil !== null ? Interval::toApi($freeUntil) : null,
+            'late_cancel_hours' => $this->booking->settingsFor($tenantId)->lateCancelHours,
+            'can_move_online' => !$late || ($booking['late_moved_at'] ?? null) === null,
+        ];
+    }
+
+    /**
+     * WHIT-1445 (AP.24): the sites that may show this workspace's booking
+     * page in their own pages, as the `frame-ancestors` of
+     * `/book/{workspace}/embed`. Asked by the web app for every embed page;
+     * a workspace that is unknown or whose page is off is `'none'`.
+     *
+     * @param array<string, string> $params
+     */
+    public function embedPolicy(Request $request, array $params): Response
+    {
+        return $this->guard($request, 'cal:info:', RateLimits::publicBookingInfoPerAddress(), function () use ($request, $params): Response {
+            $workspace = $this->workspace($request, $params);
+            $ancestors = $workspace !== null
+                ? \Whity\Core\Calendar\EmbedOrigins::frameAncestors(implode(',', $this->booking->settingsFor($workspace['id'])->embedOrigins))
+                : "'none'";
+
+            return Response::json(['data' => ['frame_ancestors' => $ancestors]]);
+        });
     }
 
     /**

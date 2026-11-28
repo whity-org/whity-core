@@ -32,6 +32,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@whit
 import { SaveBar, ChangedField } from '@whity/ui/save-bar';
 import { Skeleton } from '@whity/ui/skeleton';
 import { Switch } from '@whity/ui/switch';
+import { Textarea } from '@whity/ui/textarea';
+import { Button } from '@whity/ui/button';
 import { ToggleGroup } from '@whity/ui/toggle-group';
 import { useTranslation } from '@whity/features/i18n';
 import { calendarApi, type CalendarSettings, type CalendarSettingsRequest } from '@/lib/calendar/api';
@@ -57,6 +59,10 @@ interface Draft {
   flagAfter: string;
   windowMonths: string;
   countLate: boolean;
+  /** WHIT-1445 (AP.10, AP.24): Ask for a deposit, and Your website (one site a line). */
+  depositPolicy: boolean;
+  depositAfter: string;
+  embedOrigins: string;
   weekStart: string;
   weekend: string[];
 }
@@ -79,6 +85,9 @@ function draftOf(s: CalendarSettings): Draft {
     flagAfter: String(s.no_show_flag_after ?? 2),
     windowMonths: String(s.no_show_window_months ?? 12),
     countLate: s.no_show_count_late_cancels ?? true,
+    depositPolicy: s.deposit_policy ?? false,
+    depositAfter: String(s.deposit_after_no_shows ?? 2),
+    embedOrigins: (s.embed_origins ?? []).join('\n'),
     weekStart: s.week_start,
     weekend: [...s.weekend_days].sort(),
   };
@@ -126,6 +135,9 @@ export default function CalendarSettingsPage() {
     if (current.flagAfter !== saved.flagAfter) changes.push(t('settings.flagAfter', 'Flag after'));
     if (current.windowMonths !== saved.windowMonths) changes.push(t('settings.windowMonths', 'Count over'));
     if (current.countLate !== saved.countLate) changes.push(t('settings.countLate', 'Late cancels count'));
+    if (current.depositPolicy !== saved.depositPolicy || current.depositAfter !== saved.depositAfter)
+      changes.push(t('settings.depositPolicy', 'Ask for a deposit'));
+    if (current.embedOrigins !== saved.embedOrigins) changes.push(t('settings.website', 'Your website'));
     if (current.weekStart !== saved.weekStart) changes.push(t('settings.weekStart', 'First day of the week'));
     if (current.weekend.join(',') !== saved.weekend.join(',')) changes.push(t('settings.weekend', 'Weekend'));
   }
@@ -158,6 +170,10 @@ export default function CalendarSettingsPage() {
     if (lateHours === null) return setProblem(t('settings.error.lateHours', 'A late cancel must be from 0 to 168 hours before.'));
     if (flagAfter === null) return setProblem(t('settings.error.flagAfter', 'Flag after must be from 0 to 20 missed bookings.'));
     if (windowMonths === null) return setProblem(t('settings.error.windowMonths', 'Count over must be from 1 to 36 months.'));
+    const depositAfter = whole(current.depositAfter, 1, 20);
+    if (depositAfter === null) return setProblem(t('settings.error.depositAfter', 'Ask for a deposit after must be from 1 to 20 missed bookings.'));
+    const origins = current.embedOrigins.split(/[\s,]+/).map((o) => o.trim().replace(/\/+$/, '')).filter((o) => o !== '');
+    if (origins.length > 10) return setProblem(t('settings.error.websites', 'Add up to 10 websites.'));
 
     const body: CalendarSettingsRequest = {
       booking_page_enabled: current.bookingPage,
@@ -175,6 +191,9 @@ export default function CalendarSettingsPage() {
       no_show_flag_after: flagAfter,
       no_show_window_months: windowMonths,
       no_show_count_late_cancels: current.countLate,
+      deposit_policy: current.depositPolicy,
+      deposit_after_no_shows: depositAfter,
+      embed_origins: origins,
       week_start: current.weekStart as CalendarSettingsRequest['week_start'],
       weekend_days: current.weekend as CalendarSettingsRequest['weekend_days'],
     };
@@ -454,6 +473,95 @@ export default function CalendarSettingsPage() {
                     data-testid="settings-auto-no-show"
                   />
                 </label>
+              </ChangedField>
+              {/* WHIT-1445 (AP.10, AP.26): Ask for a deposit, off by default. */}
+              <ChangedField changed={current.depositPolicy !== saved.depositPolicy}>
+                <label className="flex min-h-10 items-start justify-between gap-3">
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium text-foreground">{t('settings.depositPolicy', 'Ask for a deposit')}</span>
+                    <span className="block text-sm text-muted-foreground">
+                      {t(
+                        'settings.depositPolicyHint',
+                        'On: a customer who missed this many bookings pays the service’s deposit to book online. For a service without one, the business confirms their booking first. Off by default.'
+                      )}
+                    </span>
+                  </span>
+                  <Switch
+                    checked={current.depositPolicy}
+                    onCheckedChange={(depositPolicy) => update({ depositPolicy })}
+                    aria-label={t('settings.depositPolicy', 'Ask for a deposit')}
+                    data-testid="settings-deposit-policy"
+                  />
+                </label>
+              </ChangedField>
+              {current.depositPolicy && (
+                <ChangedField changed={current.depositAfter !== saved.depositAfter}>
+                  <Input
+                    id="settings-deposit-after"
+                    dir="ltr"
+                    inputMode="numeric"
+                    className="max-w-40"
+                    label={t('settings.depositAfter', 'After this many missed bookings')}
+                    value={current.depositAfter}
+                    onChange={(e) => update({ depositAfter: e.target.value })}
+                  />
+                </ChangedField>
+              )}
+              {current.depositPolicy && data.deposits_connected === false && (
+                <p className="m-0 text-sm text-warning-text" data-testid="settings-deposit-no-provider">
+                  {t('settings.depositNoProvider', 'Connect a payment provider to take deposits. Until then, their online bookings are requests you approve.')}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* WHIT-1445 (AP.24): the booking widget, and the sites that may show it. */}
+          <Card data-testid="settings-website">
+            <CardHeader>
+              <CardTitle>{t('settings.website', 'Your website')}</CardTitle>
+              <CardDescription>
+                {t(
+                  'settings.websiteHint',
+                  'Paste this on your website to add a Book button that opens your booking page over it. It works only on the sites you list here.'
+                )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {data.embed_script ? (
+                <div className="space-y-2">
+                  <pre className="m-0 overflow-x-auto rounded-card bg-muted px-3 py-2 font-mono text-sm text-foreground" dir="ltr" data-testid="settings-embed-script">
+                    {data.embed_script}
+                  </pre>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(data.embed_script ?? '').then(() => addToast(t('settings.websiteCopied', 'Copied'), 'success'));
+                    }}
+                    data-testid="settings-embed-copy"
+                  >
+                    {t('settings.websiteCopy', 'Copy')}
+                  </Button>
+                </div>
+              ) : (
+                <p className="m-0 text-sm text-muted-foreground">{t('settings.websiteNoLink', 'Turn on the booking page first.')}</p>
+              )}
+              <ChangedField changed={current.embedOrigins !== saved.embedOrigins}>
+                <label htmlFor="settings-embed-origins" className="text-sm font-medium text-foreground">
+                  {t('settings.websiteSites', 'Your websites, one a line')}
+                </label>
+                <Textarea
+                  id="settings-embed-origins"
+                  dir="ltr"
+                  rows={3}
+                  placeholder="https://example-bakery.com"
+                  value={current.embedOrigins}
+                  onChange={(e) => update({ embedOrigins: e.target.value })}
+                  data-testid="settings-embed-origins"
+                />
+                <span className="block text-sm text-muted-foreground">
+                  {t('settings.websiteSitesHint', 'Each address starts with https:// and stops after the name, such as https://example-bakery.com. Up to 10. None: the booking page shows on no other site.')}
+                </span>
               </ChangedField>
             </CardContent>
           </Card>

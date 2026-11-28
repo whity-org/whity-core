@@ -52,6 +52,15 @@ final class CalendarSettings
         public readonly int $noShowFlagAfter = 2,
         /** ...late cancels included unless turned off. */
         public readonly bool $noShowCountLateCancels = true,
+        /** WHIT-1445 (AP.10, AP.26): Ask for a deposit from this many misses (off by default). */
+        public readonly bool $depositPolicy = false,
+        public readonly int $depositAfterNoShows = 2,
+        /**
+         * WHIT-1445 (AP.24): the sites that may frame the booking page.
+         *
+         * @var list<string>
+         */
+        public readonly array $embedOrigins = [],
     ) {
     }
 
@@ -111,6 +120,9 @@ final class CalendarSettings
             max(1, $int(SettingsRegistry::CALENDAR_NO_SHOW_WINDOW_MONTHS, 12)),
             $int(SettingsRegistry::CALENDAR_NO_SHOW_FLAG_AFTER, 2),
             ($effective[SettingsRegistry::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS] ?? 'true') !== 'false',
+            ($effective[SettingsRegistry::CALENDAR_DEPOSIT_POLICY] ?? 'false') === 'true',
+            max(1, $int(SettingsRegistry::CALENDAR_DEPOSIT_AFTER_NO_SHOWS, 2)),
+            EmbedOrigins::parse($effective[SettingsRegistry::CALENDAR_EMBED_ORIGINS] ?? ''),
         );
     }
 
@@ -162,6 +174,9 @@ final class CalendarSettings
             'no_show_window_months' => $this->noShowWindowMonths,
             'no_show_flag_after' => $this->noShowFlagAfter,
             'no_show_count_late_cancels' => $this->noShowCountLateCancels,
+            'deposit_policy' => $this->depositPolicy,
+            'deposit_after_no_shows' => $this->depositAfterNoShows,
+            'embed_origins' => $this->embedOrigins,
         ];
     }
 }

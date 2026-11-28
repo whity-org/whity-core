@@ -11,7 +11,9 @@ use Throwable;
 use Whity\Core\Hooks\HookManager;
 use Whity\Core\Log\ScrubbedErrorLog;
 use Whity\Core\Queue\QueueService;
+use Whity\Sdk\Calendar\BookingDepositRefunds;
 use Whity\Sdk\Calendar\BookingPaymentStep;
+use Whity\Sdk\Calendar\DepositRefund;
 use Whity\Sdk\Calendar\BookingQuote;
 use Whity\Sdk\Calendar\PaymentRequirement;
 use Whity\Sdk\Calendar\PendingBooking;
@@ -387,8 +389,10 @@ final class BookingService
         }
 
         // A request is not paid for until it is accepted: no payment step.
-        $asRequest = $request['public'] && ($service['needs_approval'] || !$settings->instantBooking);
-        $step = $asRequest ? null : $this->plugins?->paymentStep();
+        $baseRequest = $request['public'] && ($service['needs_approval'] || !$settings->instantBooking);
+        $baseStep = $baseRequest ? null : $this->plugins?->paymentStep();
+        // WHIT-1445 (AP.10): Ask for a deposit names this customer.
+        $policyDeposit = $request['public'] && !$baseRequest && $this->depositPolicyNames($tenantId, $settings, (string) $request['customer_email']);
         $room = $this->roomLock($tenantId, $service);
         $why = null;
         $base = $service;
@@ -398,10 +402,22 @@ final class BookingService
             $service = ServiceRepository::forPerson($base, $candidate);
             $end = $start->modify('+' . $service['duration_minutes'] . ' minutes');
             $block = Availability::blockFor($start, $service['duration_minutes'], $service['buffer_before_minutes'], $service['buffer_after_minutes']);
+            // WHIT-1445 (AP.26): the deposit an online booking pays, from this
+            // person's price. Without a payment provider to take it, or when
+            // the policy asks for one and the service has none, the booking
+            // becomes a request staff approve (§9.3, §4.4).
+            $asRequest = $baseRequest;
+            $step = $baseStep;
+            $deposit = $request['public'] && !$asRequest ? Deposits::amountFor(Deposits::clean($service['deposit'] ?? null), $service['price_minor']) : null;
+            if (($deposit !== null || $policyDeposit) && ($deposit === null || $step === null)) {
+                $asRequest = true;
+                $step = null;
+                $deposit = null;
+            }
             // Asked before the lock: a plugin never runs while a person's
             // calendar is held. A step that fails refuses the booking rather
             // than letting it through unpaid.
-            $quote = new BookingQuote($tenantId, (int) $service['id'], $candidate, $start, $end, $service['price_minor'], (string) $service['currency'], $request['customer_email'], $request['source']);
+            $quote = new BookingQuote($tenantId, (int) $service['id'], $candidate, $start, $end, $service['price_minor'], (string) $service['currency'], $request['customer_email'], $request['source'], $deposit);
             $requirement = null;
             if ($step !== null) {
                 try {
@@ -411,9 +427,15 @@ final class BookingService
                     throw new CalendarRejectedException('Booking is unavailable right now. Try again later.', 503);
                 }
             }
+            if ($deposit !== null && $requirement === null) {
+                // A step that takes no deposit: never confirm it unpaid.
+                $asRequest = true;
+                $step = null;
+            }
+            $depositMinor = $deposit !== null && $requirement !== null ? $requirement->amountMinor : null;
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
             try {
-                $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest, $bookAnyway, $checkHours, &$why): ?int {
+                $id = $this->underLock([[$tenantId, $candidate]], function () use ($tenantId, $candidate, $service, $settings, $request, $start, $end, $block, $now, $hold, $asRequest, $bookAnyway, $checkHours, $depositMinor, &$why): ?int {
                     $why = $this->whyNotFree($tenantId, $candidate, $service, $settings, $start, $now, null, $checkHours, $bookAnyway);
                     if ($why !== null) {
                         return null;
@@ -441,6 +463,7 @@ final class BookingService
                         'created_by_profile_id' => $request['created_by_profile_id'],
                         'room_id' => $chosen[0] ?? null,
                         'overlap_ok' => $bookAnyway && $this->personClashes($tenantId, $candidate, $service, $start, $now, null),
+                        'deposit_minor' => $depositMinor,
                     ]);
                     if ($chosen !== []) {
                         $this->bookings->setResources($tenantId, $newId, self::resourceRows([$chosen], [$block]));
@@ -506,8 +529,10 @@ final class BookingService
         foreach ($plan['services'] as $service) {
             $needsApproval = $needsApproval || $service['needs_approval'] === true;
         }
-        $asRequest = $public && ($needsApproval || !$settings->instantBooking);
-        $step = $asRequest ? null : $this->plugins?->paymentStep();
+        $baseRequest = $public && ($needsApproval || !$settings->instantBooking);
+        $baseStep = $baseRequest ? null : $this->plugins?->paymentStep();
+        // WHIT-1445 (AP.10, AP.26): as for one service; the deposit is the sum of each service's.
+        $policyDeposit = $public && !$baseRequest && $this->depositPolicyNames($tenantId, $settings, (string) $request['customer_email']);
         $why = null;
         $tried = [];
         for ($attempt = 0; $attempt < 3; $attempt++) {
@@ -525,7 +550,21 @@ final class BookingService
             $own = array_map(static fn (array $service, int $person): array => ServiceRepository::forPerson($service, $person), $plan['services'], $people);
             $total = self::totalPrice($own);
             $end = $parts[count($parts) - 1]['ends_at'];
-            $quote = new BookingQuote($tenantId, $parts[0]['service_id'], $parts[0]['profile_id'], $start, $end, $total, $plan['currency'], (string) $request['customer_email'], (string) $request['source']);
+            $asRequest = $baseRequest;
+            $step = $baseStep;
+            $deposit = null;
+            if ($public && !$asRequest) {
+                foreach ($own as $part) {
+                    $amount = Deposits::amountFor(Deposits::clean($part['deposit'] ?? null), $part['price_minor']);
+                    $deposit = $amount !== null ? ($deposit ?? 0) + $amount : $deposit;
+                }
+            }
+            if (($deposit !== null || $policyDeposit) && ($deposit === null || $step === null)) {
+                $asRequest = true;
+                $step = null;
+                $deposit = null;
+            }
+            $quote = new BookingQuote($tenantId, $parts[0]['service_id'], $parts[0]['profile_id'], $start, $end, $total, $plan['currency'], (string) $request['customer_email'], (string) $request['source'], $deposit);
             $requirement = null;
             if ($step !== null) {
                 try {
@@ -535,9 +574,14 @@ final class BookingService
                     throw new CalendarRejectedException('Booking is unavailable right now. Try again later.', 503);
                 }
             }
+            if ($deposit !== null && $requirement === null) {
+                $asRequest = true;
+                $step = null;
+            }
+            $depositMinor = $deposit !== null && $requirement !== null ? $requirement->amountMinor : null;
             $hold = $requirement !== null ? $now->modify('+' . $settings->paymentHoldMinutes . ' minutes') : null;
             try {
-                $id = $this->underLocks($tenantId, $people, $this->resourceIds($tenantId, $plan['services']), function () use ($tenantId, $plan, $own, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, &$why): ?int {
+                $id = $this->underLocks($tenantId, $people, $this->resourceIds($tenantId, $plan['services']), function () use ($tenantId, $plan, $own, $parts, $settings, $request, $start, $end, $now, $hold, $asRequest, $total, $checkHours, $bookAnyway, $depositMinor, &$why): ?int {
                     $overlapOk = false;
                     $chosen = [];
                     foreach ($parts as $k => $part) {
@@ -570,6 +614,7 @@ final class BookingService
                         'created_by_profile_id' => $request['created_by_profile_id'],
                         'room_id' => $parts[0]['room_id'],
                         'overlap_ok' => $overlapOk,
+                        'deposit_minor' => $depositMinor,
                     ]);
                     $this->bookings->insertItems($tenantId, $id, $parts);
                     $this->bookings->setResources($tenantId, $id, self::resourceRows($chosen, array_column($parts, 'block')));
@@ -1256,6 +1301,138 @@ final class BookingService
             'flag' => $settings->noShowFlagAfter > 0 && $misses >= $settings->noShowFlagAfter ? ['misses' => $misses, 'of' => count($history)] : null,
             'window_months' => $settings->noShowWindowMonths,
         ];
+    }
+
+    /**
+     * WHIT-1445 (AP.10, §4.4): Ask for a deposit applies to this customer:
+     * the switch is on and they missed at least the workspace's number over
+     * the window (late cancels as the flag counts them), since their count
+     * last started again. A customer is their contact, found by email, or the
+     * email itself.
+     */
+    private function depositPolicyNames(int $tenantId, CalendarSettings $settings, string $email): bool
+    {
+        $email = strtolower(trim($email));
+        if (!$settings->depositPolicy || $email === '') {
+            return false;
+        }
+        $contact = (new \Whity\Core\Contacts\ContactRepository($this->db))->findBy($tenantId, 'email', $email);
+        $key = AttendanceRepository::keyFor(is_array($contact) ? (int) $contact['id'] : null, $email);
+        if ($key === null) {
+            return false;
+        }
+        $now = $this->now();
+        $history = $this->attendanceRepository()->history($tenantId, [$key], $now->modify('-' . $settings->noShowWindowMonths . ' months'), $now, $settings->noShowCountLateCancels);
+
+        return count(array_filter($history[$key] ?? [])) >= $settings->depositAfterNoShows;
+    }
+
+    /** WHIT-1445 (AP.26): a payment provider is connected to take deposits. */
+    public function depositsConnected(): bool
+    {
+        return $this->plugins?->paymentStep() !== null;
+    }
+
+    /** WHIT-1445 (AP.26): the provider can also refund them from here. */
+    public function refundsConnected(): bool
+    {
+        return $this->plugins?->paymentStep() instanceof BookingDepositRefunds;
+    }
+
+    /**
+     * WHIT-1445 (AP.26, Q13): a person with `calendar:manage` pressed Refund.
+     *
+     * Only a paid deposit that is to refund (an early cancel, or we
+     * cancelled) or kept (a late cancel or a no-show, refunded as a goodwill
+     * choice) can be refunded, once. With a provider that refunds, the money
+     * goes back through it; `$outside` records a refund made in the
+     * provider's own dashboard instead. Never called on its own. Audited.
+     *
+     * @return array<string, mixed> the booking
+     */
+    public function refundDeposit(int $tenantId, int $bookingId, int $actor, bool $outside): array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        $state = Deposits::state($row);
+        if (!in_array($state, Deposits::REFUNDABLE, true)) {
+            throw new CalendarRejectedException(match ($state) {
+                Deposits::REFUNDED => 'This deposit was already refunded.',
+                Deposits::APPLIED => 'They came, so the deposit counts toward the bill.',
+                Deposits::PAID => 'The visit is still to come. Cancel it first.',
+                default => 'There is no paid deposit to refund.',
+            }, 422, ['state' => $state]);
+        }
+        $step = $this->plugins?->paymentStep();
+        $ref = 'outside';
+        if (!$outside) {
+            if (!$step instanceof BookingDepositRefunds) {
+                throw new CalendarRejectedException('Your payment provider can\'t refund from here. Refund it in its own dashboard, then mark it refunded.', 409, ['code' => 'refund_outside']);
+            }
+            try {
+                $ref = $step->refund(new DepositRefund($tenantId, $bookingId, (string) ($row['payment_ref'] ?? ''), (int) $row['deposit_minor'], trim((string) $row['currency']), $actor));
+            } catch (Throwable $e) {
+                \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] the payment provider refused a deposit refund', $e);
+                throw new CalendarRejectedException('The refund didn\'t go through. Nothing was refunded. Try again, or refund it in your payment provider.', 502, ['code' => 'refund_failed']);
+            }
+        }
+        if (!$this->bookings->markDepositRefunded($tenantId, $bookingId, $actor, $ref)) {
+            throw new CalendarRejectedException('This deposit was already refunded.', 409);
+        }
+        try {
+            $this->audit?->record('calendar.deposit.refunded', [
+                'tenant_id' => $tenantId,
+                'actor_user_id' => $actor > 0 ? $actor : null,
+                'target_type' => 'calendar_booking',
+                'target_id' => $bookingId,
+                'metadata' => ['amount_minor' => (int) $row['deposit_minor'], 'currency' => trim((string) $row['currency']), 'was' => $state, 'outside' => $outside],
+            ]);
+        } catch (Throwable $e) {
+            \Whity\Core\Log\ScrubbedErrorLog::failure('[calendar] could not audit a deposit refund', $e);
+        }
+
+        return $this->bookingOrFail($tenantId, $bookingId);
+    }
+
+    /**
+     * WHIT-1445 (AP.25): until when the customer may cancel or move for free.
+     * After it a cancel is late (the deposit is kept), and a move is allowed
+     * once online (§9.2).
+     *
+     * @param array<string, mixed> $booking a row or {@see BookingRepository::toApi()}
+     */
+    public function freeUntil(int $tenantId, array $booking): ?DateTimeImmutable
+    {
+        $raw = $booking['starts_at'] ?? null;
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+        $start = str_contains($raw, 'T') ? Interval::fromApi($raw) : Interval::fromDb($raw);
+
+        return $start?->modify('-' . $this->settingsFor($tenantId)->lateCancelHours . ' hours');
+    }
+
+    /**
+     * WHIT-1445 (§9.2, Q4): the customer moves their booking on their link.
+     * Inside the window they may move it once online, and it doesn't count
+     * as a miss; a second move inside it is for the desk.
+     *
+     * @return array<string, mixed>
+     */
+    public function moveByCustomer(int $tenantId, int $bookingId, DateTimeImmutable $start): array
+    {
+        $row = $this->bookings->find($tenantId, $bookingId) ?? throw CalendarRejectedException::notFound('Booking');
+        $freeUntil = $this->freeUntil($tenantId, $row);
+        $late = $row['status'] === BookingRepository::STATUS_CONFIRMED && $freeUntil !== null && $this->now() >= $freeUntil;
+        if ($late && ($row['late_moved_at'] ?? null) !== null) {
+            throw new CalendarRejectedException('You have already moved this booking once. To move it again, please call us.', 422, ['code' => 'call_to_move']);
+        }
+        $booking = $this->move($tenantId, $bookingId, $start, null, true);
+        if ($late) {
+            $this->bookings->markLateMoved($tenantId, $bookingId);
+            $booking['late_moved_at'] = Interval::toApi($this->now());
+        }
+
+        return $booking;
     }
 
     /** "Start again from today" for a customer's count (AP.10), recorded and audited. */
