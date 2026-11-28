@@ -452,6 +452,13 @@ export const calendarApi = {
   },
   visitFileUrl: (fileId: number) => `/api/v1/calendar/visit-files/${fileId}`,
 
+  /** WHIT-1445 (AP.26): Refund the deposit; `outside` records a refund made in the provider's own dashboard. */
+  refundDeposit: async (bookingId: number, outside: boolean) =>
+    send<CalendarBooking>(
+      await api.POST('/api/v1/calendar/bookings/{id}/deposit/refund', { params: { path: { id: bookingId } }, body: { outside } }),
+      'The deposit could not be refunded'
+    ),
+
   /** WHIT-1444 (AP.22): treatment plans. */
   plans: async (contactId: number) =>
     read<CalendarPlan[]>(await api.GET('/api/v1/calendar/plans', { params: { query: { contact_id: contactId } } }), 'The plans could not be loaded'),

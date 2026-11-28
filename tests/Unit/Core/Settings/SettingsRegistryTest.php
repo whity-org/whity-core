@@ -146,6 +146,9 @@ final class SettingsRegistryTest extends TestCase
              'calendar.no_show_window_months',
              'calendar.no_show_flag_after',
              'calendar.no_show_count_late_cancels',
+             'calendar.deposit_policy',
+             'calendar.deposit_after_no_shows',
+             'calendar.embed_origins',
              'app.installable',
             'navigation.hidden_ids',
             'navigation.home_path',
@@ -348,7 +351,8 @@ final class SettingsRegistryTest extends TestCase
         // 59 since #1730: documents.qr_public_signer_names.
         // 60 since WHIT-1417: calendar.reminders.
         // 66 since WHIT-1427: six calendar.* keys for did they come.
-        self::assertCount(66, SettingsRegistry::tenantTextKeys());
+        // 69 since WHIT-1445: the deposit policy, its threshold and Your website.
+        self::assertCount(69, SettingsRegistry::tenantTextKeys());
 
         // The desktop-login TTL is per-tenant overridable (NOT global-only) and a
         // plain numeric string key.
@@ -539,7 +543,8 @@ final class SettingsRegistryTest extends TestCase
         // 173 since WHIT-1416: the customer area's seven keys.
         // 179 since WHIT-1427: six calendar.* keys for did they come.
         // 180 since WHIT-1438: customer_area.hidden_screens.
-        self::assertCount(180, $describe);
+        // 183 since WHIT-1445: the deposit policy, its threshold and Your website.
+        self::assertCount(183, $describe);
         self::assertSame(
             ['key' => 'site_name', 'type' => 'string', 'default' => 'Whity'],
             $describe[0]

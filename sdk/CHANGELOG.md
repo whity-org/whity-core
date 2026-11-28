@@ -6,6 +6,12 @@ Every SDK minor, newest first: what it added for plugins and why it doesn't brea
 - **Additive.** Every 1.x minor only adds. An entry says so on its last line, and names what it deprecates and the replacement.
 - **Read by CI.** `scripts/ci-sdk-version-collision.php` checks the top entry against `Sdk::VERSION` and the order of the entries; `scripts/sdk-coverage.php` checks that every minor here is named by a `since` in `docs/sdk-coverage/coverage.json`.
 
+## 1.177
+
+DEPOSITS (design section 39 §9.3, AP.26; owner, 25 Nov 2026, "Accept all"): `Calendar\BookingQuote` gains `depositMinor`, the deposit core asks for: the service's deposit (none, a fixed amount or a percentage of the price), or the one the workspace's policy requires of a customer who missed often, in the booking's currency, or null for none. A payment step that takes deposits asks for exactly that amount. `Calendar\BookingDepositRefunds`, optional and implemented by the same object as the `BookingPaymentStep`, refunds a deposit (`refund(DepositRefund): string`, the provider's reference) when a person with `calendar:manage` presses Refund; core never refunds on its own, and records who did it in the audit log. Core: deposits per service, `deposit` on each booking (due, paid, kept, to refund, refunded or applied, worked out from the booking), `POST /api/calendar/bookings/{id}/deposit/refund`, the cancellation policy on the booking and manage pages, and the booking widget (WHIT-1445).
+
+Purely additive: one new optional constructor argument (last, default null), one new optional interface and one new class. Existing payment steps are unchanged.
+
 ## 1.176
 
 TEMPLATE ORDER (design section 40 §4; the owner's order of 17 Nov 2026): a workspace template may give `order`, a whole number from 1 to 9999, and core shows the cards lowest first. Templates without one come after, by English name, so a third-party template falls in after Whity's own; Start blank stays last. A template built on another (`extends`) has its own `order`, not its parent's. Whity's seven templates use 10 to 70 in the owner's order (coffee house, study house, meeting rooms, salon, clinic, bakery, car dealership), whichever plugin each comes from now (WHIT-1436).

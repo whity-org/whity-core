@@ -920,6 +920,15 @@ final class SettingsRegistry
     public const CALENDAR_NO_SHOW_WINDOW_MONTHS = 'calendar.no_show_window_months';
     public const CALENDAR_NO_SHOW_FLAG_AFTER = 'calendar.no_show_flag_after';
     public const CALENDAR_NO_SHOW_COUNT_LATE_CANCELS = 'calendar.no_show_count_late_cancels';
+    /**
+     * WHIT-1445 (design section 39 §4.4 and §9, AP.10, AP.24, AP.26): Ask for
+     * a deposit, off by default, from this many misses in the window; and
+     * Your website, the https origins that may show the booking page in their
+     * own pages (comma separated, none by default; see Calendar\EmbedOrigins).
+     */
+    public const CALENDAR_DEPOSIT_POLICY = 'calendar.deposit_policy';
+    public const CALENDAR_DEPOSIT_AFTER_NO_SHOWS = 'calendar.deposit_after_no_shows';
+    public const CALENDAR_EMBED_ORIGINS = 'calendar.embed_origins';
 
     /**
      * Whether the web app offers itself as an installable app (#1733): the web
@@ -1283,6 +1292,7 @@ final class SettingsRegistry
         self::CALENDAR_WALKINS_ENABLED,
         self::CALENDAR_AUTO_NO_SHOW,
         self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS,
+        self::CALENDAR_DEPOSIT_POLICY,
         self::BILLING_TAX_INCLUSIVE,
         self::PAYMENTS_MOCK_ENABLED,
         self::BILLING_LOCAL_RUNS_ENABLED,
@@ -1644,6 +1654,9 @@ final class SettingsRegistry
         self::CALENDAR_NO_SHOW_WINDOW_MONTHS => '12',
         self::CALENDAR_NO_SHOW_FLAG_AFTER => '2',
         self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS => 'true',
+        self::CALENDAR_DEPOSIT_POLICY => 'false',
+        self::CALENDAR_DEPOSIT_AFTER_NO_SHOWS => '2',
+        self::CALENDAR_EMBED_ORIGINS => '',
         // On: app.whity.dev installs as a phone app. See APP_INSTALLABLE.
         self::APP_INSTALLABLE => 'true',
         // Empty: every page is in the menus. See NAVIGATION_HIDDEN_IDS.
@@ -2170,6 +2183,9 @@ final class SettingsRegistry
             self::CALENDAR_NO_SHOW_WINDOW_MONTHS => self::validateWholeNumberBetween($value, self::CALENDAR_NO_SHOW_WINDOW_MONTHS, 1, 36),
             self::CALENDAR_NO_SHOW_FLAG_AFTER => self::validateWholeNumberBetween($value, self::CALENDAR_NO_SHOW_FLAG_AFTER, 0, 20),
             self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS => self::validateBoolean($value, self::CALENDAR_NO_SHOW_COUNT_LATE_CANCELS),
+            self::CALENDAR_DEPOSIT_POLICY => self::validateBoolean($value, self::CALENDAR_DEPOSIT_POLICY),
+            self::CALENDAR_DEPOSIT_AFTER_NO_SHOWS => self::validateWholeNumberBetween($value, self::CALENDAR_DEPOSIT_AFTER_NO_SHOWS, 1, 20),
+            self::CALENDAR_EMBED_ORIGINS => \Whity\Core\Calendar\EmbedOrigins::validate($value),
             self::APP_INSTALLABLE => self::validateBoolean($value, self::APP_INSTALLABLE),
             self::NAVIGATION_HIDDEN_IDS => \Whity\Core\Navigation\HiddenNavIds::validate($value),
             self::NAVIGATION_HOME_PATH => \Whity\Core\Navigation\HomeLinks::validateHomePath($value),

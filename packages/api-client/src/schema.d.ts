@@ -2669,6 +2669,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/calendar/bookings/{id}/deposit/refund": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refund the deposit: a person's click, never automatic and never an agent; audited (WHIT-1445)
+         * @description Only a paid deposit that is to refund (an early cancel, or we cancelled) or kept (a late cancel or didn't come). Through the payment provider when it can refund; `outside: true` records a refund made in its own dashboard.
+         */
+        post: operations["post_api_v1_calendar_bookings_id_deposit_refund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calendar/bookings/{id}/desk-status": {
         parameters: {
             query?: never;
@@ -12496,6 +12516,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/public/booking/{workspace}/embed": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The sites that may show the booking page in their own pages, as `frame-ancestors` (public, WHIT-1445)
+         * @description Asked by the web app for `/book/{workspace}/embed`. `'none'` for an unknown workspace, one whose page is off, or one that listed no website.
+         */
+        get: operations["get_api_v1_public_booking_workspace_embed"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/public/booking/{workspace}/me": {
         parameters: {
             query?: never;
@@ -17946,6 +17986,9 @@ export interface components {
             updated_at?: string | null;
             /** @description `expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441). */
             desk_status?: string;
+            deposit?: components["schemas"]["CalendarBookingDeposit"];
+            /** @description The customer moved it inside the cancellation window, which they may do once online (WHIT-1445). */
+            late_moved_at?: string | null;
             intake?: components["schemas"]["CalendarIntakeStatus"];
             customer_flag?: components["schemas"]["CalendarCustomerFlag"];
             /** @description Only on one booking: every room and piece of equipment it holds (WHIT-1439). `room_id` is the first. */
@@ -18002,6 +18045,20 @@ export interface components {
             phone?: string;
             note?: string;
         };
+        /** @description The deposit and what happened to it (WHIT-1445); null for none. */
+        CalendarBookingDeposit: {
+            amount_minor: number;
+            currency: string;
+            state: components["schemas"]["CalendarDepositState"];
+            paid_at?: string | null;
+            refunded_at?: string | null;
+            refunded_by?: {
+                profile_id: number;
+                name: string;
+            } | null;
+            /** @description The provider's reference, or `outside` when it was refunded in the provider's own dashboard. */
+            refund_ref?: string | null;
+        } | null;
         CalendarBookingItem: {
             /** @description 0 for the first service. */
             position: number;
@@ -18187,6 +18244,15 @@ export interface components {
             service_id: number;
             count: number;
         };
+        CalendarDepositRefundRequest: {
+            /** @description True: it was refunded in the payment provider's own dashboard; only record it. Default false: refund it through the provider. */
+            outside?: boolean;
+        };
+        /**
+         * @description Worked out from the booking (WHIT-1445, AP.26): `due` waits for payment; `paid` the visit is to come; `kept` a late cancel or didn't come; `to_refund` an early cancel or we cancelled, waiting for someone to press Refund; `refunded`; `applied` they came, so it counts toward the bill; `not_paid` it was never paid.
+         * @enum {string}
+         */
+        CalendarDepositState: "due" | "paid" | "kept" | "to_refund" | "refunded" | "applied" | "not_paid";
         CalendarDeskDay: {
             /** @description The local day, Y-m-d. */
             date: string;
@@ -18532,6 +18598,15 @@ export interface components {
             needs_approval?: boolean;
             /** @description The inventory service item that holds its name and price (WHIT-1334). */
             item_id?: number | null;
+            deposit?: components["schemas"]["CalendarServiceDeposit"];
+        };
+        CalendarServiceDeposit: {
+            /** @enum {string} */
+            kind: "none" | "fixed" | "percent";
+            /** @description A fixed deposit in minor units (JOD 5.000 is 5000), never more than the price. */
+            amount_minor?: number | null;
+            /** @description A percentage of the person's price, 1 to 100. */
+            percent?: number | null;
         };
         CalendarServiceForm: {
             form_id: number;
@@ -18617,6 +18692,8 @@ export interface components {
             resources?: components["schemas"]["CalendarServiceNeed"][];
             /** @description Customers send a request instead of booking. */
             needs_approval?: boolean;
+            /** @description What online bookings pay first: none, a fixed amount, or a percentage of the price (WHIT-1445). */
+            deposit?: components["schemas"]["CalendarServiceDeposit"];
         };
         CalendarSettings: {
             /** @description The public booking page to share with customers, such as https://app.example.com/book/example-bakery. Null when it cannot be formed. Read-only. */
@@ -18653,6 +18730,18 @@ export interface components {
             no_show_flag_after?: number;
             /** @description Late cancels count as misses for the flag. */
             no_show_count_late_cancels?: boolean;
+            /** @description Ask for a deposit of a customer who missed often (WHIT-1445). */
+            deposit_policy?: boolean;
+            /** @description From this many misses over the window. */
+            deposit_after_no_shows?: number;
+            /** @description Your website: the https sites that may show the booking page in their own pages (WHIT-1445). */
+            embed_origins?: string[];
+            /** @description The script tag to paste into the website. */
+            embed_script?: string | null;
+            /** @description A payment provider takes deposits; without one, a booking with a deposit is a request. */
+            deposits_connected?: boolean;
+            /** @description The provider can also refund a deposit from Whity. */
+            refunds_connected?: boolean;
         };
         CalendarSettingsRequest: {
             /** @description Turn the public booking page on or off. */
@@ -18694,6 +18783,12 @@ export interface components {
             no_show_flag_after?: number;
             /** @description Late cancels count as misses for the flag. Default on. */
             no_show_count_late_cancels?: boolean;
+            /** @description Ask for a deposit of a customer who missed often: their online bookings pay the service's deposit, or are requests when it has none (WHIT-1445). Default off. */
+            deposit_policy?: boolean;
+            /** @description From this many misses over the window. Default 2. */
+            deposit_after_no_shows?: number;
+            /** @description Your website: up to 10 https origins such as https://example-bakery.com, no wildcards and nothing after the name. The list replaces what is there; empty frames nowhere (WHIT-1445). */
+            embed_origins?: string[];
         };
         CalendarSlot: {
             starts_at: string;
@@ -26145,6 +26240,19 @@ export interface components {
                 duration_minutes: number;
                 price_minor: number | null;
             }[];
+            /** @description The deposit and what happened to it (WHIT-1445); null for none. */
+            deposit?: {
+                amount_minor: number;
+                currency: string;
+                state: components["schemas"]["CalendarDepositState"];
+            } | null;
+            /** @description Only on the manage link (WHIT-1445, AP.25): free to cancel or move until `free_until`; after it a cancel is late and the deposit is kept, and a move is allowed once online. */
+            policy?: {
+                free_until: string | null;
+                late_cancel_hours: number;
+                /** @description False after the one move inside the window: a second needs the business. */
+                can_move_online: boolean;
+            };
         };
         PublicBookingMoveRequest: {
             /** @description A free time, ISO 8601 with an offset. */
@@ -26163,6 +26271,8 @@ export interface components {
                 weekend_days: string[];
                 /** @description The customer may book several services back to back as one booking (WHIT-1173). */
                 multi_service_booking?: boolean;
+                /** @description Free to cancel or move until this many hours before the start (WHIT-1445, AP.25). */
+                late_cancel_hours?: number;
             };
             services: {
                 id: number;
@@ -26177,8 +26287,11 @@ export interface components {
                     profile_id: number;
                     duration_minutes: number;
                     price_minor: number | null;
+                    /** @description The deposit with this person, in minor units, from their price; null for none (WHIT-1445). */
+                    deposit_minor?: number | null;
                 }[];
-                /** @description Booking it sends a request the business accepts first. */
+                deposit?: components["schemas"]["CalendarServiceDeposit"];
+                /** @description Booking it sends a request the business accepts first; also when it has a deposit and no payment provider takes it. */
                 sends_request?: boolean;
             }[];
             staff: {
@@ -43172,6 +43285,115 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    post_api_v1_calendar_bookings_id_deposit_refund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CalendarDepositRefundRequest"];
+            };
+        };
+        responses: {
+            /** @description The booking */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["CalendarBooking"];
+                    };
+                };
+            };
+            /** @description Invalid request body */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Missing or invalid authentication */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not a person with calendar:manage */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The provider can't refund from here (`refund_outside`), or it was just refunded */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Nothing to refund: not paid, already refunded, applied, or the visit is still to come */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description The provider refused the refund; nothing was refunded */
+            502: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -95502,6 +95724,69 @@ export interface operations {
             };
             /** @description The bot check could not be reached */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    get_api_v1_public_booking_workspace_embed: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The workspace slug. */
+                workspace: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            frame_ancestors: string;
+                        };
+                    };
+                };
+            };
+            /** @description Not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Method not allowed */
+            405: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Too many attempts */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description Internal server error */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

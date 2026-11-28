@@ -16,7 +16,8 @@ use Whity\Core\i18n\LocalizedText;
 final class ServiceRepository
 {
     private const COLUMNS = 'id, name, description, duration_minutes, buffer_before_minutes, buffer_after_minutes,
-                             price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval, item_id';
+                             price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval, item_id,
+                             deposit_kind, deposit_value';
 
     public function __construct(private readonly PDO $db)
     {
@@ -65,8 +66,10 @@ final class ServiceRepository
     {
         $stmt = $this->db->prepare(
             'INSERT INTO calendar_services (tenant_id, name, description, duration_minutes, buffer_before_minutes,
-                    buffer_after_minutes, price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval)
-             VALUES (:tenant_id, :name, :description, :duration, :before, :after, :price, :currency, :online, :active, :sort, :room_id, :needs_approval)
+                    buffer_after_minutes, price_minor, currency, bookable_online, active, sort_order, room_id, needs_approval,
+                    deposit_kind, deposit_value)
+             VALUES (:tenant_id, :name, :description, :duration, :before, :after, :price, :currency, :online, :active, :sort, :room_id, :needs_approval,
+                    :deposit_kind, :deposit_value)
              RETURNING id'
         );
         $this->bind($stmt, $v);
@@ -84,7 +87,8 @@ final class ServiceRepository
                 SET name = :name, description = :description, duration_minutes = :duration,
                     buffer_before_minutes = :before, buffer_after_minutes = :after, price_minor = :price,
                     currency = :currency, bookable_online = :online, active = :active, sort_order = :sort,
-                    room_id = :room_id, needs_approval = :needs_approval, updated_at = :now
+                    room_id = :room_id, needs_approval = :needs_approval, deposit_kind = :deposit_kind,
+                    deposit_value = :deposit_value, updated_at = :now
               WHERE tenant_id = :tenant_id AND id = :id'
         );
         $this->bind($stmt, $v);
@@ -232,6 +236,10 @@ final class ServiceRepository
         $room = $v['room_id'] ?? null;
         $stmt->bindValue(':room_id', $room, $room === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
         $stmt->bindValue(':needs_approval', ($v['needs_approval'] ?? false) === true, PDO::PARAM_BOOL);
+        // WHIT-1445 (AP.26): none unless given.
+        $deposit = Deposits::clean($v['deposit'] ?? null);
+        $stmt->bindValue(':deposit_kind', $deposit['kind']);
+        $stmt->bindValue(':deposit_value', $deposit['kind'] === Deposits::FIXED ? $deposit['amount_minor'] : ($deposit['kind'] === Deposits::PERCENT ? $deposit['percent'] : 0), PDO::PARAM_INT);
     }
 
     /**
@@ -263,6 +271,8 @@ final class ServiceRepository
             'needs_approval' => DbBool::of($r['needs_approval']),
             // WHIT-1334 (SL.8): the inventory service item whose price this is.
             'item_id' => $r['item_id'] !== null ? (int) $r['item_id'] : null,
+            // WHIT-1445 (AP.26): the deposit online bookings pay.
+            'deposit' => Deposits::fromRow((string) ($r['deposit_kind'] ?? Deposits::NONE), (int) ($r['deposit_value'] ?? 0)),
         ];
     }
 }

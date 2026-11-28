@@ -17843,6 +17843,151 @@
                 ]
             }
         },
+        "/api/v1/calendar/bookings/{id}/deposit/refund": {
+            "post": {
+                "operationId": "post_api_v1_calendar_bookings_id_deposit_refund",
+                "summary": "Refund the deposit: a person's click, never automatic and never an agent; audited (WHIT-1445)",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Only a paid deposit that is to refund (an early cancel, or we cancelled) or kept (a late cancel or didn't come). Through the payment provider when it can refund; `outside: true` records a refund made in its own dashboard.",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "$ref": "#/components/schemas/CalendarDepositRefundRequest"
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "The booking",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/components/schemas/CalendarBooking"
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Invalid request body",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Missing or invalid authentication",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "403": {
+                        "description": "Not a person with calendar:manage",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "409": {
+                        "description": "The provider can't refund from here (`refund_outside`), or it was just refunded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "Nothing to refund: not paid, already refunded, applied, or the visit is still to come",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "502": {
+                        "description": "The provider refused the refund; nothing was refunded",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
         "/api/v1/calendar/bookings/{id}/desk-status": {
             "post": {
                 "operationId": "post_api_v1_calendar_bookings_id_desk_status",
@@ -86152,6 +86297,103 @@
                 }
             }
         },
+        "/api/v1/public/booking/{workspace}/embed": {
+            "get": {
+                "operationId": "get_api_v1_public_booking_workspace_embed",
+                "summary": "The sites that may show the booking page in their own pages, as `frame-ancestors` (public, WHIT-1445)",
+                "tags": [
+                    "calendar"
+                ],
+                "description": "Asked by the web app for `/book/{workspace}/embed`. `'none'` for an unknown workspace, one whose page is off, or one that listed no website.",
+                "parameters": [
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "workspace",
+                        "in": "path",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        },
+                        "description": "The workspace slug."
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "The policy",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "frame_ancestors": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "frame_ancestors"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Not found",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "405": {
+                        "description": "Method not allowed",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many attempts",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Error"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/public/booking/{workspace}/me": {
             "get": {
                 "operationId": "get_api_v1_public_booking_workspace_me",
@@ -117567,6 +117809,14 @@
                         "type": "string",
                         "description": "`expected`, `arrived`, `with_staff`, `done` or `no_show` for a confirmed booking; otherwise its status (WHIT-1441)."
                     },
+                    "deposit": {
+                        "$ref": "#/components/schemas/CalendarBookingDeposit"
+                    },
+                    "late_moved_at": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The customer moved it inside the cancellation window, which they may do once online (WHIT-1445)."
+                    },
                     "intake": {
                         "$ref": "#/components/schemas/CalendarIntakeStatus"
                     },
@@ -117718,6 +117968,56 @@
                         "maxLength": 1000
                     }
                 }
+            },
+            "CalendarBookingDeposit": {
+                "type": "object",
+                "nullable": true,
+                "description": "The deposit and what happened to it (WHIT-1445); null for none.",
+                "properties": {
+                    "amount_minor": {
+                        "type": "integer"
+                    },
+                    "currency": {
+                        "type": "string"
+                    },
+                    "state": {
+                        "$ref": "#/components/schemas/CalendarDepositState"
+                    },
+                    "paid_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "refunded_at": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "refunded_by": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                            "profile_id": {
+                                "type": "integer"
+                            },
+                            "name": {
+                                "type": "string"
+                            }
+                        },
+                        "required": [
+                            "profile_id",
+                            "name"
+                        ]
+                    },
+                    "refund_ref": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The provider's reference, or `outside` when it was refunded in the provider's own dashboard."
+                    }
+                },
+                "required": [
+                    "amount_minor",
+                    "currency",
+                    "state"
+                ]
             },
             "CalendarBookingItem": {
                 "type": "object",
@@ -118298,6 +118598,28 @@
                     "service_id",
                     "count"
                 ]
+            },
+            "CalendarDepositRefundRequest": {
+                "type": "object",
+                "properties": {
+                    "outside": {
+                        "type": "boolean",
+                        "description": "True: it was refunded in the payment provider's own dashboard; only record it. Default false: refund it through the provider."
+                    }
+                }
+            },
+            "CalendarDepositState": {
+                "type": "string",
+                "enum": [
+                    "due",
+                    "paid",
+                    "kept",
+                    "to_refund",
+                    "refunded",
+                    "applied",
+                    "not_paid"
+                ],
+                "description": "Worked out from the booking (WHIT-1445, AP.26): `due` waits for payment; `paid` the visit is to come; `kept` a late cancel or didn't come; `to_refund` an early cancel or we cancelled, waiting for someone to press Refund; `refunded`; `applied` they came, so it counts toward the bill; `not_paid` it was never paid."
             },
             "CalendarDeskDay": {
                 "type": "object",
@@ -119446,6 +119768,9 @@
                         "type": "integer",
                         "nullable": true,
                         "description": "The inventory service item that holds its name and price (WHIT-1334)."
+                    },
+                    "deposit": {
+                        "$ref": "#/components/schemas/CalendarServiceDeposit"
                     }
                 },
                 "required": [
@@ -119460,6 +119785,32 @@
                     "active",
                     "sort_order",
                     "staff_profile_ids"
+                ]
+            },
+            "CalendarServiceDeposit": {
+                "type": "object",
+                "properties": {
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "none",
+                            "fixed",
+                            "percent"
+                        ]
+                    },
+                    "amount_minor": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "A fixed deposit in minor units (JOD 5.000 is 5000), never more than the price."
+                    },
+                    "percent": {
+                        "type": "integer",
+                        "nullable": true,
+                        "description": "A percentage of the person's price, 1 to 100."
+                    }
+                },
+                "required": [
+                    "kind"
                 ]
             },
             "CalendarServiceForm": {
@@ -119704,6 +120055,14 @@
                     "needs_approval": {
                         "type": "boolean",
                         "description": "Customers send a request instead of booking."
+                    },
+                    "deposit": {
+                        "allOf": [
+                            {
+                                "$ref": "#/components/schemas/CalendarServiceDeposit"
+                            }
+                        ],
+                        "description": "What online bookings pay first: none, a fixed amount, or a percentage of the price (WHIT-1445)."
                     }
                 }
             },
@@ -119792,6 +120151,34 @@
                     "no_show_count_late_cancels": {
                         "type": "boolean",
                         "description": "Late cancels count as misses for the flag."
+                    },
+                    "deposit_policy": {
+                        "type": "boolean",
+                        "description": "Ask for a deposit of a customer who missed often (WHIT-1445)."
+                    },
+                    "deposit_after_no_shows": {
+                        "type": "integer",
+                        "description": "From this many misses over the window."
+                    },
+                    "embed_origins": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Your website: the https sites that may show the booking page in their own pages (WHIT-1445)."
+                    },
+                    "embed_script": {
+                        "type": "string",
+                        "nullable": true,
+                        "description": "The script tag to paste into the website."
+                    },
+                    "deposits_connected": {
+                        "type": "boolean",
+                        "description": "A payment provider takes deposits; without one, a booking with a deposit is a request."
+                    },
+                    "refunds_connected": {
+                        "type": "boolean",
+                        "description": "The provider can also refund a deposit from Whity."
                     }
                 },
                 "required": [
@@ -119926,6 +120313,24 @@
                     "no_show_count_late_cancels": {
                         "type": "boolean",
                         "description": "Late cancels count as misses for the flag. Default on."
+                    },
+                    "deposit_policy": {
+                        "type": "boolean",
+                        "description": "Ask for a deposit of a customer who missed often: their online bookings pay the service's deposit, or are requests when it has none (WHIT-1445). Default off."
+                    },
+                    "deposit_after_no_shows": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20,
+                        "description": "From this many misses over the window. Default 2."
+                    },
+                    "embed_origins": {
+                        "type": "array",
+                        "maxItems": 10,
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Your website: up to 10 https origins such as https://example-bakery.com, no wildcards and nothing after the name. The list replaces what is there; empty frames nowhere (WHIT-1445)."
                     }
                 }
             },
@@ -145546,6 +145951,49 @@
                                 "price_minor"
                             ]
                         }
+                    },
+                    "deposit": {
+                        "type": "object",
+                        "nullable": true,
+                        "description": "The deposit and what happened to it (WHIT-1445); null for none.",
+                        "properties": {
+                            "amount_minor": {
+                                "type": "integer"
+                            },
+                            "currency": {
+                                "type": "string"
+                            },
+                            "state": {
+                                "$ref": "#/components/schemas/CalendarDepositState"
+                            }
+                        },
+                        "required": [
+                            "amount_minor",
+                            "currency",
+                            "state"
+                        ]
+                    },
+                    "policy": {
+                        "type": "object",
+                        "description": "Only on the manage link (WHIT-1445, AP.25): free to cancel or move until `free_until`; after it a cancel is late and the deposit is kept, and a move is allowed once online.",
+                        "properties": {
+                            "free_until": {
+                                "type": "string",
+                                "nullable": true
+                            },
+                            "late_cancel_hours": {
+                                "type": "integer"
+                            },
+                            "can_move_online": {
+                                "type": "boolean",
+                                "description": "False after the one move inside the window: a second needs the business."
+                            }
+                        },
+                        "required": [
+                            "free_until",
+                            "late_cancel_hours",
+                            "can_move_online"
+                        ]
                     }
                 },
                 "required": [
@@ -145614,6 +146062,10 @@
                             "multi_service_booking": {
                                 "type": "boolean",
                                 "description": "The customer may book several services back to back as one booking (WHIT-1173)."
+                            },
+                            "late_cancel_hours": {
+                                "type": "integer",
+                                "description": "Free to cancel or move until this many hours before the start (WHIT-1445, AP.25)."
                             }
                         },
                         "required": [
@@ -145669,6 +146121,11 @@
                                             "price_minor": {
                                                 "type": "integer",
                                                 "nullable": true
+                                            },
+                                            "deposit_minor": {
+                                                "type": "integer",
+                                                "nullable": true,
+                                                "description": "The deposit with this person, in minor units, from their price; null for none (WHIT-1445)."
                                             }
                                         },
                                         "required": [
@@ -145678,9 +146135,12 @@
                                         ]
                                     }
                                 },
+                                "deposit": {
+                                    "$ref": "#/components/schemas/CalendarServiceDeposit"
+                                },
                                 "sends_request": {
                                     "type": "boolean",
-                                    "description": "Booking it sends a request the business accepts first."
+                                    "description": "Booking it sends a request the business accepts first; also when it has a deposit and no payment provider takes it."
                                 }
                             },
                             "required": [

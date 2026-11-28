@@ -69,6 +69,10 @@ interface Draft {
    * by profile id; empty is the service's own.
    */
   own: Record<number, OwnValues>;
+  /** WHIT-1445 (AP.26): none, a fixed amount (in normal units) or a percentage. */
+  depositKind: 'none' | 'fixed' | 'percent';
+  depositAmount: string;
+  depositPercent: string;
 }
 
 interface OwnValues {
@@ -117,6 +121,9 @@ function draftOf(service: CalendarService): Draft {
         },
       ])
     ),
+    depositKind: service.deposit?.kind ?? 'none',
+    depositAmount: service.deposit?.kind === 'fixed' && typeof service.deposit.amount_minor === 'number' ? safeDecimal(service.deposit.amount_minor, service.currency) : '',
+    depositPercent: service.deposit?.kind === 'percent' && typeof service.deposit.percent === 'number' ? String(service.deposit.percent) : '',
   };
 }
 
@@ -138,8 +145,14 @@ export default function CalendarServicePage() {
   const workspaceCurrency = useWorkspaceCurrency();
 
   const { data, error, forbidden, refetch } = useFetch(async () => {
-    const [service, staff, rooms] = await Promise.all([calendarApi.service(id), calendarApi.staff(), calendarApi.rooms()]);
-    return { service, staff, rooms };
+    const [service, staff, rooms, settings] = await Promise.all([
+      calendarApi.service(id),
+      calendarApi.staff(),
+      calendarApi.rooms(),
+      // WHIT-1445: whether a payment provider takes deposits; only for the note.
+      calendarApi.settings().catch(() => null),
+    ]);
+    return { service, staff, rooms, settings };
   }, [id]);
 
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -161,6 +174,8 @@ export default function CalendarServicePage() {
     if (current.duration !== saved.duration || current.before !== saved.before || current.after !== saved.after)
       changes.push(t('services.field.time', 'Time'));
     if (current.price !== saved.price || current.currency !== saved.currency) changes.push(t('services.field.price', 'Price'));
+    if (current.depositKind !== saved.depositKind || current.depositAmount !== saved.depositAmount || current.depositPercent !== saved.depositPercent)
+      changes.push(t('services.field.deposit', 'Deposit'));
     if (current.bookableOnline !== saved.bookableOnline || current.active !== saved.active || current.needsApproval !== saved.needsApproval)
       changes.push(t('services.field.offered', 'Where it is offered'));
     if (current.needs.join('|') !== saved.needs.join('|')) changes.push(t('services.field.needs', 'Rooms and equipment it needs'));
@@ -233,6 +248,34 @@ export default function CalendarServicePage() {
       staff.push({ profile_id: profileId, duration_minutes: ownDuration, buffer_after_minutes: ownAfter, price_minor: ownPrice });
     }
 
+    // WHIT-1445 (AP.26): the deposit, in the service's currency.
+    let deposit: CalendarServiceRequest['deposit'] = { kind: 'none' };
+    if (current.depositKind === 'fixed') {
+      let amountMinor: number;
+      try {
+        amountMinor = parseMoney(current.depositAmount, currency);
+      } catch {
+        setProblem(t('services.error.deposit', 'Enter the deposit as a number, such as 5.00.'));
+        return;
+      }
+      if (amountMinor <= 0 || (priceMinor !== null && amountMinor > priceMinor)) {
+        setProblem(t('services.error.depositAmount', 'The deposit must be more than nothing and no more than the price.'));
+        return;
+      }
+      deposit = { kind: 'fixed', amount_minor: amountMinor };
+    } else if (current.depositKind === 'percent') {
+      const percent = whole(current.depositPercent, 1, 100);
+      if (percent === null) {
+        setProblem(t('services.error.depositPercent', 'Enter a percentage from 1 to 100.'));
+        return;
+      }
+      if (priceMinor === null) {
+        setProblem(t('services.error.depositNoPrice', 'Give the service a price before asking for a percentage of it.'));
+        return;
+      }
+      deposit = { kind: 'percent', percent };
+    }
+
     const body: CalendarServiceRequest = {
       name: names,
       description: cleanLocalizedText(current.description),
@@ -246,6 +289,7 @@ export default function CalendarServicePage() {
       resources: current.needs.map(needOf),
       active: current.active,
       staff,
+      deposit,
     };
     setSaving(true);
     setProblem(null);
@@ -411,6 +455,73 @@ export default function CalendarServicePage() {
                     onChange={(e) => update({ currency: e.target.value.toUpperCase() })}
                   />
                 </ChangedField>
+              </CardContent>
+            </Card>
+
+            {/* WHIT-1445 (AP.26): what online bookings pay first. */}
+            <Card data-testid="service-deposit">
+              <CardHeader>
+                <CardTitle>{t('services.field.deposit', 'Deposit')}</CardTitle>
+                <CardDescription>
+                  {t(
+                    'services.card.depositHint',
+                    'Online bookings pay it when they book. It’s kept after a late cancel or if they don’t come, counts toward the bill when they come, and is refunded only when someone presses Refund.'
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-4 sm:grid-cols-[14rem_1fr]">
+                <ChangedField changed={current.depositKind !== saved.depositKind}>
+                  <label htmlFor="service-deposit-kind" className="text-sm font-medium text-foreground">
+                    {t('services.deposit.kind', 'Ask for')}
+                  </label>
+                  <FieldSelect
+                    id="service-deposit-kind"
+                    value={current.depositKind}
+                    disabled={readOnly}
+                    onChange={(v) => update({ depositKind: v === 'fixed' || v === 'percent' ? v : 'none' })}
+                    options={[
+                      { value: 'none', label: t('services.deposit.none', 'No deposit') },
+                      { value: 'fixed', label: t('services.deposit.fixed', 'A fixed amount') },
+                      { value: 'percent', label: t('services.deposit.percent', 'A percentage of the price') },
+                    ]}
+                  />
+                </ChangedField>
+                {current.depositKind === 'fixed' && (
+                  <ChangedField changed={current.depositAmount !== saved.depositAmount}>
+                    <label htmlFor="service-deposit-amount" className="text-sm font-medium text-foreground">
+                      {t('services.deposit.amount', 'Amount')}
+                    </label>
+                    <MoneyInput
+                      id="service-deposit-amount"
+                      currency={/^[A-Z]{3}$/.test(current.currency) ? current.currency : workspaceCurrency}
+                      value={current.depositAmount}
+                      disabled={readOnly}
+                      onValueChange={(depositAmount) => update({ depositAmount })}
+                      placeholder={toDecimalString(0, /^[A-Z]{3}$/.test(current.currency) ? current.currency : workspaceCurrency)}
+                    />
+                  </ChangedField>
+                )}
+                {current.depositKind === 'percent' && (
+                  <ChangedField changed={current.depositPercent !== saved.depositPercent}>
+                    <Input
+                      id="service-deposit-percent"
+                      dir="ltr"
+                      inputMode="numeric"
+                      label={t('services.deposit.percentLabel', 'Percent of each person’s price')}
+                      value={current.depositPercent}
+                      disabled={readOnly}
+                      onChange={(e) => update({ depositPercent: e.target.value.replace(/[^\d]/g, '').slice(0, 3) })}
+                    />
+                  </ChangedField>
+                )}
+                {current.depositKind !== 'none' && data.settings?.deposits_connected === false && (
+                  <p className="m-0 text-sm text-warning-text sm:col-span-2" data-testid="service-deposit-no-provider">
+                    {t(
+                      'services.deposit.noProvider',
+                      'Connect a payment provider to take deposits. Until then, online bookings of this service are requests you approve.'
+                    )}
+                  </p>
+                )}
               </CardContent>
             </Card>
 

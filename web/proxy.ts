@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { isPathHidden } from '@/lib/routes/hidden';
 import { hiddenIdsForGuard } from '@/lib/routes/hidden-cache';
 import { buildCsp, cspNonce } from '@/lib/csp';
+import { embedWorkspace, frameAncestorsFor } from '@/lib/booking/embed-policy';
 
 /**
  * The route guard for hidden pages (whity-org/whity-core#2386).
@@ -42,6 +43,14 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
     ? NextResponse.rewrite(new URL('/_whity/hidden', request.url), { status: 404, request: { headers: requestHeaders } })
     : NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set('Content-Security-Policy-Report-Only', policy);
+
+  // WHIT-1445 (AP.24): the booking widget's page is the one page another site
+  // may frame, and only the sites the workspace listed under Your website.
+  // next.config.ts leaves its framing headers to this.
+  const embedded = embedWorkspace(request.nextUrl.pathname);
+  if (embedded !== null) {
+    response.headers.set('Content-Security-Policy', `frame-ancestors ${await frameAncestorsFor(embedded)}`);
+  }
 
   return response;
 }

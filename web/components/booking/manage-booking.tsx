@@ -49,7 +49,7 @@ import {
 } from '@/lib/booking/public-api';
 import { FreeTimePicker } from './free-time-picker';
 import { BookingFacts, InYourZone, ZoneNote, useWhenAt } from './booking-parts';
-import { useBookingWords } from './use-booking-words';
+import { moneyText, useBookingWords } from './use-booking-words';
 
 type Phase = 'loading' | 'invalid' | 'error' | 'tooMany' | 'ready';
 
@@ -252,6 +252,8 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
           {mode === 'view' ? (
             <>
               <BookingFacts booking={booking} timeZone={timeZone} />
+              {/* WHIT-1445 (AP.25, AP.26): the deposit, and until when cancelling or moving is free. */}
+              <ManagePolicy booking={booking} timeZone={timeZone} workspaceName={workspaceName} />
               {booking.status === 'confirmed' && booking.coming === true && notice === null && (
                 <p className="text-sm text-muted-foreground" data-testid="manage-coming-said">
                   {t('manage.comingSaid', 'You told us you’re coming.')}
@@ -292,18 +294,21 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
                       {t('action.addToMyCalendar', 'Add to my calendar')}
                     </a>
                   </Button>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setNotice(null);
-                        setMode('move');
-                      }}
-                      data-testid="manage-move"
-                    >
-                      <Icon name="sync" />
-                      {t('manage.move.action', 'Move it')}
-                    </Button>
+                  <div className={booking.policy?.can_move_online === false ? 'grid gap-2' : 'grid grid-cols-2 gap-2'}>
+                    {/* WHIT-1445 (§9.2): one move online inside the window; then the business moves it. */}
+                    {booking.policy?.can_move_online !== false && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setNotice(null);
+                          setMode('move');
+                        }}
+                        data-testid="manage-move"
+                      >
+                        <Icon name="sync" />
+                        {t('manage.move.action', 'Move it')}
+                      </Button>
+                    )}
                     <Button variant="outline" onClick={() => setCancelling(true)} data-testid="manage-cancel">
                       <Icon name="close" />
                       {askComing ? t('manage.cantCome', 'I can’t come') : t('manage.cancel.action', 'Cancel it')}
@@ -352,6 +357,64 @@ export function ManageBookingScreen({ token: initialToken }: { token: string }) 
         }}
       />
     </PublicShell>
+  );
+}
+
+/**
+ * WHIT-1445 (AP.25, AP.26, §9.2): what the customer's deposit is, and the
+ * cancellation policy with the exact time: free to cancel or move until then;
+ * after it a cancel counts as late (the deposit is kept) and a move is
+ * allowed once online.
+ */
+function ManagePolicy({ booking, timeZone, workspaceName }: { booking: PublicBooking; timeZone: string; workspaceName: string }) {
+  const t = useTranslation('booking');
+  const whenAt = useWhenAt(timeZone);
+  const [now] = useState(() => Date.now());
+  const deposit = booking.deposit ?? null;
+  const policy = booking.policy ?? null;
+  const amount = deposit ? moneyText(deposit.amount_minor, deposit.currency) : '';
+  const depositLine =
+    deposit === null
+      ? null
+      : {
+          due: t('manage.deposit.due', 'The deposit of {amount} isn’t paid yet.', { amount }),
+          paid: t('manage.deposit.paid', 'Deposit paid: {amount}. It counts toward your bill.', { amount }),
+          kept: t('manage.deposit.kept', 'The deposit of {amount} was kept.', { amount }),
+          to_refund: t('manage.deposit.toRefund', '{workspace} will refund your deposit of {amount}.', { workspace: workspaceName, amount }),
+          refunded: t('manage.deposit.refunded', 'Your deposit of {amount} was refunded.', { amount }),
+          applied: t('manage.deposit.applied', 'Your deposit of {amount} counts toward your bill.', { amount }),
+          not_paid: null,
+        }[deposit.state];
+  const live = booking.status === 'confirmed' && policy !== null && policy.free_until !== null;
+  const late = live && policy.free_until !== null && new Date(policy.free_until).getTime() <= now;
+  const keeps = deposit !== null && deposit.state === 'paid';
+  let policyLine: string | null = null;
+  if (live && policy.free_until !== null && !late) {
+    policyLine = keeps
+      ? t('manage.policy.freeUntilDeposit', 'Free to cancel or move until {when}. After that, a cancel counts as late and the deposit is kept.', { when: whenAt(policy.free_until) })
+      : t('manage.policy.freeUntil', 'Free to cancel or move until {when}. After that, a cancel counts as late.', { when: whenAt(policy.free_until) });
+  } else if (late) {
+    policyLine = policy.can_move_online
+      ? keeps
+        ? t('manage.policy.lateDeposit', 'A cancel now counts as late, and the deposit is kept. You can still move it once.')
+        : t('manage.policy.late', 'A cancel now counts as late. You can still move it once.')
+      : t('manage.policy.movedOnce', 'You’ve moved it once already. To move it again, contact {workspace}.', { workspace: workspaceName });
+  }
+  if (depositLine === null && policyLine === null) return null;
+
+  return (
+    <div className="space-y-1 text-sm" data-testid="manage-policy">
+      {depositLine !== null && (
+        <p className="m-0 text-foreground" data-testid="manage-deposit">
+          {depositLine}
+        </p>
+      )}
+      {policyLine !== null && (
+        <p className="m-0 text-muted-foreground" data-testid="manage-free-until">
+          {policyLine}
+        </p>
+      )}
+    </div>
   );
 }
 

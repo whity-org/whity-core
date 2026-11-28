@@ -5676,6 +5676,8 @@ $router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/finish', [$ca
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/corrections', [$calendarHandler, 'correctVisit'], null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/files',  [$calendarHandler, 'addVisitFile'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/visit-files/{id:\d+}',           [$calendarHandler, 'visitFile'],       null, null, CorePermissions::CALENDAR_READ);
+// WHIT-1445 (AP.26): Refund the deposit, a person's click with calendar:manage.
+$router->register('POST',   '/api/calendar/bookings/{id:\d+}/deposit/refund', [$calendarHandler, 'refundDeposit'], null, null, CorePermissions::CALENDAR_MANAGE);
 // WHIT-1444 (AP.22): treatment plans, and a service's plan templates.
 $router->register('GET',    '/api/calendar/plans',                          [$calendarHandler, 'listPlans'],       null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/plans',                          [$calendarHandler, 'createPlan'],      null, null, CorePermissions::CALENDAR_WRITE);
@@ -6565,6 +6567,8 @@ $publicBookingHandler = new \Whity\Api\PublicBookingApiHandler(
 $router->register('GET',  '/api/public/booking/{workspace}',                       [$publicBookingHandler, 'page'],        null);
 $router->register('GET',  '/api/public/booking/{workspace}/slots',                 [$publicBookingHandler, 'slots'],       null);
 $router->register('GET',  '/api/public/booking/{workspace}/me',                    [$publicBookingHandler, 'visitor'],     null);
+// WHIT-1445 (AP.24): the sites that may frame the booking page.
+$router->register('GET',  '/api/public/booking/{workspace}/embed',                 [$publicBookingHandler, 'embedPolicy'], null);
 $router->register('POST', '/api/public/booking/{workspace}/bookings',              [$publicBookingHandler, 'book'],        null);
 // WHIT-1442 (AP.23): join the waitlist, and an offered time's page.
 $router->register('POST', '/api/public/booking/{workspace}/waitlist',              [$publicBookingHandler, 'joinWaitlist'], null);
