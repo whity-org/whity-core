@@ -24,6 +24,7 @@ import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { CalendarNav } from '@/components/calendar/calendar-nav';
 import { ServiceFormsCard } from '@/components/calendar/service-forms';
+import { PlanTemplatesCard } from '@/components/calendar/treatment-plans';
 import { useCalendarAccess } from '@/components/calendar/use-calendar-basics';
 import { useCalendarWords } from '@/components/calendar/use-calendar-words';
 import { useFetch } from '@/hooks/useFetch';
@@ -618,6 +619,8 @@ export default function CalendarServicePage() {
 
           {/* WHIT-1443 (AP.20): the forms customers fill for this service. */}
           <ServiceFormsCard serviceId={id} canManage={!readOnly} />
+          {/* WHIT-1444 (AP.22): its ready-made treatment plans. */}
+          <PlanTemplatesCard serviceId={id} canManage={!readOnly} />
 
           {problem && (
             <Alert variant="destructive" data-testid="service-problem">

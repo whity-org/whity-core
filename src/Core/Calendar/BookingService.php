@@ -83,6 +83,8 @@ final class BookingService
     private ?Waitlist $waitlist = null;
     private ?IntakeForms $intake = null;
     private ?VisitRecords $visits = null;
+
+    private ?TreatmentPlans $plans = null;
     private ?\Whity\Storage\StorageDriverInterface $storage = null;
 
     /** WHIT-1427: every attendance mark is audited (AP.3). */
@@ -762,6 +764,12 @@ final class BookingService
         }
 
         return ['url' => $url, 'sent' => $sent];
+    }
+
+    /** Treatment plans (WHIT-1444, AP.22). */
+    public function plans(): TreatmentPlans
+    {
+        return $this->plans ??= new TreatmentPlans($this->db, $this);
     }
 
     /** The waitlist (WHIT-1442, AP.23). */

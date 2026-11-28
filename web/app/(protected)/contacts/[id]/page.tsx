@@ -18,6 +18,8 @@ import { LoadProblem } from '@/components/load-problem';
 import { NoAccess } from '@/components/no-access';
 import { ContactFormDialog } from '@/components/contacts/contact-form-dialog';
 import { CustomerActivity } from '@/components/contacts/customer-activity';
+import { TreatmentPlansCard } from '@/components/calendar/treatment-plans';
+import { CALENDAR_WRITE } from '@/lib/calendar/api';
 import { SupplierActivity } from '@/components/contacts/supplier-activity';
 import { fieldLabel, isEditableHere } from '@/components/contacts/field-input';
 import { useCapabilities } from '@/hooks/useCapabilities';
@@ -292,6 +294,8 @@ export default function ContactPage({ params }: { params: Promise<{ id: string }
       </div>
 
       {contact.is_customer && <CustomerActivity contactId={contact.id} />}
+      {/* WHIT-1444 (AP.22): their treatment plans, for people who see the calendar. */}
+      {contact.is_customer && <TreatmentPlansCard contactId={contact.id} canChange={has(CALENDAR_WRITE) && !contact.archived} />}
       {contact.is_supplier && <SupplierActivity contactId={contact.id} />}
 
       {canWrite && !contact.archived && (

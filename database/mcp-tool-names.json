@@ -2919,5 +2919,45 @@
   "get_api_calendar_price_list": {
     "en": "Open the price list to print",
     "ar": "فتح قائمة الأسعار للطباعة"
+  },
+  "get_api_calendar_plans": {
+    "en": "List a customer's treatment plans",
+    "ar": "عرض خطط العلاج للعميل"
+  },
+  "post_api_calendar_plans": {
+    "en": "Make a treatment plan",
+    "ar": "إنشاء خطة علاج"
+  },
+  "get_api_calendar_plans_id": {
+    "en": "Read a treatment plan",
+    "ar": "عرض خطة علاج"
+  },
+  "patch_api_calendar_plans_id": {
+    "en": "Mark a treatment plan done or stopped",
+    "ar": "تعليم خطة العلاج كمكتملة أو متوقفة"
+  },
+  "get_api_calendar_plans_id_next": {
+    "en": "Find the next visit's time in a treatment plan",
+    "ar": "إيجاد موعد الزيارة التالية في خطة العلاج"
+  },
+  "post_api_calendar_plans_id_book_next": {
+    "en": "Book the next visit in a treatment plan",
+    "ar": "حجز الزيارة التالية في خطة العلاج"
+  },
+  "post_api_calendar_plans_id_book_all": {
+    "en": "Book every visit in a treatment plan",
+    "ar": "حجز كل زيارات خطة العلاج"
+  },
+  "get_api_calendar_bookings_id_plan": {
+    "en": "Read the treatment plan a booking belongs to",
+    "ar": "عرض خطة العلاج التي يتبعها الحجز"
+  },
+  "get_api_calendar_services_id_plan_templates": {
+    "en": "List a service's ready-made treatment plans",
+    "ar": "عرض خطط العلاج الجاهزة للخدمة"
+  },
+  "put_api_calendar_services_id_plan_templates": {
+    "en": "Change a service's ready-made treatment plans",
+    "ar": "تغيير خطط العلاج الجاهزة للخدمة"
   }
 }

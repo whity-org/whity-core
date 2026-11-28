@@ -50,6 +50,13 @@ export type CalendarIntakeStatus = Schemas['CalendarIntakeStatus'];
 export type CalendarVisitRecord = Schemas['CalendarVisitRecord'];
 export type CalendarVisitFile = Schemas['CalendarVisitFile'];
 export type CalendarWaitlistRequest = Schemas['CalendarWaitlistRequest'];
+export type CalendarPlan = Schemas['CalendarPlan'];
+export type CalendarPlanStep = Schemas['CalendarPlanStep'];
+export type CalendarPlanStepInput = Schemas['CalendarPlanStepInput'];
+export type CalendarPlanTemplate = Schemas['CalendarPlanTemplate'];
+export type CalendarPlanNext = Schemas['CalendarPlanNext'];
+export type CalendarPlanBookAll = Schemas['CalendarPlanBookAll'];
+export type CalendarBookingPlan = Schemas['CalendarBookingPlan'];
 export type CalendarRoomRequest = Schemas['CalendarRoomRequest'];
 export type CalendarToday = Schemas['CalendarToday'];
 /** WHIT-1427: did they come. */
@@ -444,6 +451,35 @@ export const calendarApi = {
     );
   },
   visitFileUrl: (fileId: number) => `/api/v1/calendar/visit-files/${fileId}`,
+
+  /** WHIT-1444 (AP.22): treatment plans. */
+  plans: async (contactId: number) =>
+    read<CalendarPlan[]>(await api.GET('/api/v1/calendar/plans', { params: { query: { contact_id: contactId } } }), 'The plans could not be loaded'),
+  createPlan: async (body: Schemas['CalendarPlanRequest']) =>
+    send<CalendarPlan>(await api.POST('/api/v1/calendar/plans', { body }), 'The plan could not be made'),
+  setPlanStatus: async (id: number, status: 'active' | 'done' | 'stopped') =>
+    send<CalendarPlan>(await api.PATCH('/api/v1/calendar/plans/{id}', { params: { path: { id } }, body: { status } }), 'The plan could not be changed'),
+  planNext: async (id: number) =>
+    read<CalendarPlanNext>(await api.GET('/api/v1/calendar/plans/{id}/next', { params: { path: { id } } }), 'The next time could not be found'),
+  planBookNext: async (id: number, startsAt?: string) =>
+    send<CalendarPlan>(
+      await api.POST('/api/v1/calendar/plans/{id}/book-next', { params: { path: { id } }, body: startsAt !== undefined ? { starts_at: startsAt } : {} }),
+      'The visit could not be booked'
+    ),
+  planBookAll: async (id: number) =>
+    send<CalendarPlanBookAll>(await api.POST('/api/v1/calendar/plans/{id}/book-all', { params: { path: { id } } }), 'The visits could not be booked'),
+  bookingPlan: async (bookingId: number) =>
+    read<CalendarBookingPlan>(await api.GET('/api/v1/calendar/bookings/{id}/plan', { params: { path: { id: bookingId } } }), 'The plan could not be loaded'),
+  planTemplates: async (serviceId: number) =>
+    read<CalendarPlanTemplate[]>(
+      await api.GET('/api/v1/calendar/services/{id}/plan-templates', { params: { path: { id: serviceId } } }),
+      'The ready-made plans could not be loaded'
+    ),
+  savePlanTemplates: async (serviceId: number, templates: Schemas['CalendarPlanTemplatesRequest']['templates']) =>
+    send<CalendarPlanTemplate[]>(
+      await api.PUT('/api/v1/calendar/services/{id}/plan-templates', { params: { path: { id: serviceId } }, body: { templates } }),
+      'The ready-made plans could not be saved'
+    ),
 
   /** WHIT-1442 (AP.23): the waitlist. */
   waitlist: async () => {

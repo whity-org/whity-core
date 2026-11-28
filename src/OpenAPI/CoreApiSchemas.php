@@ -11727,6 +11727,82 @@ final class CoreApiSchemas
             'CalendarVisitCorrectionRequest' => self::object([
                 'body' => self::str() + ['maxLength' => 20000, 'description' => 'What is added to a finished visit, dated and signed.'],
             ], ['body']),
+            'CalendarPlanStepInput' => self::object([
+                'service_id' => self::int(),
+                'gap_min_days' => self::int() + ['minimum' => 0, 'maximum' => 365, 'description' => 'The least days after the step before (for the first, after today). Default 0.'],
+                'gap_max_days' => self::int() + ['minimum' => 0, 'maximum' => 365, 'description' => 'The most days after the step before. Default the least.'],
+            ], ['service_id']),
+            'CalendarPlanStep' => self::object([
+                'id' => self::int(),
+                'position' => self::int(),
+                'service_id' => self::int(),
+                'service_name' => ['type' => 'object', 'additionalProperties' => self::str(), 'description' => 'Language code => text.'],
+                'gap_min_days' => self::int(),
+                'gap_max_days' => self::int(),
+                'state' => self::str() + ['enum' => ['to_book', 'booked', 'done', 'missed'], 'description' => 'Read from its booking: attended or finished is done, didn\'t come is missed, cancelled is to book again.'],
+                'booking' => ['type' => 'object', 'nullable' => true, 'properties' => ['id' => self::int(), 'starts_at' => self::str(), 'status' => self::str()], 'required' => ['id', 'starts_at', 'status']],
+            ], ['id', 'position', 'service_id', 'service_name', 'gap_min_days', 'gap_max_days', 'state', 'booking']),
+            'CalendarPlan' => self::object([
+                'id' => self::int(),
+                'title' => self::str(),
+                'status' => self::str() + ['enum' => ['active', 'done', 'stopped']],
+                'customer' => self::object([
+                    'contact_id' => self::int(),
+                    'name' => self::str(),
+                    'email' => self::str(),
+                    'phone' => self::str(),
+                ], ['contact_id', 'name', 'email', 'phone']) + ['description' => 'Read from the contact each time, never kept on the plan.'],
+                'staff' => self::object(['profile_id' => self::int(), 'name' => self::str()], ['profile_id', 'name']),
+                'steps' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarPlanStep')],
+                'progress' => self::object(['done' => self::int(), 'missed' => self::int(), 'total' => self::int()], ['done', 'missed', 'total']),
+                'created_at' => self::str(),
+            ], ['id', 'title', 'status', 'customer', 'staff', 'steps', 'progress', 'created_at']),
+            'CalendarPlanRequest' => self::object([
+                'contact_id' => self::int() + ['description' => 'The customer.'],
+                'profile_id' => self::int() + ['description' => 'The staff member who treats them; every step is booked with them.'],
+                'template_id' => self::int() + ['description' => 'Make it from this template; then title and steps are the template\'s.'],
+                'title' => self::str() + ['maxLength' => 200, 'description' => 'The name of the plan, such as "Laser, 6 sessions". Needed without a template_id.'],
+                'steps' => ['type' => 'array', 'maxItems' => 30, 'items' => SchemaBuilder::ref('CalendarPlanStepInput'), 'description' => 'The visits in order. Needed without a template_id.'],
+            ], ['contact_id', 'profile_id']),
+            'CalendarPlanStatusRequest' => self::object([
+                'status' => self::str() + ['enum' => ['active', 'done', 'stopped'], 'description' => 'done: finished; stopped: no more visits; active: carry on.'],
+            ], ['status']),
+            'CalendarPlanBookRequest' => self::object([
+                'starts_at' => self::str() + ['description' => 'ISO 8601. Left out: the first free time in the step\'s gap.'],
+            ], []),
+            'CalendarPlanNext' => self::object([
+                'step_id' => self::int(true) + ['description' => 'Null when every step is booked.'],
+                'starts_at' => self::str(true) + ['description' => 'The first free time, or null when the gap has none.'],
+                'window' => ['type' => 'object', 'nullable' => true, 'properties' => ['from' => self::str(), 'to' => self::str()], 'required' => ['from', 'to']],
+            ], ['step_id', 'starts_at', 'window']),
+            'CalendarPlanBookAll' => self::object([
+                'plan' => SchemaBuilder::ref('CalendarPlan'),
+                'steps' => ['type' => 'array', 'items' => self::object([
+                    'step_id' => self::int(),
+                    'booked' => self::bool(),
+                    'starts_at' => self::str(true),
+                ], ['step_id', 'booked', 'starts_at'])],
+            ], ['plan', 'steps']),
+            'CalendarBookingPlan' => ['type' => 'object', 'nullable' => true, 'properties' => [
+                'plan_id' => self::int(),
+                'title' => self::str(),
+                'step' => self::int(),
+                'total' => self::int(),
+                'done' => self::int(),
+                'status' => self::str(),
+                'next_to_book' => self::bool(),
+            ], 'required' => ['plan_id', 'title', 'step', 'total', 'done', 'status', 'next_to_book']],
+            'CalendarPlanTemplate' => self::object([
+                'id' => self::int(),
+                'title' => self::str(),
+                'steps' => ['type' => 'array', 'items' => SchemaBuilder::ref('CalendarPlanStepInput')],
+            ], ['id', 'title', 'steps']),
+            'CalendarPlanTemplatesRequest' => self::object([
+                'templates' => ['type' => 'array', 'maxItems' => 10, 'description' => 'The ready-made plans; the list replaces what is there. Plans already made keep their visits.', 'items' => self::object([
+                    'title' => self::str() + ['maxLength' => 200],
+                    'steps' => ['type' => 'array', 'maxItems' => 30, 'items' => SchemaBuilder::ref('CalendarPlanStepInput')],
+                ], ['title', 'steps'])],
+            ], ['templates']),
             'CalendarWaitlistEntry' => self::object([
                 'id' => self::int(),
                 'contact_id' => self::int(true),
@@ -21215,6 +21291,97 @@ final class CoreApiSchemas
                     200 => ['description' => 'The file\'s bytes, with its type'],
                     403 => self::errorResponse('Not the treating person, and no calendar:visit_notes'),
                     404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/plans', 'calendar:read', [
+                'summary' => 'A customer\'s treatment plans, newest first, each with its steps and progress (WHIT-1444)',
+                'tags' => ['calendar'],
+                'parameters' => [self::queryParam('contact_id', 'integer', 'The customer\'s contact.')],
+                'responses' => [
+                    200 => self::jsonResponse('The plans', self::listEnvelope('CalendarPlan')),
+                    422 => self::errorResponse('No contact_id'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/plans', 'calendar:write', [
+                'summary' => 'Make a treatment plan, by hand or from a service\'s template (WHIT-1444); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarPlanRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The plan', self::dataEnvelope(SchemaBuilder::ref('CalendarPlan'))),
+                    404 => self::errorResponse('No such customer, staff member, service or template'),
+                    422 => self::errorResponse('No title, no steps, a gap out of range, or the person does not offer a service'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/plans/{id:\d+}', 'calendar:read', [
+                'summary' => 'A treatment plan, its customer (read from their contact), steps and progress (WHIT-1444)',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The plan', self::dataEnvelope(SchemaBuilder::ref('CalendarPlan'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PATCH', '/api/calendar/plans/{id:\d+}', 'calendar:write', [
+                'summary' => 'Mark a treatment plan done or stopped, or active again (WHIT-1444); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarPlanStatusRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The plan', self::dataEnvelope(SchemaBuilder::ref('CalendarPlan'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('Not active, done or stopped'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/plans/{id:\d+}/next', 'calendar:read', [
+                'summary' => 'Book the next visit: the first free time in the next step\'s gap with the same person; nothing is booked (WHIT-1444)',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The suggestion', self::dataEnvelope(SchemaBuilder::ref('CalendarPlanNext'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/plans/{id:\d+}/book-next', 'calendar:write', [
+                'summary' => 'Book the plan\'s next step as an ordinary booking with the same person, at `starts_at` or the first free time in its gap (WHIT-1444); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarPlanBookRequest',
+                'responses' => [
+                    201 => self::jsonResponse('The plan', self::dataEnvelope(SchemaBuilder::ref('CalendarPlan'))),
+                    404 => self::errorResponse('Not found'),
+                    409 => self::errorResponse('That time is taken, or no free time in the gap'),
+                    422 => self::errorResponse('The plan is not active, or every step is booked'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('POST', '/api/calendar/plans/{id:\d+}/book-all', 'calendar:write', [
+                'summary' => 'Book all: every step still to book, each checked like any booking; the ones that can\'t be placed are left and listed (WHIT-1444); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The plan, and what was booked', self::dataEnvelope(SchemaBuilder::ref('CalendarPlanBookAll'))),
+                    404 => self::errorResponse('Not found'),
+                    422 => self::errorResponse('The plan is not active'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/bookings/{id:\d+}/plan', 'calendar:read', [
+                'summary' => 'The treatment plan a booking is a step of ("step 3 of 6"), or null (WHIT-1444)',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The plan, or null', self::dataEnvelope(SchemaBuilder::ref('CalendarBookingPlan'))),
+                    404 => self::errorResponse('Not found'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('GET', '/api/calendar/services/{id:\d+}/plan-templates', 'calendar:read', [
+                'summary' => 'A service\'s ready-made treatment plans (WHIT-1444)',
+                'tags' => ['calendar'],
+                'responses' => [
+                    200 => self::jsonResponse('The templates', self::listEnvelope('CalendarPlanTemplate')),
+                    404 => self::errorResponse('No such service'),
+                ] + self::authErrors(),
+            ]),
+            self::permissionRoute('PUT', '/api/calendar/services/{id:\d+}/plan-templates', 'calendar:manage', [
+                'summary' => 'Replace a service\'s ready-made treatment plans (WHIT-1444); an agent\'s call is a proposal',
+                'tags' => ['calendar'],
+                'request' => 'CalendarPlanTemplatesRequest',
+                'responses' => [
+                    200 => self::jsonResponse('The templates', self::listEnvelope('CalendarPlanTemplate')),
+                    404 => self::errorResponse('No such service'),
+                    422 => self::errorResponse('More than 10, no title, no steps, or a gap out of range'),
                 ] + self::authErrors(),
             ]),
             self::permissionRoute('GET', '/api/calendar/waitlist', 'calendar:read', [

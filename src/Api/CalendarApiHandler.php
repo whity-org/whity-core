@@ -967,6 +967,156 @@ final class CalendarApiHandler
         });
     }
 
+    /** WHIT-1444 (AP.22): a customer's treatment plans (`contact_id`). */
+    public function listPlans(Request $request): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId) use ($request): Response {
+            $contactId = (int) ($this->query($request)['contact_id'] ?? 0);
+            if ($contactId <= 0) {
+                throw new CalendarRejectedException('contact_id is required', 422);
+            }
+
+            return Response::json(['data' => $this->booking->plans()->forContact($tenantId, $contactId)]);
+        });
+    }
+
+    /**
+     * WHIT-1444 (AP.22): a new plan, by hand (`steps`) or from a service's
+     * template (`template_id`). An agent's call is a proposal.
+     */
+    public function createPlan(Request $request): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId, int $actor) use ($request): Response {
+            $body = JsonBody::parsed($request);
+            $contactId = $body['contact_id'] ?? null;
+            $profileId = $body['profile_id'] ?? null;
+            if (!is_int($contactId) || !is_int($profileId)) {
+                throw new CalendarRejectedException('contact_id and profile_id are required', 422);
+            }
+            $plans = $this->booking->plans();
+            $templateId = $body['template_id'] ?? null;
+            if (is_int($templateId)) {
+                $plan = $plans->createFromTemplate($tenantId, $templateId, $contactId, $this->staffOr404($tenantId, $profileId), $actor);
+            } else {
+                $steps = $body['steps'] ?? null;
+                if (!is_array($steps) || !array_is_list($steps)) {
+                    throw new CalendarRejectedException('steps is a list, or give a template_id', 422);
+                }
+                $plan = $plans->create($tenantId, $contactId, $this->staffOr404($tenantId, $profileId), is_string($body['title'] ?? null) ? $body['title'] : '', $steps, $actor);
+            }
+
+            return Response::json(['data' => $plan], 201);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function getPlan(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', fn (int $tenantId): Response => Response::json([
+            'data' => $this->booking->plans()->findOrFail($tenantId, (int) $params['id']),
+        ]));
+    }
+
+    /**
+     * Mark a plan done or stopped, or active again.
+     *
+     * @param array<string, string> $params
+     */
+    public function patchPlan(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId) use ($request, $params): Response {
+            $status = JsonBody::parsed($request)['status'] ?? null;
+            if (!is_string($status)) {
+                throw new CalendarRejectedException('status is required', 422);
+            }
+
+            return Response::json(['data' => $this->booking->plans()->setStatus($tenantId, (int) $params['id'], $status)]);
+        });
+    }
+
+    /**
+     * Book the next visit: the first free time in the next step's gap with
+     * the same person. Nothing is booked.
+     *
+     * @param array<string, string> $params
+     */
+    public function planNext(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', fn (int $tenantId): Response => Response::json([
+            'data' => $this->booking->plans()->nextSlot($tenantId, (int) $params['id']),
+        ]));
+    }
+
+    /**
+     * Book the next step, at `starts_at` or the first free time in its gap.
+     *
+     * @param array<string, string> $params
+     */
+    public function planBookNext(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId, int $actor) use ($request, $params): Response {
+            $raw = JsonBody::parsed($request)['starts_at'] ?? null;
+            $start = $raw !== null ? (Interval::fromApi($raw) ?? throw new CalendarRejectedException('starts_at is an ISO 8601 time', 422)) : null;
+
+            return Response::json(['data' => $this->booking->plans()->bookNext($tenantId, (int) $params['id'], $start, $actor)], 201);
+        });
+    }
+
+    /**
+     * Book all: every step still to book; the ones that can't be placed are
+     * left and listed.
+     *
+     * @param array<string, string> $params
+     */
+    public function planBookAll(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', fn (int $tenantId, int $actor): Response => Response::json([
+            'data' => $this->booking->plans()->bookAll($tenantId, (int) $params['id'], $actor),
+        ]));
+    }
+
+    /**
+     * The plan a booking is a step of ("step 3 of 6"), or null.
+     *
+     * @param array<string, string> $params
+     */
+    public function bookingPlan(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId) use ($params): Response {
+            $this->bookings->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Booking');
+
+            return Response::json(['data' => $this->booking->plans()->forBooking($tenantId, (int) $params['id'])]);
+        });
+    }
+
+    /** @param array<string, string> $params */
+    public function planTemplates(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId) use ($params): Response {
+            $this->services->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Service');
+
+            return Response::json(['data' => $this->booking->plans()->templates($tenantId, (int) $params['id'])]);
+        });
+    }
+
+    /**
+     * Replace a service's plan templates.
+     *
+     * @param array<string, string> $params
+     */
+    public function putPlanTemplates(Request $request, array $params): Response
+    {
+        return $this->run($request, 'plans', function (int $tenantId) use ($request, $params): Response {
+            $this->services->find($tenantId, (int) $params['id']) ?? throw CalendarRejectedException::notFound('Service');
+            $templates = JsonBody::parsed($request)['templates'] ?? null;
+            if (!is_array($templates) || !array_is_list($templates)) {
+                throw new CalendarRejectedException('templates is a list', 422);
+            }
+
+            return Response::json(['data' => $this->booking->plans()->replaceTemplates($tenantId, (int) $params['id'], $templates)]);
+        });
+    }
+
     /**
      * The booking's id, when the caller may see its visit record: with
      * calendar:visit_notes, or as the person treating the customer. An agent

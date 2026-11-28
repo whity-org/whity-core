@@ -5676,6 +5676,17 @@ $router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/finish', [$ca
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/corrections', [$calendarHandler, 'correctVisit'], null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/bookings/{id:\d+}/visit/files',  [$calendarHandler, 'addVisitFile'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('GET',    '/api/calendar/visit-files/{id:\d+}',           [$calendarHandler, 'visitFile'],       null, null, CorePermissions::CALENDAR_READ);
+// WHIT-1444 (AP.22): treatment plans, and a service's plan templates.
+$router->register('GET',    '/api/calendar/plans',                          [$calendarHandler, 'listPlans'],       null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/plans',                          [$calendarHandler, 'createPlan'],      null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/plans/{id:\d+}',                 [$calendarHandler, 'getPlan'],         null, null, CorePermissions::CALENDAR_READ);
+$router->register('PATCH',  '/api/calendar/plans/{id:\d+}',                 [$calendarHandler, 'patchPlan'],       null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/plans/{id:\d+}/next',            [$calendarHandler, 'planNext'],        null, null, CorePermissions::CALENDAR_READ);
+$router->register('POST',   '/api/calendar/plans/{id:\d+}/book-next',       [$calendarHandler, 'planBookNext'],    null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('POST',   '/api/calendar/plans/{id:\d+}/book-all',        [$calendarHandler, 'planBookAll'],     null, null, CorePermissions::CALENDAR_WRITE);
+$router->register('GET',    '/api/calendar/bookings/{id:\d+}/plan',         [$calendarHandler, 'bookingPlan'],     null, null, CorePermissions::CALENDAR_READ);
+$router->register('GET',    '/api/calendar/services/{id:\d+}/plan-templates', [$calendarHandler, 'planTemplates'], null, null, CorePermissions::CALENDAR_READ);
+$router->register('PUT',    '/api/calendar/services/{id:\d+}/plan-templates', [$calendarHandler, 'putPlanTemplates'], null, null, CorePermissions::CALENDAR_MANAGE);
 // WHIT-1442 (AP.23): the waitlist.
 $router->register('GET',    '/api/calendar/waitlist',                       [$calendarHandler, 'listWaitlist'],    null, null, CorePermissions::CALENDAR_READ);
 $router->register('POST',   '/api/calendar/waitlist',                       [$calendarHandler, 'addWaitlist'],     null, null, CorePermissions::CALENDAR_WRITE);
